@@ -26,7 +26,7 @@ export const HorizontalScrollWrapper = ({ children, contentWidth = "400vw" }: Ho
     });
 
     // We map 0-1 progress to the total horizontal scrolling distance.
-    const totalSlides = 8; // Hero, Trust, About, Services, Portfolio, Pricing, Booking, Careers
+    const totalSlides = 9; // Hero, Trust, About, Services, Portfolio, START_PROJECT, Pricing, Booking, Careers
     // The total width of content is totalSlides * 100vw
     // We want to translate from 0 to -(totalSlides - 1) * 100vw
     const finalX = `-${(totalSlides - 1) * 100}vw`;
@@ -47,12 +47,16 @@ export const HorizontalScrollWrapper = ({ children, contentWidth = "400vw" }: Ho
     return (
         <>
             {/* 
-        This outer container provides the HEIGHT to allow vertical scrolling.
-        We use 'vh' to ensure consistent scroll length regardless of screen width.
-        300vh - 400vh is usually good to control speed. 
         Length should remain proportional to number of slides.
       */}
-            <div ref={scrollRef} style={{ height: contentWidth }} className="relative bg-custom-bg">
+            <div ref={scrollRef} style={{ height: `${totalSlides * 100}vh` }} className="relative bg-custom-bg">
+                {/* Scroll Snap Points - Center Aligned */}
+                <div className="absolute inset-0 flex flex-col pointer-events-none">
+                    {Array.from({ length: totalSlides }).map((_, i) => (
+                        <div key={i} className="h-[100vh] w-full snap-center" />
+                    ))}
+                </div>
+
                 <div className="sticky top-0 h-screen w-screen overflow-hidden">
                     <motion.div style={{ x }} className="flex h-full w-max">
                         {children}

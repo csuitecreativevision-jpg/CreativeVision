@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 html {
-  /* Scroll snap removed for smoother feel */
+  scroll-snap-type: y mandatory;
 }
 
 /* Set Poppins as default font */

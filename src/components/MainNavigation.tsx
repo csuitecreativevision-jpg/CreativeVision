@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { motion, useScroll, useMotionValueEvent } from 'framer-motion';
+import { motion, useScroll, useMotionValueEvent, AnimatePresence } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { MagneticButton } from './ui/MagneticButton';
@@ -15,28 +15,25 @@ interface MainNavigationProps {
 export default function MainNavigation({
   isMenuOpen,
   setIsMenuOpen,
-  onGetStarted,
-  onBack
+  onGetStarted: _,
+  onBack: __
 }: MainNavigationProps) {
-  const [hidden, setHidden] = useState(false);
+  const [isCompact, setIsCompact] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const { scrollY } = useScroll();
   const navigate = useNavigate();
   const location = useLocation();
 
   useMotionValueEvent(scrollY, "change", (latest) => {
-    const previous = scrollY.getPrevious() ?? 0;
-    if (latest > previous && latest > 150) {
-      setHidden(true);
-    } else {
-      setHidden(false);
-    }
+    const isScrollDown = latest > 50;
+    setIsCompact(isScrollDown);
   });
 
+  const isExpanded = !isCompact || isHovered || isMenuOpen;
+
   const scrollToSection = (sectionId: string) => {
-    // If not on homepage, navigate home first
     if (location.pathname !== '/') {
       navigate('/');
-      // Wait for navigation then scroll
       setTimeout(() => {
         const element = document.getElementById(sectionId);
         if (element) {
@@ -55,81 +52,119 @@ export default function MainNavigation({
 
   return (
     <motion.header
-      variants={{
-        visible: { y: 0, opacity: 1 },
-        hidden: { y: -100, opacity: 0 }
-      }}
-      animate={hidden ? "hidden" : "visible"}
-      transition={{ duration: 0.35, ease: "easeInOut" }}
       className="fixed top-6 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none"
     >
-      <nav className="pointer-events-auto flex items-center gap-2 p-2 rounded-full bg-black/40 backdrop-blur-xl border border-white/5 shadow-2xl shadow-black/20">
+      <motion.nav
+        layout
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        initial={false}
+        animate={{
+          width: isExpanded ? "auto" : "auto",
+          mixBlendMode: isExpanded ? "normal" : "difference"
+        }}
+        transition={{
+          type: "spring",
+          stiffness: 400,
+          damping: 30
+        }}
+        className={cn(
+          "pointer-events-auto flex items-center gap-2 p-2 rounded-full border shadow-2xl transition-colors duration-500",
+          isExpanded
+            ? "bg-black/60 backdrop-blur-xl border-white/10 shadow-black/20 pr-4"
+            : "bg-white/90 border-white/20 shadow-white/10 pr-2 pl-2"
+        )}
+      >
 
         {/* Logo Area */}
-        <div className="pl-4 pr-2 flex items-center gap-3">
+        <motion.div layout className="flex items-center gap-3 pl-2">
           <img
             src="/Untitled design (3).png"
             alt="Logo"
-            className="h-8 w-auto hover:rotate-12 transition-transform duration-500 cursor-pointer"
+            className="h-8 w-8 hover:rotate-12 transition-transform duration-500 cursor-pointer object-contain"
             onClick={() => scrollToSection('hero')}
           />
-          <button
-            onClick={() => scrollToSection('hero')}
-            className="text-lg font-bold tracking-tight text-white hidden sm:block"
-          >
-            CreativeVision
-          </button>
-        </div>
+          <AnimatePresence>
+            {isExpanded && (
+              <motion.button
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: "auto" }}
+                exit={{ opacity: 0, width: 0 }}
+                transition={{ duration: 0.2 }}
+                onClick={() => scrollToSection('hero')}
+                className="text-lg font-bold tracking-tight text-white whitespace-nowrap overflow-hidden"
+              >
+                CreativeVision
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </motion.div>
 
-        {/* Divider */}
-        <div className="h-6 w-[1px] bg-white/10 hidden md:block" />
-
-        {/* Desktop Links */}
-        <div className="hidden md:flex items-center gap-1">
-          <NavButton onClick={() => scrollToSection('about')}>About</NavButton>
-          <NavButton onClick={() => scrollToSection('services')}>Services</NavButton>
-          <NavButton onClick={() => scrollToSection('portfolio')}>Work</NavButton>
-          <NavButton onClick={() => scrollToSection('pricing')}>Pricing</NavButton>
-          <NavButton onClick={() => scrollToSection('careers')}>Careers</NavButton>
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-2 pl-2">
-          <MagneticButton>
-            <button
-              onClick={() => scrollToSection('pricing')}
-              className="px-5 py-2.5 rounded-full bg-white text-black text-sm font-semibold hover:bg-gray-200 transition-colors"
+        {/* Actions & Links - Only visible when expanded */}
+        <AnimatePresence>
+          {isExpanded && (
+            <motion.div
+              initial={{ opacity: 0, width: 0 }}
+              animate={{ opacity: 1, width: "auto" }}
+              exit={{ opacity: 0, width: 0 }}
+              className="flex items-center overflow-hidden"
             >
-              Start Project
-            </button>
-          </MagneticButton>
+              {/* Divider */}
+              <div className="h-6 w-[1px] bg-white/10 hidden md:block mx-3" />
 
-          <button
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="p-3 rounded-full bg-white/5 hover:bg-white/10 text-white md:hidden transition-colors"
-          >
-            {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
-        </div>
-      </nav>
+              {/* Desktop Links */}
+              <div className="hidden md:flex items-center gap-1">
+                <NavButton onClick={() => scrollToSection('about')}>About</NavButton>
+                <NavButton onClick={() => scrollToSection('services')}>Services</NavButton>
+                <NavButton onClick={() => scrollToSection('portfolio')}>Work</NavButton>
+                <NavButton onClick={() => scrollToSection('pricing')}>Pricing</NavButton>
+                <NavButton onClick={() => scrollToSection('careers')}>Careers</NavButton>
+              </div>
+
+              {/* CTA */}
+              <div className="flex items-center gap-2 pl-3">
+                <MagneticButton>
+                  <button
+                    onClick={() => scrollToSection('pricing')}
+                    className="px-5 py-2.5 rounded-full bg-white text-black text-sm font-semibold hover:bg-gray-200 transition-colors whitespace-nowrap"
+                  >
+                    Start Project
+                  </button>
+                </MagneticButton>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Mobile Toggle */}
+        <button
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+          className="p-2 rounded-full hover:bg-white/10 md:hidden ml-auto"
+        >
+          {isMenuOpen ? <X className={cn("w-5 h-5", isExpanded ? "text-white" : "text-black")} /> : <Menu className={cn("w-5 h-5", isExpanded ? "text-white" : "text-black")} />}
+        </button>
+
+      </motion.nav>
 
       {/* Mobile Menu Overlay */}
-      {isMenuOpen && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          className="pointer-events-auto absolute top-20 left-4 right-4 p-4 rounded-2xl bg-[#0a0a0a]/95 backdrop-blur-2xl border border-white/10 flex flex-col gap-2"
-        >
-          <MobileNavLink onClick={() => scrollToSection('about')}>About</MobileNavLink>
-          <MobileNavLink onClick={() => scrollToSection('services')}>Services</MobileNavLink>
-          <MobileNavLink onClick={() => scrollToSection('portfolio')}>Work</MobileNavLink>
-          <MobileNavLink onClick={() => scrollToSection('pricing')}>Pricing</MobileNavLink>
-          <MobileNavLink onClick={() => scrollToSection('careers')}>Careers</MobileNavLink>
-          <div className="h-[1px] bg-white/10 my-2" />
-          <MobileNavLink onClick={() => scrollToSection('pricing')} primary>Start Project</MobileNavLink>
-        </motion.div>
-      )}
+      <AnimatePresence>
+        {isMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: -20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: -20 }}
+            className="pointer-events-auto absolute top-20 left-4 right-4 p-4 rounded-2xl bg-[#0a0a0a]/95 backdrop-blur-2xl border border-white/10 flex flex-col gap-2 shadow-2xl"
+          >
+            <MobileNavLink onClick={() => scrollToSection('about')}>About</MobileNavLink>
+            <MobileNavLink onClick={() => scrollToSection('services')}>Services</MobileNavLink>
+            <MobileNavLink onClick={() => scrollToSection('portfolio')}>Work</MobileNavLink>
+            <MobileNavLink onClick={() => scrollToSection('pricing')}>Pricing</MobileNavLink>
+            <MobileNavLink onClick={() => scrollToSection('careers')}>Careers</MobileNavLink>
+            <div className="h-[1px] bg-white/10 my-2" />
+            <MobileNavLink onClick={() => scrollToSection('pricing')} primary>Start Project</MobileNavLink>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </motion.header>
   );

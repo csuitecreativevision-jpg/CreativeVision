@@ -5,6 +5,7 @@ import Services from './Services';
 import Portfolio from './Portfolio';
 import MainNavigation from './MainNavigation';
 import PricingSection from './PricingSection';
+import StartProjectSection from './StartProjectSection';
 import BookingSection from './BookingSection';
 import CareersSection from './CareersSection';
 import TrustSignals from './sections/TrustSignals';
@@ -72,6 +73,10 @@ export default function HomePage() {
         <Portfolio onGetStarted={() => scrollToSection('pricing')} />
       </Slide>
 
+      <Slide className="start-project-slide">
+        <StartProjectSection id="start-project" onViewPackages={() => scrollToSection('pricing')} />
+      </Slide>
+
       <Slide className="pricing-slide">
         <PricingSection id="pricing" />
       </Slide>
@@ -88,12 +93,12 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen text-white relative bg-[#050511]">
-      <MainNavigation
+      {/* <MainNavigation
         isMenuOpen={isMenuOpen}
         setIsMenuOpen={setIsMenuOpen}
         onGetStarted={() => scrollToSection('pricing')}
         onBack={() => { }}
-      />
+      /> */}
 
       {isMobile ? (
         <main className="flex flex-col">
@@ -101,7 +106,9 @@ export default function HomePage() {
           <About />
           <Services onGetStarted={() => scrollToSection('pricing')} onJoinTeam={() => scrollToSection('careers')} />
           <Portfolio onGetStarted={() => scrollToSection('pricing')} />
+          <StartProjectSection id="start-project" onViewPackages={() => scrollToSection('pricing')} />
           <PricingSection id="pricing" />
+          <BookingSection id="booking" />
           <CareersSection id="careers" />
         </main>
       ) : (

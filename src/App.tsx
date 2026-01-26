@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 
 import { BackgroundLayout } from './components/layout/BackgroundLayout';
+import { CinematicOverlay } from './components/ui/CinematicOverlay';
+import { Preloader } from './components/ui/Preloader';
 import HomePage from './components/HomePage';
 import HireUsPage from './components/HireUsPage';
 import JoinTeamPage from './components/JoinTeamPage';
@@ -25,6 +27,9 @@ export default function App() {
 
   return (
     <BackgroundLayout>
+      <Preloader />
+      <CinematicOverlay />
+      {/* Main Routing */}
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/hire" element={<HireUsPage onBack={handleBack} />} />
