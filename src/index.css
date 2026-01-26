@@ -9,10 +9,10 @@ body {
 
 /* Premium Glass Effects */
 .glass-premium {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .backdrop-blur-premium {
@@ -20,21 +20,30 @@ body {
   -webkit-backdrop-filter: blur(24px);
 }
 
+/* Typography Utilities */
+.text-gradient-primary {
+  background: linear-gradient(135deg, #a855f7 0%, #8b5cf6 30%, #7c3aed 60%, #6366f1 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent; /* Fallback */
+}
+
 /* Enhanced Glow Effects */
 .glow-purple {
-  box-shadow: 0 0 20px rgba(116, 36, 245, 0.3), 0 0 40px rgba(116, 36, 245, 0.2);
+  @apply shadow-glow-sm;
 }
 
 .glow-purple-intense {
-  box-shadow: 0 0 30px rgba(116, 36, 245, 0.5), 0 0 60px rgba(116, 36, 245, 0.3), 0 0 90px rgba(116, 36, 245, 0.1);
+  @apply shadow-glow-md;
 }
 
 .text-glow {
-  text-shadow: 0 0 40px rgba(116, 36, 245, 0.15), 0 0 80px rgba(116, 36, 245, 0.1), 0 0 120px rgba(116, 36, 245, 0.05);
+  text-shadow: 0 0 40px rgba(116, 36, 245, 0.25);
 }
 
 .glow-text {
-  text-shadow: 0 0 20px rgba(116, 36, 245, 0.6), 0 0 40px rgba(116, 36, 245, 0.4), 0 0 60px rgba(116, 36, 245, 0.2);
+  text-shadow: 0 0 20px rgba(116, 36, 245, 0.6);
 }
 
 /* Enhanced Shadow Effects */

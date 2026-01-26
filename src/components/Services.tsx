@@ -1,6 +1,8 @@
 import React from 'react';
-import { Briefcase, Users, ArrowRight } from 'lucide-react';
-import { useScrollAnimation } from '../hooks/useScrollAnimation';
+import { Briefcase, Users, ArrowRight, Star, Zap } from 'lucide-react';
+import { SpotlightCard } from './ui/SpotlightCard';
+import { RevealText } from './ui/RevealText';
+import { MagneticButton } from './ui/MagneticButton';
 
 interface ServicesProps {
   onGetStarted: () => void;
@@ -8,148 +10,109 @@ interface ServicesProps {
 }
 
 export default function Services({ onGetStarted, onJoinTeam }: ServicesProps) {
-  const visibleSections = useScrollAnimation();
-
   return (
-    <section id="services" className="py-24 px-6" style={{backgroundColor: '#100024'}}>
-      <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-16">
-          <h2 
-            id="services-title"
-            data-animate
-            className="text-5xl md:text-6xl font-poppins font-bold text-white mb-6 text-glow"
-            style={{
-              opacity: visibleSections.has('services-title') ? 1 : 0,
-              transform: visibleSections.has('services-title') 
-                ? 'translateY(0px)' 
-                : 'translateY(30px)',
-              transition: 'all 1s cubic-bezier(0.4, 0, 0.2, 1)'
-            }}
-          >
-            Choose Your
-            <span style={{background: 'linear-gradient(135deg, #7424f5 0%, #581cd9 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text'}}> Path</span>
-          </h2>
-          <p 
-            id="services-subtitle"
-            data-animate
-            className="text-xl text-gray-300 max-w-3xl mx-auto"
-            style={{
-              opacity: visibleSections.has('services-subtitle') ? 1 : 0,
-              transform: visibleSections.has('services-subtitle') 
-                ? 'translateY(0px)' 
-                : 'translateY(30px)',
-              transition: 'all 1s cubic-bezier(0.4, 0, 0.2, 1) 200ms'
-            }}
-          >
-            Whether you're looking to elevate your content or join our creative team, we have the perfect path for you.
+    <section id="services" className="relative py-32 px-6 overflow-hidden">
+      {/* Background Ambience */}
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-custom-purple/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-custom-blue/10 rounded-full blur-[120px] pointer-events-none" />
+
+      <div className="max-w-7xl mx-auto relative z-10">
+        <div className="flex flex-col md:flex-row justify-between items-end mb-24 gap-8">
+          <div>
+            <RevealText classNameWrapper="mb-4">
+              <span className="text-custom-bright font-medium tracking-widest text-sm uppercase">Our Expertise</span>
+            </RevealText>
+            <h2 className="text-5xl md:text-7xl font-bold text-white leading-tight">
+              <RevealText delay={0.1}>Cinematic</RevealText> <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-custom-bright to-white">
+                <RevealText delay={0.2}>Precision.</RevealText>
+              </span>
+            </h2>
+          </div>
+          <p className="max-w-md text-gray-400 text-lg leading-relaxed mb-4">
+            We don't just edit videos. We engineer attention. Choose your path to excellence below.
           </p>
         </div>
 
-        <div 
-          id="services-cards"
-          data-animate
-          className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto"
-          style={{
-            opacity: visibleSections.has('services-cards') ? 1 : 0,
-            transform: visibleSections.has('services-cards') 
-              ? 'translateY(0px)' 
-              : 'translateY(30px)',
-            transition: 'all 1s cubic-bezier(0.4, 0, 0.2, 1) 400ms'
-          }}
-        >
-          {/* Hire Us Card */}
-          <div className="group relative rounded-3xl p-8 glass-premium shadow-depth hover-glow transition-all duration-500 border overflow-hidden" style={{borderColor: '#3a14b7'}}>
-            {/* Gradient Background */}
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{background: 'linear-gradient(135deg, rgba(116, 36, 245, 0.1) 0%, rgba(88, 28, 217, 0.1) 100%)'}}></div>
-            
-            {/* Floating Elements */}
-            <div className="absolute -top-4 -right-4 w-24 h-24 rounded-full blur-xl group-hover:scale-150 transition-transform duration-700 glow-purple" style={{background: 'radial-gradient(circle, rgba(116, 36, 245, 0.3) 0%, rgba(88, 28, 217, 0.2) 100%)'}}></div>
-            
-            <div className="relative z-10">
-              <div className="mb-6">
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 glow-purple-intense" style={{background: 'linear-gradient(135deg, #3a14b7 0%, #7424f5 100%)'}}>
-                  <Briefcase className="w-8 h-8 text-white" />
-                </div>
-                <h3 className="text-2xl font-poppins font-bold text-white mb-2">Hire Us</h3>
-                <p className="text-gray-100 leading-relaxed">
-                  Ready to transform your raw footage into cinematic masterpieces? Let our expert team bring your vision to life with professional-grade editing services.
-                </p>
-              </div>
-              
-              <div className="space-y-3 mb-8">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full" style={{background: 'linear-gradient(135deg, #7424f5 0%, #581cd9 100%)'}}></div>
-                  <span className="text-sm text-gray-200">Professional video editing</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full" style={{background: 'linear-gradient(135deg, #7424f5 0%, #581cd9 100%)'}}></div>
-                  <span className="text-sm text-gray-200">24-hour turnaround available</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full" style={{background: 'linear-gradient(135deg, #7424f5 0%, #581cd9 100%)'}}></div>
-                  <span className="text-sm text-gray-200">Unlimited revisions included</span>
-                </div>
-              </div>
-              
-              <button 
-                onClick={onGetStarted}
-                className="w-full button-premium px-6 py-4 text-white font-poppins font-semibold rounded-xl shadow-depth glow-purple-intense overflow-hidden" style={{background: 'linear-gradient(135deg, #3a14b7 0%, #7424f5 100%)'}}>
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{background: 'linear-gradient(135deg, #581cd9 0%, #7424f5 100%)'}}></div>
-                <span className="relative flex items-center justify-center gap-2">
-                  Get Started Now
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
-                </span>
-              </button>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Hire Us - Large Card */}
+          <SpotlightCard className="rounded-3xl bg-white/5 p-8 md:p-12 border-white/10 relative overflow-hidden flex flex-col justify-between min-h-[500px]">
+            <div className="absolute flex top-0 right-0 p-8 opacity-20">
+              <Briefcase className="w-64 h-64 text-custom-bright -mr-20 -mt-20 transform rotate-12" />
             </div>
-          </div>
 
-          {/* Join Our Team Card */}
-          <div className="group relative rounded-3xl p-8 glass-premium shadow-depth hover-glow transition-all duration-500 border overflow-hidden" style={{borderColor: '#3a14b7'}}>
-            {/* Gradient Background */}
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{background: 'linear-gradient(135deg, rgba(88, 28, 217, 0.1) 0%, rgba(116, 36, 245, 0.1) 100%)'}}></div>
-            
-            {/* Floating Elements */}
-            <div className="absolute -top-4 -left-4 w-24 h-24 rounded-full blur-xl group-hover:scale-150 transition-transform duration-700 glow-purple" style={{background: 'radial-gradient(circle, rgba(88, 28, 217, 0.3) 0%, rgba(116, 36, 245, 0.2) 100%)'}}></div>
-            
             <div className="relative z-10">
-              <div className="mb-6">
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 glow-purple-intense" style={{background: 'linear-gradient(135deg, #581cd9 0%, #7424f5 100%)'}}>
-                  <Users className="w-8 h-8 text-white" />
-                </div>
-                <h3 className="text-2xl font-poppins font-bold text-white mb-2">Join Our Team</h3>
-                <p className="text-gray-100 leading-relaxed">
-                  Are you a talented video editor looking to join a dynamic creative team? Become part of our mission to create exceptional visual content that captivates audiences.
-                </p>
+              <div className="w-16 h-16 rounded-2xl bg-custom-bright/20 flex items-center justify-center mb-8 backdrop-blur-md border border-white/10">
+                <Zap className="w-8 h-8 text-custom-bright" />
               </div>
-              
-              <div className="space-y-3 mb-8">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full" style={{background: 'linear-gradient(135deg, #581cd9 0%, #7424f5 100%)'}}></div>
-                  <span className="text-sm text-gray-200">Remote-first work environment</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full" style={{background: 'linear-gradient(135deg, #581cd9 0%, #7424f5 100%)'}}></div>
-                  <span className="text-sm text-gray-200">Competitive compensation</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full" style={{background: 'linear-gradient(135deg, #581cd9 0%, #7424f5 100%)'}}></div>
-                  <span className="text-sm text-gray-200">Creative growth opportunities</span>
-                </div>
-              </div>
-              
-              <button 
-                onClick={onJoinTeam}
-                className="w-full button-premium px-6 py-4 text-white font-poppins font-semibold rounded-xl shadow-depth glow-purple-intense overflow-hidden" style={{background: 'linear-gradient(135deg, #581cd9 0%, #7424f5 100%)'}}>
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{background: 'linear-gradient(135deg, #7424f5 0%, #581cd9 100%)'}}></div>
-                <span className="relative flex items-center justify-center gap-2">
-                  Apply Today
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
-                </span>
-              </button>
+              <h3 className="text-4xl font-bold text-white mb-4">Hire CreativeVision</h3>
+              <p className="text-gray-400 text-lg max-w-sm">
+                Transform your raw footage into high-converting assets. Professional turnaround, unlimited revisions.
+              </p>
             </div>
-          </div>
+
+            <div className="relative z-10 mt-12">
+              <div className="grid grid-cols-2 gap-4 mb-8">
+                <FeatureItem text="4K Post-Production" />
+                <FeatureItem text="Sound Design" />
+                <FeatureItem text="Color Grading" />
+                <FeatureItem text="VFX & Motion" />
+              </div>
+
+              <MagneticButton className="w-full">
+                <button
+                  onClick={onGetStarted}
+                  className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-100 transition-colors flex items-center justify-center gap-2 group"
+                >
+                  Start Project <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </button>
+              </MagneticButton>
+            </div>
+          </SpotlightCard>
+
+          {/* Join Team - Large Card */}
+          <SpotlightCard className="rounded-3xl bg-custom-purple/20 p-8 md:p-12 border-white/10 relative overflow-hidden flex flex-col justify-between min-h-[500px]">
+            <div className="absolute flex top-0 right-0 p-8 opacity-20">
+              <Users className="w-64 h-64 text-white -mr-20 -mt-20 transform -rotate-12" />
+            </div>
+
+            <div className="relative z-10">
+              <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center mb-8 backdrop-blur-md border border-white/10">
+                <Star className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-4xl font-bold text-white mb-4">Join The Roster</h3>
+              <p className="text-gray-300 text-lg max-w-sm">
+                Are you a world-class editor? Join our distributed team of creatives working on top-tier projects.
+              </p>
+            </div>
+
+            <div className="relative z-10 mt-12">
+              <div className="grid grid-cols-2 gap-4 mb-8 text-gray-300">
+                <FeatureItem text="Remote First" />
+                <FeatureItem text="Global Clients" />
+                <FeatureItem text="Fair Pay" />
+                <FeatureItem text="Creative Freedom" />
+              </div>
+
+              <MagneticButton className="w-full">
+                <button
+                  onClick={onJoinTeam}
+                  className="w-full py-4 bg-transparent border border-white/20 text-white font-bold rounded-xl hover:bg-white/10 transition-colors flex items-center justify-center gap-2 group"
+                >
+                  Apply Now <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </button>
+              </MagneticButton>
+            </div>
+          </SpotlightCard>
         </div>
       </div>
     </section>
   );
 }
+
+const FeatureItem = ({ text }: { text: string }) => (
+  <div className="flex items-center gap-2">
+    <div className="w-1.5 h-1.5 rounded-full bg-custom-bright" />
+    <span className="text-sm font-medium">{text}</span>
+  </div>
+);

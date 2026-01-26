@@ -1,75 +1,99 @@
-import React from 'react';
-import { ArrowRight } from 'lucide-react';
+import React, { useRef } from 'react';
+import { motion, useScroll, useTransform } from 'framer-motion';
+import { ArrowRight, Play } from 'lucide-react';
+import { MagneticButton } from './ui/MagneticButton';
+import { RevealText } from './ui/RevealText';
 
 interface HeroProps {
   onGetStarted: () => void;
 }
 
 export default function Hero({ onGetStarted }: HeroProps) {
-  return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-24 pb-12 px-4" style={{backgroundColor: '#100024'}}>
-      {/* Abstract Background Elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -left-40 w-80 h-80 rounded-full opacity-40 blur-3xl animate-pulse glow-purple" style={{background: 'radial-gradient(circle, #7424f5 0%, #581cd9 100%)'}}></div>
-        <div className="absolute -bottom-40 -right-40 w-96 h-96 rounded-full opacity-30 blur-3xl animate-pulse delay-1000 glow-purple" style={{background: 'radial-gradient(circle, #581cd9 0%, #3a14b7 100%)'}}></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full opacity-25 blur-2xl animate-pulse delay-500 glow-purple" style={{background: 'radial-gradient(circle, #3a14b7 0%, #01077c 100%)'}}></div>
-        
-        {/* Cinematic particles */}
-        <div className="absolute top-0 left-1/4 w-1 h-1 rounded-full particle animation-delay-200" style={{backgroundColor: '#7424f5'}}></div>
-        <div className="absolute top-0 right-1/3 w-1 h-1 rounded-full particle animation-delay-400" style={{backgroundColor: '#581cd9'}}></div>
-        <div className="absolute top-0 left-2/3 w-1 h-1 rounded-full particle animation-delay-600" style={{backgroundColor: '#3a14b7'}}></div>
-      </div>
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { scrollY } = useScroll();
+  const opacity = useTransform(scrollY, [0, 300], [1, 0]);
 
-      <div className="relative z-10 text-center w-full animate-fade-in-up">
-        <h1 className="text-6xl md:text-8xl font-poppins font-bold text-white mb-8 md:mb-6 leading-tight text-glow">
-          {/* Mobile layout - stacked lines */}
-          <span className="block md:hidden px-2">
-            <span className="block">Elevating</span>
-            <span className="block">Your Brand</span>
-            <span className="block">One Pixel</span>
-            <span className="block" style={{background: 'linear-gradient(135deg, #a855f7 0%, #8b5cf6 30%, #7c3aed 60%, #6366f1 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text'}}>
-              at a Time
-            </span>
-          </span>
-          
-          {/* Desktop layout - 2 lines */}
-          <span className="hidden md:block">
-            <span className="block">Elevating Your Brand</span>
-            <span className="block" style={{background: 'linear-gradient(135deg, #a855f7 0%, #8b5cf6 30%, #7c3aed 60%, #6366f1 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text'}}>
-              One Pixel at a Time
-            </span>
-          </span>
+  return (
+    <section ref={containerRef} className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
+
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-6 flex flex-col items-center text-center">
+
+        {/* Label */}
+        <RevealText delay={0.2} classNameWrapper="mb-6">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 backdrop-blur-md">
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-xs uppercase tracking-widest text-gray-300 font-medium">Available for new projects</span>
+          </div>
+        </RevealText>
+
+        {/* Headline */}
+        <h1 className="text-6xl md:text-8xl lg:text-9xl font-bold tracking-tight text-white mb-8 leading-[0.9]">
+          <div className="overflow-hidden">
+            <RevealText delay={0.4} direction="up" className="block">
+              Visuals That
+            </RevealText>
+          </div>
+          <div className="overflow-hidden">
+            <RevealText delay={0.5} direction="up" className="block text-transparent bg-clip-text bg-gradient-to-r from-custom-bright via-white to-custom-violet">
+              Transcend
+            </RevealText>
+          </div>
+          <div className="overflow-hidden">
+            <RevealText delay={0.6} direction="up" className="block">
+              Reality.
+            </RevealText>
+          </div>
         </h1>
 
-        <p className="text-lg md:text-2xl text-gray-100 mb-12 max-w-4xl mx-auto leading-relaxed animate-fade-in-up animation-delay-600 px-4">
-          We Deliver <span className="font-bold" style={{background: 'linear-gradient(135deg, #a855f7 0%, #8b5cf6 30%, #7c3aed 60%, #6366f1 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text'}}>Quality and Creativity</span> in Every Frame
-          <br />
-          — Because <span className="font-bold" style={{background: 'linear-gradient(135deg, #a855f7 0%, #8b5cf6 30%, #7c3aed 60%, #6366f1 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text'}}>YOUR STORY</span> Deserves the Best.
-        </p>
+        {/* Subline */}
+        <motion.p
+          style={{ opacity }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8, duration: 1 }}
+          className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-12 leading-relaxed"
+        >
+          We are a premium video agency crafting cinematic experiences.
+          From concept to final cut, we elevate your brand's narrative.
+        </motion.p>
 
-        <div className="flex flex-col sm:flex-row gap-6 justify-center animate-fade-in-up animation-delay-600 px-4">
-          <button 
-            onClick={() => {
-              const element = document.getElementById('services');
-              if (element) {
-                element.scrollIntoView({ behavior: 'smooth' });
-              }
-            }}
-            className="group button-premium px-8 py-4 text-white font-poppins font-semibold rounded-full shadow-depth glow-purple-intense overflow-hidden max-w-xs sm:max-w-none mx-auto" 
-            style={{background: 'linear-gradient(135deg, #3a14b7 0%, #7424f5 100%)'}}
-          >
-            <span className="relative flex items-center gap-2">
-              Get Started
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
-            </span>
-          </button>
-        </div>
+        {/* Actions */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1, duration: 1 }}
+          className="flex flex-col sm:flex-row items-center gap-6"
+        >
+          <MagneticButton strength={0.4} onClick={onGetStarted}>
+            <button className="group relative px-8 py-4 bg-white text-black font-semibold rounded-full overflow-hidden transition-all hover:scale-105">
+              <div className="absolute inset-0 bg-gradient-to-r from-gray-200 to-white opacity-0 group-hover:opacity-100 transition-opacity" />
+              <span className="relative flex items-center gap-2">
+                Start Project <ArrowRight className="w-4 h-4" />
+              </span>
+            </button>
+          </MagneticButton>
+
+          <MagneticButton strength={0.2}>
+            <button className="px-8 py-4 text-white font-medium hover:text-custom-bright transition-colors flex items-center gap-3 group">
+              <div className="w-10 h-10 rounded-full border border-white/20 flex items-center justify-center group-hover:border-custom-bright/50 transition-colors">
+                <Play className="w-4 h-4 fill-white group-hover:fill-custom-bright transition-colors" />
+              </div>
+              <span className="uppercase tracking-wide text-sm">View Reel</span>
+            </button>
+          </MagneticButton>
+        </motion.div>
       </div>
 
-      {/* Floating Elements */}
-      <div className="absolute top-20 left-20 w-3 h-3 rounded-full float-animation delay-300 glow-purple" style={{backgroundColor: '#7424f5'}}></div>
-      <div className="absolute bottom-32 right-32 w-2 h-2 rounded-full float-animation delay-700 glow-purple" style={{backgroundColor: '#581cd9'}}></div>
-      <div className="absolute top-1/3 right-20 w-4 h-4 rounded-full float-rotate glow-purple-intense" style={{background: 'linear-gradient(135deg, #7424f5 0%, #581cd9 100%)'}}></div>
+      {/* Scroll Indicator */}
+      <motion.div
+        style={{ opacity }}
+        animate={{ y: [0, 10, 0] }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
+      >
+        <span className="text-[10px] uppercase tracking-[0.2em] text-gray-500">Scroll</span>
+        <div className="w-[1px] h-12 bg-gradient-to-b from-gray-500 to-transparent" />
+      </motion.div>
     </section>
   );
 }

@@ -1,142 +1,83 @@
 import React from 'react';
-import { Award, Play, Users } from 'lucide-react';
+import { Play, Users, Clock } from 'lucide-react';
 import CountingNumber from './CountingNumber';
-import { useScrollAnimation } from '../hooks/useScrollAnimation';
+import { RevealText } from './ui/RevealText';
+import { SpotlightCard } from './ui/SpotlightCard';
 
 export default function About() {
-  const visibleSections = useScrollAnimation();
-
   return (
-    <section id="about" className="py-24 px-6" style={{backgroundColor: '#100024'}}>
-      <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-16">
-          <div 
-            id="about-header"
-            data-animate
-            className="mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-full glass-premium shadow-cinematic hover:shadow-cinematic-lg hover-glow transition-all duration-300"
-            style={{
-              opacity: visibleSections.has('about-header') ? 1 : 0,
-              transform: visibleSections.has('about-header') 
-                ? 'translateY(0px)' 
-                : 'translateY(30px)',
-              transition: 'all 1s cubic-bezier(0.4, 0, 0.2, 1)'
-            }}
-          >
-            <Award className="w-4 h-4" style={{color: '#7424f5'}} />
-            <span className="text-sm font-medium" style={{color: '#7424f5'}}>About Creative Vision</span>
-          </div>
-          
-          <h2 
-            id="about-title"
-            data-animate
-            className="text-5xl md:text-6xl font-poppins font-bold text-white mb-8 text-glow"
-            style={{
-              opacity: visibleSections.has('about-title') ? 1 : 0,
-              transform: visibleSections.has('about-title') 
-                ? 'translateY(0px)' 
-                : 'translateY(30px)',
-              transition: 'all 1s cubic-bezier(0.4, 0, 0.2, 1) 200ms'
-            }}
-          >
-            Crafting Visual
-            <span style={{background: 'linear-gradient(135deg, #7424f5 0%, #581cd9 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text'}}> Stories</span>
-          </h2>
-        </div>
+    <section id="about" className="py-32 px-6 border-t border-white/5">
+      <div className="max-w-7xl mx-auto">
+        <div className="grid md:grid-cols-2 gap-16 items-center mb-24">
+          <div>
+            <RevealText classNameWrapper="mb-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10">
+                <div className="w-1.5 h-1.5 rounded-full bg-custom-bright" />
+                <span className="text-xs font-medium text-gray-300">About Us</span>
+              </div>
+            </RevealText>
 
-        <div className="grid md:grid-cols-2 gap-16 items-center">
-          <div 
-            id="about-content"
-            data-animate
-            className="space-y-6"
-            style={{
-              opacity: visibleSections.has('about-content') ? 1 : 0,
-              transform: visibleSections.has('about-content') 
-                ? 'translateY(0px)' 
-                : 'translateY(30px)',
-              transition: 'all 1s cubic-bezier(0.4, 0, 0.2, 1) 400ms'
-            }}
-          >
-            <p className="text-lg text-gray-300 leading-relaxed">
-              CreativeVision is a dedicated video editing agency that turns raw footage into engaging, professional-quality edits. Our mission is to bring stories to life with creativity and precision — whether short-form, long-form, or promotional content.
-            </p>
-            
-            <p className="text-lg text-gray-300 leading-relaxed">
-              With years of experience in the industry, we understand that every frame matters. Our team of skilled editors combines technical expertise with artistic vision to deliver content that not only meets but exceeds expectations.
+            <h2 className="text-4xl md:text-6xl font-bold text-white mb-6 leading-tight">
+              Crafting Visual <br />
+              <span className="text-custom-purple">Stories.</span>
+            </h2>
+
+            <p className="text-gray-400 text-lg leading-relaxed mb-8">
+              CreativeVision is more than an editing house. We are your post-production partner, turning raw footage into compelling narratives that drive results.
             </p>
 
-            <div className="grid grid-cols-3 gap-6 pt-8">
-              <div className="text-center">
-                <div className="text-3xl font-poppins font-bold" style={{background: 'linear-gradient(135deg, #7424f5 0%, #581cd9 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text'}}>
-                  <CountingNumber target={5000} suffix="+" />
-                </div>
-                <div className="text-sm text-gray-400 mt-1">Projects Completed</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-poppins font-bold" style={{background: 'linear-gradient(135deg, #7424f5 0%, #581cd9 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text'}}>98%</div>
-                <div className="text-sm text-gray-400 mt-1">Client Satisfaction</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-poppins font-bold" style={{background: 'linear-gradient(135deg, #7424f5 0%, #581cd9 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text'}}>
-                  <CountingNumber target={24} suffix="h" />
-                </div>
-                <div className="text-sm text-gray-400 mt-1">Average Turnaround</div>
-              </div>
+            <div className="grid grid-cols-3 gap-8">
+              <StatItem number={5000} suffix="+" label="Projects" />
+              <StatItem number={98} suffix="%" label="Satisfaction" />
+              <StatItem number={24} suffix="h" label="Turnaround" />
             </div>
           </div>
 
-          <div 
-            id="about-features"
-            data-animate
-            className="relative"
-            style={{
-              opacity: visibleSections.has('about-features') ? 1 : 0,
-              transform: visibleSections.has('about-features') 
-                ? 'translateY(0px)' 
-                : 'translateY(30px)',
-              transition: 'all 1s cubic-bezier(0.4, 0, 0.2, 1) 600ms'
-            }}
-          >
-            <div className="relative rounded-3xl p-8 glass-premium shadow-depth hover-glow transition-all duration-500 border" style={{borderColor: '#3a14b7'}}>
-              <div className="absolute inset-0 rounded-3xl" style={{background: 'linear-gradient(135deg, rgba(58, 20, 183, 0.2) 0%, rgba(116, 36, 245, 0.1) 100%)'}}></div>
-              <div className="relative space-y-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center glow-purple" style={{background: 'linear-gradient(135deg, #3a14b7 0%, #7424f5 100%)'}}>
-                    <Play className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="font-poppins font-semibold text-white">Premium Quality</h3>
-                    <p className="text-sm text-gray-200">Cinema-grade editing standards</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center glow-purple" style={{background: 'linear-gradient(135deg, #3a14b7 0%, #7424f5 100%)'}}>
-                    <Users className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="font-poppins font-semibold text-white">Expert Team</h3>
-                    <p className="text-sm text-gray-200">Skilled professionals with industry experience</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center glow-purple" style={{background: 'linear-gradient(135deg, #3a14b7 0%, #7424f5 100%)'}}>
-                    <Award className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="font-poppins font-semibold text-white">Fast Delivery</h3>
-                    <p className="text-sm text-gray-200">Quick turnaround without compromising quality</p>
-                  </div>
-                </div>
+          <div className="relative">
+            <div className="absolute -inset-4 bg-gradient-to-r from-custom-purple to-custom-blue rounded-3xl opacity-20 blur-2xl" />
+            <SpotlightCard className="relative rounded-3xl bg-black/40 border-white/10 p-8 backdrop-blur-xl">
+              <div className="space-y-8">
+                <FeatureRow
+                  icon={<Play className="w-5 h-5 text-white" />}
+                  title="Premium Quality"
+                  desc="Cinema-grade color grading and sound design."
+                />
+                <FeatureRow
+                  icon={<Users className="w-5 h-5 text-white" />}
+                  title="Expert Team"
+                  desc="Curated roster of top-tier editors."
+                />
+                <FeatureRow
+                  icon={<Clock className="w-5 h-5 text-white" />}
+                  title="Fast Delivery"
+                  desc="Rapid turnaround without compromising quality."
+                />
               </div>
-            </div>
-            
-            {/* Floating decoration */}
-            <div className="absolute -top-6 -right-6 w-12 h-12 rounded-full float-animation glow-purple-intense" style={{background: 'linear-gradient(135deg, #7424f5 0%, #581cd9 100%)'}}></div>
-            <div className="absolute -bottom-4 -left-4 w-8 h-8 rounded-full float-rotate glow-purple" style={{background: 'linear-gradient(135deg, #581cd9 0%, #7424f5 100%)'}}></div>
+            </SpotlightCard>
           </div>
         </div>
       </div>
     </section>
   );
 }
+
+const StatItem = ({ number, suffix, label }: { number: number, suffix: string, label: string }) => (
+  <div>
+    <div className="text-3xl font-bold text-white mb-1 flex items-baseline">
+      <CountingNumber target={number} suffix={suffix} />
+    </div>
+    <div className="text-sm text-gray-500 uppercase tracking-wider">{label}</div>
+  </div>
+);
+
+const FeatureRow = ({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) => (
+  <div className="flex gap-4">
+    <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+      {icon}
+    </div>
+    <div>
+      <h3 className="text-white font-bold text-lg mb-1">{title}</h3>
+      <p className="text-gray-400 text-sm">{desc}</p>
+    </div>
+  </div>
+);

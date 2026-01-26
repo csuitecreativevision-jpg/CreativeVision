@@ -1,49 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useInView, useSpring, useMotionValue } from 'framer-motion';
 
 interface CountingNumberProps {
   target: number;
-  duration?: number;
   suffix?: string;
 }
 
-const CountingNumber: React.FC<CountingNumberProps> = ({ target, duration = 2000, suffix = '' }) => {
-  const [count, setCount] = useState(0);
+const CountingNumber: React.FC<CountingNumberProps> = ({ target, suffix = '' }) => {
+  const ref = useRef<HTMLSpanElement>(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
+
+  const motionValue = useMotionValue(0);
+  const springValue = useSpring(motionValue, {
+    damping: 50,
+    stiffness: 75,
+  });
+
+  const [displayValue, setDisplayValue] = useState(0);
 
   useEffect(() => {
-    let startTime: number;
-    let animationFrame: number;
+    if (isInView) {
+      motionValue.set(target);
+    }
+  }, [isInView, target, motionValue]);
 
-    const animate = (timestamp: number) => {
-      if (!startTime) startTime = timestamp;
-      const progress = Math.min((timestamp - startTime) / duration, 1);
-      
-      // Easing function for smooth animation
-      const easeOutQuart = 1 - Math.pow(1 - progress, 4);
-      const currentCount = Math.floor(easeOutQuart * target);
-      
-      setCount(currentCount);
-
-      if (progress < 1) {
-        animationFrame = requestAnimationFrame(animate);
-      }
-    };
-
-    animationFrame = requestAnimationFrame(animate);
-
-    return () => {
-      if (animationFrame) {
-        cancelAnimationFrame(animationFrame);
-      }
-    };
-  }, [target, duration]);
-
-  const formatNumber = (num: number) => {
-    return num.toLocaleString();
-  };
+  useEffect(() => {
+    const unsubscribe = springValue.on("change", (latest) => {
+      setDisplayValue(Math.floor(latest));
+    });
+    return unsubscribe;
+  }, [springValue]);
 
   return (
-    <span>
-      {formatNumber(count)}{suffix}
+    <span ref={ref}>
+      {displayValue.toLocaleString()}{suffix}
     </span>
   );
 };
