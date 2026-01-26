@@ -5,6 +5,7 @@ import Services from './Services';
 import Portfolio from './Portfolio';
 import MainNavigation from './MainNavigation';
 import PricingSection from './PricingSection';
+import BookingSection from './BookingSection';
 import CareersSection from './CareersSection';
 import TrustSignals from './sections/TrustSignals';
 import { HorizontalScrollWrapper } from './layout/HorizontalScrollWrapper';
@@ -14,10 +15,10 @@ import { motion } from 'framer-motion';
 const Slide = ({ children, id, className = "" }: { children: React.ReactNode, id?: string, className?: string }) => (
   <section id={id} className={`w-screen h-screen flex-shrink-0 flex items-center justify-center relative overflow-hidden ${className}`}>
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      whileInView={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.8, ease: "easeOut" }}
-      viewport={{ margin: "-20%" }} // Trigger when significant portion is visible
+      initial={{ opacity: 0, scale: 0.92, filter: 'blur(10px)' }}
+      whileInView={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+      transition={{ duration: 1.2, ease: [0.25, 1, 0.5, 1] }} // Luxurious easing
+      viewport={{ margin: "-10%", amount: 0.2 }}
       className="w-full h-full flex items-center justify-center"
     >
       {children}
@@ -73,6 +74,10 @@ export default function HomePage() {
 
       <Slide className="pricing-slide">
         <PricingSection id="pricing" />
+      </Slide>
+
+      <Slide className="booking-slide">
+        <BookingSection id="booking" />
       </Slide>
 
       <Slide className="careers-slide">

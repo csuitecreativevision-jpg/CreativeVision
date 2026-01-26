@@ -9,7 +9,10 @@ interface HeroProps {
 export default function Hero({ onGetStarted: _ }: HeroProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { scrollY } = useScroll();
-  const opacity = useTransform(scrollY, [0, 300], [1, 0]);
+  const scale = useTransform(scrollY, [0, 400], [1, 4.5]);
+  const textOpacity = useTransform(scrollY, [0, 200], [1, 0]); // Surrounding text fades quick
+  const attentionOpacity = useTransform(scrollY, [200, 400], [1, 0]); // Attention text fades later
+  const blur = useTransform(scrollY, [0, 300], [0, 10]);
 
   return (
     <section ref={containerRef} className="relative w-screen h-screen flex-shrink-0 flex items-center justify-center overflow-hidden">
@@ -19,7 +22,7 @@ export default function Hero({ onGetStarted: _ }: HeroProps) {
 
       <div className="relative z-10 w-full max-w-7xl mx-auto px-6 flex flex-col items-center text-center">
 
-        {/* Label - Social Proof / Urgency */}
+        {/* Label */}
         <RevealText delay={0.2} classNameWrapper="mb-8">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 backdrop-blur-md">
             <span className="relative flex h-2 w-2">
@@ -32,26 +35,28 @@ export default function Hero({ onGetStarted: _ }: HeroProps) {
 
         {/* Headline - The Hook */}
         <h1 className="text-6xl md:text-8xl lg:text-9xl font-bold tracking-tight text-white mb-8 leading-[0.9]">
-          <div className="overflow-hidden">
+          <motion.div style={{ opacity: textOpacity, filter: blur }} className="overflow-hidden">
             <RevealText delay={0.4} direction="up" className="block text-gray-300">
               Turn
             </RevealText>
-          </div>
-          <div className="overflow-hidden">
+          </motion.div>
+
+          <motion.div style={{ scale, opacity: attentionOpacity }} className="overflow-visible relative z-20 origin-center">
             <RevealText delay={0.5} direction="up" className="block text-transparent bg-clip-text bg-gradient-to-r from-custom-bright via-white to-custom-violet pb-2">
               Attention
             </RevealText>
-          </div>
-          <div className="overflow-hidden">
+          </motion.div>
+
+          <motion.div style={{ opacity: textOpacity, filter: blur }} className="overflow-hidden">
             <RevealText delay={0.6} direction="up" className="block text-gray-300">
               Into Revenue.
             </RevealText>
-          </div>
+          </motion.div>
         </h1>
 
         {/* Subline */}
         <motion.p
-          style={{ opacity }}
+          style={{ opacity: textOpacity }}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8, duration: 1 }}

@@ -1,5 +1,5 @@
 
-import { Check, Calendar } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { SpotlightCard } from './ui/SpotlightCard';
 import { MagneticButton } from './ui/MagneticButton';
 import { ScrollReveal } from './ui/ScrollReveal';
@@ -103,39 +103,39 @@ export default function PricingSection({ id, className }: PricingSectionProps) {
                     </div>
                 </ScrollReveal>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 h-full items-center">
                     {packages.map((pkg, index) => (
-                        <ScrollReveal key={pkg.name} animation="scale-up" delay={index * 0.1}>
+                        <ScrollReveal key={pkg.name} animation="scale-up" delay={index * 0.1} className="h-full max-h-[600px]">
                             <SpotlightCard
-                                className={`rounded-3xl p-8 flex flex-col h-full border-white/10 ${pkg.popular ? 'bg-custom-purple/10 border-custom-purple/30' : 'bg-black/20'}`}
+                                className={`rounded-2xl p-6 flex flex-col h-full border-white/10 transition-transform hover:scale-[1.02] ${pkg.popular ? 'bg-custom-purple/10 border-custom-purple/30' : 'bg-black/20'}`}
                                 spotlightColor={pkg.popular ? "rgba(116, 36, 245, 0.4)" : "rgba(255, 255, 255, 0.1)"}
                             >
                                 {pkg.popular && (
-                                    <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-custom-purple/20 border border-custom-purple/50 text-xs font-bold text-custom-bright">
+                                    <div className="absolute top-4 right-4 px-2 py-0.5 rounded-full bg-custom-purple/20 border border-custom-purple/50 text-[10px] font-bold text-custom-bright">
                                         POPULAR
                                     </div>
                                 )}
 
-                                <div className="mb-6">
-                                    <div className="text-4xl mb-4">{pkg.icon}</div>
-                                    <h3 className="text-xl font-bold text-white mb-2">{pkg.name}</h3>
+                                <div className="mb-4">
+                                    <div className="text-3xl mb-2">{pkg.icon}</div>
+                                    <h3 className="text-lg font-bold text-white mb-1">{pkg.name}</h3>
                                     <div className="flex items-baseline gap-1">
-                                        <span className="text-3xl font-bold text-white">${pkg.price}</span>
-                                        <span className="text-sm text-gray-500">/{pkg.duration}</span>
+                                        <span className="text-2xl font-bold text-white">${pkg.price}</span>
+                                        <span className="text-xs text-gray-500">/{pkg.duration}</span>
                                     </div>
                                 </div>
 
-                                <div className="space-y-3 mb-8 flex-grow">
+                                <div className="space-y-2 mb-6 flex-grow overflow-y-auto custom-scrollbar">
                                     {pkg.features.map((feat, i) => (
-                                        <div key={i} className="flex items-start gap-2 text-sm text-gray-300">
-                                            <Check className="w-4 h-4 text-green-400 mt-0.5 shrink-0" />
+                                        <div key={i} className="flex items-start gap-2 text-xs text-gray-300">
+                                            <Check className="w-3 h-3 text-green-400 mt-0.5 shrink-0" />
                                             <span>{feat}</span>
                                         </div>
                                     ))}
                                 </div>
 
-                                <MagneticButton className="w-full">
-                                    <button className={`w-full py-3 rounded-xl font-bold transition-all ${pkg.popular
+                                <MagneticButton className="w-full mt-auto">
+                                    <button className={`w-full py-2.5 rounded-lg text-sm font-bold transition-all ${pkg.popular
                                         ? 'bg-custom-bright text-white hover:bg-custom-purple'
                                         : 'bg-white/5 text-white hover:bg-white/10 border border-white/10'
                                         }`}>
@@ -146,28 +146,6 @@ export default function PricingSection({ id, className }: PricingSectionProps) {
                         </ScrollReveal>
                     ))}
                 </div>
-
-                {/* Booking CTA */}
-                <ScrollReveal animation="fade-up" delay={0.4} className="mt-24 max-w-4xl mx-auto">
-                    <SpotlightCard className="p-12 rounded-3xl bg-gradient-to-br from-custom-purple/20 to-blue-900/20 border-white/10 text-center">
-                        <Calendar className="w-16 h-16 text-custom-bright mx-auto mb-6" />
-                        <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Ready to Scale?</h2>
-                        <p className="text-lg text-gray-300 mb-8 max-w-xl mx-auto">
-                            Book a free 30-minute consultation. No commitment, just value.
-                        </p>
-                        <MagneticButton className="inline-block">
-                            <a
-                                href="https://calendly.com/creativevision"
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-2 px-8 py-4 bg-white text-black font-bold rounded-full hover:bg-gray-100 transition-colors"
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                <Calendar className="w-5 h-5" /> Book Consultation
-                            </a>
-                        </MagneticButton>
-                    </SpotlightCard>
-                </ScrollReveal>
             </div>
         </section>
     );

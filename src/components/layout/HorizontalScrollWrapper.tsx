@@ -1,5 +1,5 @@
 import { useRef, ReactNode, useState, useEffect } from "react";
-import { motion, useScroll, useTransform, useSpring } from "framer-motion";
+import { motion, useScroll, useTransform } from "framer-motion";
 
 interface HorizontalScrollWrapperProps {
     children: ReactNode;
@@ -25,21 +25,14 @@ export const HorizontalScrollWrapper = ({ children, contentWidth = "400vw" }: Ho
         offset: ["start start", "end end"]
     });
 
-    // Smooth out the scroll progress for a "weighty" feel
-    const springScroll = useSpring(scrollYProgress, {
-        stiffness: 50,
-        damping: 30,
-        mass: 1.2,
-        restDelta: 0.001
-    });
-
     // We map 0-1 progress to the total horizontal scrolling distance.
-    const totalSlides = 7; // We know we have 7 slides: Hero, Trust, About, Services, Portfolio, Pricing, Careers
+    const totalSlides = 8; // Hero, Trust, About, Services, Portfolio, Pricing, Booking, Careers
     // The total width of content is totalSlides * 100vw
     // We want to translate from 0 to -(totalSlides - 1) * 100vw
     const finalX = `-${(totalSlides - 1) * 100}vw`;
 
-    const x = useTransform(springScroll, [0, 1], ["0%", finalX]);
+    // Direct mapping for snappy 1:1 scroll response
+    const x = useTransform(scrollYProgress, [0, 1], ["0%", finalX]);
 
     if (isMobile) {
         return (
