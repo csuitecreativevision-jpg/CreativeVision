@@ -5,65 +5,64 @@
 /* Set Poppins as default font */
 body {
   font-family: 'Poppins', sans-serif;
+  background-color: #050511;
+  /* Deep premium dark */
+  color: #fff;
+  overflow-x: hidden;
+  /* Hide horizontal scrollbar initially */
+  width: 100%;
 }
 
 /* Premium Glass Effects */
 .glass-premium {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
-.backdrop-blur-premium {
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+.glass-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
+  backdrop-filter: blur(40px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
 }
 
 /* Typography Utilities */
 .text-gradient-primary {
-  background: linear-gradient(135deg, #a855f7 0%, #8b5cf6 30%, #7c3aed 60%, #6366f1 100%);
+  background: linear-gradient(135deg, #bbbaff 0%, #7c3aed 50%, #6366f1 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  color: transparent; /* Fallback */
+  color: transparent;
+  text-shadow: 0px 0px 30px rgba(124, 58, 237, 0.3);
 }
+
+.text-gradient-gold {
+  background: linear-gradient(135deg, #FFF5C3 0%, #E3A342 50%, #B87612 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
 
 /* Enhanced Glow Effects */
 .glow-purple {
-  @apply shadow-glow-sm;
-}
-
-.glow-purple-intense {
-  @apply shadow-glow-md;
-}
-
-.text-glow {
-  text-shadow: 0 0 40px rgba(116, 36, 245, 0.25);
+  box-shadow: 0 0 50px rgba(124, 58, 237, 0.15);
 }
 
 .glow-text {
-  text-shadow: 0 0 20px rgba(116, 36, 245, 0.6);
-}
-
-/* Enhanced Shadow Effects */
-.shadow-depth {
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 30px rgba(116, 36, 245, 0.1);
-}
-
-.shadow-cinematic {
-  box-shadow: 0 35px 60px -12px rgba(0, 0, 0, 0.4), 0 0 40px rgba(116, 36, 245, 0.15);
-}
-
-.shadow-cinematic-lg {
-  box-shadow: 0 45px 80px -12px rgba(0, 0, 0, 0.5), 0 0 50px rgba(116, 36, 245, 0.2);
+  text-shadow: 0 0 20px rgba(124, 58, 237, 0.5);
 }
 
 /* Premium Button Effects */
 .button-premium {
   position: relative;
   overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+  background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .button-premium::before {
@@ -73,8 +72,8 @@ body {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.5s;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.6s;
 }
 
 .button-premium:hover::before {
@@ -82,138 +81,142 @@ body {
 }
 
 .button-premium:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 20px 40px rgba(116, 36, 245, 0.4);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 20px 40px -10px rgba(124, 58, 237, 0.5);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
-/* Hover Glow Effect */
-.hover-glow {
-  transition: all 0.3s ease;
+/* Hide Scrollbar */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
-.hover-glow:hover {
-  box-shadow: 0 0 30px rgba(116, 36, 245, 0.4), 0 0 60px rgba(116, 36, 245, 0.2);
-  transform: translateY(-2px);
+.no-scrollbar {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
 }
 
-/* Enhanced Animations */
-@keyframes float {
-  0%, 100% { transform: translateY(0px) rotate(0deg); }
-  50% { transform: translateY(-20px) rotate(5deg); }
+.animation-delay-200 {
+  animation-delay: 200ms;
 }
 
-@keyframes floatRotate {
-  0% { transform: translateY(0px) rotate(0deg); }
-  33% { transform: translateY(-15px) rotate(120deg); }
-  66% { transform: translateY(-10px) rotate(240deg); }
-  100% { transform: translateY(0px) rotate(360deg); }
+.animation-delay-300 {
+  animation-delay: 300ms;
 }
 
-@keyframes float-animation {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-15px); }
+.animation-delay-400 {
+  animation-delay: 400ms;
 }
 
-@keyframes float-rotate {
-  0% { transform: translateY(0px) rotate(0deg); }
-  50% { transform: translateY(-10px) rotate(180deg); }
-  100% { transform: translateY(0px) rotate(360deg); }
+.animation-delay-500 {
+  animation-delay: 500ms;
 }
 
-@keyframes particle {
-  0% { transform: translateY(100vh) scale(0); opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { transform: translateY(-100vh) scale(1); opacity: 0; }
+.animation-delay-600 {
+  animation-delay: 600ms;
 }
 
-@keyframes slideRight {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100vw); }
+.animation-delay-700 {
+  animation-delay: 700ms;
 }
 
-@keyframes slideLeft {
-  0% { transform: translateX(100%); }
-  100% { transform: translateX(-100vw); }
+.animation-delay-800 {
+  animation-delay: 800ms;
 }
 
-@keyframes gridMove {
-  0%, 100% { transform: translate(0, 0); }
-  25% { transform: translate(10px, -10px); }
-  50% { transform: translate(-5px, 10px); }
-  75% { transform: translate(-10px, -5px); }
+.animation-delay-1000 {
+  animation-delay: 1000ms;
 }
-
-@keyframes slideLeftCarousel {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-
-/* Animation Classes */
-.float-animation {
-  animation: float-animation 3s ease-in-out infinite;
-}
-
-.float-rotate {
-  animation: float-rotate 4s ease-in-out infinite;
-}
-
-.particle {
-  animation: particle 8s linear infinite;
-}
-
-.animate-slide-left {
-  animation: slideLeftCarousel 20s linear infinite;
-}
-
-/* Animation Delays */
-.delay-300 { animation-delay: 300ms; }
-.delay-500 { animation-delay: 500ms; }
-.delay-700 { animation-delay: 700ms; }
-.delay-1000 { animation-delay: 1000ms; }
-
-.animation-delay-200 { animation-delay: 200ms; }
-.animation-delay-300 { animation-delay: 300ms; }
-.animation-delay-400 { animation-delay: 400ms; }
-.animation-delay-500 { animation-delay: 500ms; }
-.animation-delay-600 { animation-delay: 600ms; }
-.animation-delay-700 { animation-delay: 700ms; }
-.animation-delay-800 { animation-delay: 800ms; }
-.animation-delay-1000 { animation-delay: 1000ms; }
 
 /* Icon Animations */
 @keyframes iconFloat {
-  0%, 100% { transform: translateY(0px) rotate(0deg); }
-  50% { transform: translateY(-12px) rotate(3deg); }
+
+  0%,
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+
+  50% {
+    transform: translateY(-12px) rotate(3deg);
+  }
 }
 
 @keyframes iconPulse {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.1); opacity: 0.8; }
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
 }
 
 @keyframes iconRotate {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes iconBounce {
-  0%, 100% { transform: translateY(0px); }
-  25% { transform: translateY(-6px); }
-  50% { transform: translateY(-12px); }
-  75% { transform: translateY(-6px); }
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  25% {
+    transform: translateY(-6px);
+  }
+
+  50% {
+    transform: translateY(-12px);
+  }
+
+  75% {
+    transform: translateY(-6px);
+  }
 }
 
 @keyframes iconGlow {
-  0%, 100% { filter: drop-shadow(0 0 8px rgba(116, 36, 245, 0.4)); }
-  50% { filter: drop-shadow(0 0 20px rgba(116, 36, 245, 0.8)); }
+
+  0%,
+  100% {
+    filter: drop-shadow(0 0 8px rgba(116, 36, 245, 0.4));
+  }
+
+  50% {
+    filter: drop-shadow(0 0 20px rgba(116, 36, 245, 0.8));
+  }
 }
 
 @keyframes iconWave {
-  0%, 100% { transform: rotate(0deg) scale(1); }
-  25% { transform: rotate(-8deg) scale(1.05); }
-  50% { transform: rotate(0deg) scale(1.1); }
-  75% { transform: rotate(8deg) scale(1.05); }
+
+  0%,
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+
+  25% {
+    transform: rotate(-8deg) scale(1.05);
+  }
+
+  50% {
+    transform: rotate(0deg) scale(1.1);
+  }
+
+  75% {
+    transform: rotate(8deg) scale(1.05);
+  }
 }
 
 /* Icon Animation Classes */
@@ -246,8 +249,8 @@ body {
 .scroll-animate {
   opacity: 0;
   transform: translateY(40px);
-  transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), 
-              transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .scroll-animate.animate-in {
@@ -273,6 +276,7 @@ body {
     opacity: 0;
     transform: translateY(30px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -284,6 +288,7 @@ body {
     opacity: 0;
     transform: translateX(-30px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -295,6 +300,7 @@ body {
     opacity: 0;
     transform: translateX(30px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -306,7 +312,7 @@ body {
   .text-glow {
     text-shadow: 0 0 30px rgba(116, 36, 245, 0.12), 0 0 60px rgba(116, 36, 245, 0.08);
   }
-  
+
   .glow-purple-intense {
     box-shadow: 0 0 20px rgba(116, 36, 245, 0.4), 0 0 40px rgba(116, 36, 245, 0.2);
   }

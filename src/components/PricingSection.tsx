@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Check, Calendar } from 'lucide-react';
 import { SpotlightCard } from './ui/SpotlightCard';
 import { MagneticButton } from './ui/MagneticButton';
@@ -94,7 +94,7 @@ export default function PricingSection({ id, className }: PricingSectionProps) {
     ];
 
     return (
-        <section id={id} className={`py-24 px-6 relative z-10 ${className}`}>
+        <section id={id} className={`py-12 px-6 relative z-10 ${className} h-screen flex flex-col justify-center`}>
             <div className="max-w-7xl mx-auto">
                 <ScrollReveal animation="fade-up">
                     <div className="text-center mb-20">

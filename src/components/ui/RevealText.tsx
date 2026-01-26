@@ -1,9 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef, ReactNode } from 'react';
 import { motion, useInView, useAnimation } from 'framer-motion';
 import { cn } from '../../lib/utils';
 
 interface RevealTextProps {
-    children: string;
+    children: ReactNode;
     className?: string;
     delay?: number;
     direction?: 'up' | 'down' | 'left' | 'right';

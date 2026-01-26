@@ -24,7 +24,7 @@ export const BackgroundLayout = ({ children }: { children: React.ReactNode }) =>
     const backgroundStyle = useMotionTemplate`radial-gradient(600px circle at ${smoothX}px ${smoothY}px, rgba(116, 36, 245, 0.08), transparent 80%)`;
 
     return (
-        <div className="relative min-h-screen bg-custom-bg overflow-x-hidden selection:bg-custom-purple/30 selection:text-white">
+        <div className="relative min-h-screen bg-custom-bg selection:bg-custom-purple/30 selection:text-white">
             {/* Fixed Global Background Layer */}
             <div className="fixed inset-0 z-0 pointer-events-none">
 

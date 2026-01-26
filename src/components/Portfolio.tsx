@@ -1,5 +1,5 @@
-import React from 'react';
-import { Play, ArrowRight, Star } from 'lucide-react';
+
+import { Play, ArrowRight } from 'lucide-react';
 import { SpotlightCard } from './ui/SpotlightCard';
 import { RevealText } from './ui/RevealText';
 import { MagneticButton } from './ui/MagneticButton';
@@ -8,18 +8,19 @@ interface PortfolioProps {
   onGetStarted: () => void;
 }
 
-export default function Portfolio({ onGetStarted }: PortfolioProps) {
+export default function Portfolio(_props: PortfolioProps) {
   return (
-    <section id="portfolio" className="py-32 px-6 relative overflow-hidden">
+    <section id="portfolio" className="w-screen h-screen flex-shrink-0 flex items-center justify-center relative overflow-hidden bg-[#050511] px-6">
 
-      <div className="max-w-7xl mx-auto relative z-10">
-        <div className="flex flex-col md:flex-row justify-between items-end mb-20 gap-8">
+      <div className="max-w-7xl mx-auto w-full relative z-10 flex flex-col justify-center h-full">
+
+        <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-8 shrink-0">
           <div>
-            <RevealText classNameWrapper="mb-4">
+            <RevealText classNameWrapper="mb-2">
               <span className="text-custom-bright font-medium tracking-widest text-sm uppercase">Selected Work</span>
             </RevealText>
-            <h2 className="text-5xl md:text-7xl font-bold text-white leading-tight">
-              <RevealText delay={0.1}>Visual</RevealText> <br />
+            <h2 className="text-4xl md:text-6xl font-bold text-white leading-tight">
+              <RevealText delay={0.1}>Visual</RevealText>{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-custom-purple to-custom-bright">
                 <RevealText delay={0.2}>Masterpieces.</RevealText>
               </span>
@@ -32,7 +33,7 @@ export default function Portfolio({ onGetStarted }: PortfolioProps) {
           </MagneticButton>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-32">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
           <ProjectCard
             category="Brand Film"
             title="Neon Nights"
@@ -49,44 +50,6 @@ export default function Portfolio({ onGetStarted }: PortfolioProps) {
             image="https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2670&auto=format&fit=crop"
           />
         </div>
-
-        {/* Testimonials */}
-        <div className="border-t border-white/10 pt-24">
-          <div className="text-center mb-16">
-            <h3 className="text-3xl md:text-4xl font-bold text-white mb-6">Trusted by Creators</h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <TestimonialCard
-              name="Sarah Chen"
-              role="Content Creator"
-              quote="CreativeVision transformed my raw footage into a cinematic masterpiece. Engagement skyrocketed!"
-            />
-            <TestimonialCard
-              name="Marcus Rodriguez"
-              role="YouTuber (1M+ Subs)"
-              quote="The speed and quality are unmatched. They just 'get' the pacing I need for retention."
-            />
-            <TestimonialCard
-              name="Emma Thompson"
-              role="Brand Director"
-              quote="Reliable, creative, and professional. The best post-production partner we've worked with."
-            />
-          </div>
-        </div>
-
-        <div className="mt-24 text-center">
-          <h2 className="text-4xl md:text-6xl font-bold text-white mb-8">Ready to create?</h2>
-          <MagneticButton className="inline-block">
-            <button
-              onClick={onGetStarted}
-              className="px-12 py-6 bg-white text-black text-xl font-bold rounded-full hover:scale-105 transition-transform shadow-[0_0_40px_rgba(255,255,255,0.3)]"
-            >
-              Start Your Project
-            </button>
-          </MagneticButton>
-        </div>
-
       </div>
     </section>
   );
@@ -109,19 +72,4 @@ const ProjectCard = ({ category, title, image }: { category: string, title: stri
       </div>
     </div>
   </SpotlightCard>
-);
-
-const TestimonialCard = ({ name, role, quote }: { name: string, role: string, quote: string }) => (
-  <div className="p-8 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
-    <div className="flex gap-1 mb-6">
-      {[...Array(5)].map((_, i) => (
-        <Star key={i} className="w-4 h-4 text-custom-bright fill-custom-bright" />
-      ))}
-    </div>
-    <p className="text-gray-300 mb-6 leading-relaxed">"{quote}"</p>
-    <div>
-      <div className="text-white font-bold">{name}</div>
-      <div className="text-gray-500 text-sm">{role}</div>
-    </div>
-  </div>
 );
