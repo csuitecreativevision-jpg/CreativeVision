@@ -16,13 +16,14 @@ export default function Portfolio(_props: PortfolioProps) {
 
         <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-8 shrink-0">
           <div>
-            <RevealText classNameWrapper="mb-2">
-              <span className="text-custom-bright font-medium tracking-widest text-sm uppercase">Selected Work</span>
-            </RevealText>
-            <h2 className="text-4xl md:text-6xl font-bold text-white leading-tight">
-              <RevealText delay={0.1}>Visual</RevealText>{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-custom-purple to-custom-bright">
-                <RevealText delay={0.2}>Masterpieces.</RevealText>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 mb-4">
+              <div className="w-1.5 h-1.5 rounded-full bg-custom-bright" />
+              <span className="text-xs font-medium text-gray-300">Selected Work</span>
+            </div>
+            <h2 className="text-6xl md:text-8xl font-bold text-white leading-tight">
+              Visual{' '}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-custom-bright via-white to-custom-violet">
+                Masterpieces.
               </span>
             </h2>
           </div>

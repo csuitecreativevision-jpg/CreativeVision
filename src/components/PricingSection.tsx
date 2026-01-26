@@ -1,5 +1,5 @@
 
-import { Check } from 'lucide-react';
+import { Check, Calendar, Sparkles } from 'lucide-react';
 import { SpotlightCard } from './ui/SpotlightCard';
 import { MagneticButton } from './ui/MagneticButton';
 import { ScrollReveal } from './ui/ScrollReveal';
@@ -12,10 +12,10 @@ interface PricingSectionProps {
 export default function PricingSection({ id, className }: PricingSectionProps) {
     const packages = [
         {
-            name: "Bronze Plan",
+            name: "Bronze",
             price: 390,
-            duration: "monthly",
-            description: "Perfect for getting started with professional video editing",
+            duration: "month",
+            description: "Perfect for getting started",
             features: [
                 "6 Videos",
                 "6 Thumbnails",
@@ -24,16 +24,17 @@ export default function PricingSection({ id, className }: PricingSectionProps) {
                 "Unlimited Revisions"
             ],
             popular: false,
-            color: "bronze",
-            icon: "🟤"
+            gradient: "from-amber-700/20 to-amber-900/10",
+            borderColor: "border-amber-700/30",
+            iconGradient: "from-amber-600 to-amber-800"
         },
         {
-            name: "Silver Plan",
+            name: "Silver",
             price: 780,
-            duration: "monthly",
+            duration: "month",
             originalPrice: 870,
-            savings: "Save 10%",
-            description: "Great value for growing content creators and small businesses",
+            savings: "10% OFF",
+            description: "Great for growing creators",
             features: [
                 "12 Videos",
                 "12 Thumbnails",
@@ -42,16 +43,17 @@ export default function PricingSection({ id, className }: PricingSectionProps) {
                 "Unlimited revisions"
             ],
             popular: false,
-            color: "silver",
-            icon: "⚪"
+            gradient: "from-gray-400/20 to-gray-600/10",
+            borderColor: "border-gray-400/30",
+            iconGradient: "from-gray-300 to-gray-500"
         },
         {
-            name: "Gold Plan",
+            name: "Gold",
             price: 1600,
-            duration: "monthly",
+            duration: "month",
             originalPrice: 1915,
-            savings: "Save 15%",
-            description: "Professional solution with advanced features and full support",
+            savings: "15% OFF",
+            description: "Professional solution",
             features: [
                 "25 Videos",
                 "25 Thumbnails",
@@ -60,21 +62,22 @@ export default function PricingSection({ id, className }: PricingSectionProps) {
                 "Unlimited revisions",
                 "Content Curation",
                 "Content Repurposing",
-                "Access to Editing Style Inventory",
-                "Customized Distribution System",
-                "Customized Project Overview System"
+                "Editing Style Inventory",
+                "Distribution System",
+                "Project Overview System"
             ],
             popular: true,
-            color: "gold",
-            icon: "🟡"
+            gradient: "from-yellow-500/20 to-amber-600/10",
+            borderColor: "border-yellow-500/50",
+            iconGradient: "from-yellow-400 to-amber-500"
         },
         {
-            name: "Platinum Plan",
+            name: "Platinum",
             price: 2900,
-            duration: "monthly",
+            duration: "month",
             originalPrice: 3660,
-            savings: "Save 20%",
-            description: "Ultimate package for serious content creators and enterprises",
+            savings: "20% OFF",
+            description: "Ultimate enterprise package",
             features: [
                 "45 Videos",
                 "45 Thumbnails",
@@ -83,49 +86,85 @@ export default function PricingSection({ id, className }: PricingSectionProps) {
                 "Unlimited Revisions",
                 "Content Curation",
                 "Content Repurposing",
-                "Access to Editing Style Inventory",
-                "Customized Distribution System",
-                "Customized Project Overview System"
+                "Editing Style Inventory",
+                "Distribution System",
+                "Project Overview System"
             ],
             popular: false,
-            color: "platinum",
-            icon: "🟣"
+            gradient: "from-slate-300/20 to-zinc-200/10",
+            borderColor: "border-slate-300/40",
+            iconGradient: "from-slate-300 to-zinc-400"
         }
     ];
 
     return (
-        <section id={id} className={`py-12 px-6 relative z-10 ${className} h-screen flex flex-col justify-center`}>
-            <div className="max-w-7xl mx-auto">
+        <section id={id} className={`w-screen min-h-screen flex-shrink-0 flex items-center justify-center relative overflow-hidden py-20 px-6 ${className}`}>
+            {/* Background glow */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-custom-purple/10 rounded-full blur-[150px]" />
+                <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-custom-blue/10 rounded-full blur-[150px]" />
+            </div>
+
+            <div className="max-w-[1600px] mx-auto relative z-10">
                 <ScrollReveal animation="fade-up">
-                    <div className="text-center mb-20">
-                        <h2 className="text-4xl md:text-6xl font-bold text-white mb-6">Pricing Plans</h2>
-                        <p className="text-gray-300">Choose the perfect plan for your needs.</p>
+                    <div className="text-center mb-16">
+                        {/* Pill badge like other sections */}
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 mb-6">
+                            <div className="w-1.5 h-1.5 rounded-full bg-custom-bright" />
+                            <span className="text-xs font-medium text-gray-300">Pricing</span>
+                        </div>
+                        <h2 className="text-5xl md:text-7xl font-bold text-white mb-4 leading-tight">
+                            Invest in{' '}
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-custom-bright via-white to-custom-violet">
+                                Quality.
+                            </span>
+                        </h2>
+                        <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+                            Transparent pricing. No hidden fees. Cancel anytime.
+                        </p>
                     </div>
                 </ScrollReveal>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 h-full items-center">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     {packages.map((pkg, index) => (
-                        <ScrollReveal key={pkg.name} animation="scale-up" delay={index * 0.1} className="h-full max-h-[600px]">
-                            <SpotlightCard
-                                className={`rounded-2xl p-6 flex flex-col h-full border-white/10 transition-transform hover:scale-[1.02] ${pkg.popular ? 'bg-custom-purple/10 border-custom-purple/30' : 'bg-black/20'}`}
-                                spotlightColor={pkg.popular ? "rgba(116, 36, 245, 0.4)" : "rgba(255, 255, 255, 0.1)"}
+                        <ScrollReveal key={pkg.name} animation="scale-up" delay={index * 0.1} className="h-full">
+                            <div
+                                className={`relative rounded-2xl p-6 flex flex-col h-full bg-gradient-to-br ${pkg.gradient} border ${pkg.borderColor} backdrop-blur-xl transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl hover:shadow-custom-purple/10 ${pkg.popular ? 'ring-2 ring-yellow-500/50' : ''}`}
                             >
+                                {/* Popular badge */}
                                 {pkg.popular && (
-                                    <div className="absolute top-4 right-4 px-2 py-0.5 rounded-full bg-custom-purple/20 border border-custom-purple/50 text-[10px] font-bold text-custom-bright">
-                                        POPULAR
+                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-gradient-to-r from-yellow-500 to-amber-500 text-xs font-bold text-black flex items-center gap-1">
+                                        <Sparkles className="w-3 h-3" /> MOST POPULAR
                                     </div>
                                 )}
 
-                                <div className="mb-4">
-                                    <div className="text-3xl mb-2">{pkg.icon}</div>
-                                    <h3 className="text-lg font-bold text-white mb-1">{pkg.name}</h3>
-                                    <div className="flex items-baseline gap-1">
-                                        <span className="text-2xl font-bold text-white">${pkg.price}</span>
-                                        <span className="text-xs text-gray-500">/{pkg.duration}</span>
+                                {/* Savings badge - Commented out for future use
+                                {pkg.savings && (
+                                    <div className="absolute top-4 right-4 px-2 py-0.5 rounded-full bg-green-500/20 border border-green-500/50 text-[10px] font-bold text-green-400">
+                                        {pkg.savings}
                                     </div>
+                                )}
+                                */}
+
+                                <div className="mb-4">
+                                    {/* Plan icon */}
+                                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${pkg.iconGradient} flex items-center justify-center mb-3 shadow-lg`}>
+                                        <span className="text-white font-bold text-base">{pkg.name.charAt(0)}</span>
+                                    </div>
+
+                                    <h3 className="text-lg font-bold text-white mb-1">{pkg.name}</h3>
+                                    <p className="text-gray-400 text-xs mb-3">{pkg.description}</p>
+
+                                    <div className="flex items-baseline gap-1">
+                                        <span className="text-3xl font-bold text-white">${pkg.price}</span>
+                                        <span className="text-sm text-gray-500">/{pkg.duration}</span>
+                                    </div>
+                                    {pkg.originalPrice && (
+                                        <div className="text-xs text-gray-500 line-through mt-1">${pkg.originalPrice}/month</div>
+                                    )}
                                 </div>
 
-                                <div className="space-y-2 mb-6 flex-grow overflow-y-auto custom-scrollbar">
+                                <div className="space-y-2 mb-6 flex-grow">
                                     {pkg.features.map((feat, i) => (
                                         <div key={i} className="flex items-start gap-2 text-xs text-gray-300">
                                             <Check className="w-3 h-3 text-green-400 mt-0.5 shrink-0" />
@@ -135,17 +174,45 @@ export default function PricingSection({ id, className }: PricingSectionProps) {
                                 </div>
 
                                 <MagneticButton className="w-full mt-auto">
-                                    <button className={`w-full py-2.5 rounded-lg text-sm font-bold transition-all ${pkg.popular
-                                        ? 'bg-custom-bright text-white hover:bg-custom-purple'
-                                        : 'bg-white/5 text-white hover:bg-white/10 border border-white/10'
+                                    <button className={`w-full py-2.5 rounded-lg text-xs font-bold transition-all ${pkg.popular
+                                        ? 'bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-400 hover:to-amber-400 shadow-lg shadow-yellow-500/25'
+                                        : 'bg-white/10 text-white hover:bg-white/20 border border-white/10'
                                         }`}>
-                                        Choose {pkg.name}
+                                        Get Started
                                     </button>
                                 </MagneticButton>
-                            </SpotlightCard>
+                            </div>
                         </ScrollReveal>
                     ))}
                 </div>
+
+                {/* Ready to Scale CTA */}
+                <ScrollReveal animation="fade-up" delay={0.5} className="mt-20">
+                    <div className="max-w-3xl mx-auto text-center p-10 rounded-3xl bg-gradient-to-br from-custom-purple/20 via-custom-blue/10 to-transparent border border-white/10 backdrop-blur-xl relative overflow-hidden">
+                        {/* Glow effect */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-custom-purple/10 via-transparent to-custom-blue/10 pointer-events-none" />
+
+                        <div className="relative z-10">
+                            <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center">
+                                <Calendar className="w-8 h-8 text-custom-bright" />
+                            </div>
+                            <h3 className="text-3xl md:text-4xl font-bold text-white mb-4">Ready to Scale?</h3>
+                            <p className="text-gray-400 text-lg mb-8 max-w-xl mx-auto">
+                                Book a free 30-minute consultation. No commitment, just value.
+                            </p>
+                            <MagneticButton className="inline-block">
+                                <a
+                                    href="https://calendly.com/creativevision"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-3 px-8 py-4 bg-white text-black font-bold rounded-full hover:bg-gray-100 transition-all shadow-lg shadow-white/10"
+                                >
+                                    <Calendar className="w-5 h-5" /> Book Free Consultation
+                                </a>
+                            </MagneticButton>
+                        </div>
+                    </div>
+                </ScrollReveal>
             </div>
         </section>
     );

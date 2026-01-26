@@ -136,8 +136,8 @@ export default function CareersSection({ id, className }: CareersSectionProps) {
     };
 
     return (
-        <section id={id} className={`py-24 px-6 relative z-10 ${className}`}>
-            <div className="max-w-7xl mx-auto flex flex-col min-h-full">
+        <section id={id} className={`w-screen h-screen flex-shrink-0 flex items-center justify-center relative overflow-hidden px-6 ${className}`}>
+            <div className="max-w-7xl mx-auto flex flex-col w-full">
                 <ScrollReveal animation="fade-up">
                     <div className="text-center mb-16">
                         <div className="mb-6 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 animate-fade-in">
@@ -147,7 +147,7 @@ export default function CareersSection({ id, className }: CareersSectionProps) {
 
                         <h2 className="text-4xl md:text-6xl font-bold mb-6 text-glow leading-[1.1]">
                             What Do You <br />
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-custom-purple via-custom-bright to-white">
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-custom-bright via-white to-custom-violet">
                                 Specialize In?
                             </span>
                         </h2>

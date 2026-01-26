@@ -23,7 +23,7 @@ export default function StartProjectSection({ id, onViewPackages }: StartProject
 
                         <h2 className="text-4xl md:text-7xl font-bold text-white mb-8 leading-[1.1] tracking-tight">
                             Have a Vision? <br />
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-custom-bright to-white">Let's Build It.</span>
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-custom-bright via-white to-custom-violet">Let's Build It.</span>
                         </h2>
 
                         <p className="text-xl text-gray-300 mb-12 max-w-2xl mx-auto leading-relaxed">
