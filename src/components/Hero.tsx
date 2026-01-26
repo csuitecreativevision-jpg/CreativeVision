@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { RevealText } from './ui/RevealText';
+import { TextRotator } from './ui/TextRotator';
 
 interface HeroProps {
   onGetStarted: () => void;
@@ -8,11 +9,6 @@ interface HeroProps {
 
 export default function Hero({ onGetStarted: _ }: HeroProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { scrollY } = useScroll();
-  const scale = useTransform(scrollY, [0, 400], [1, 4.5]);
-  const textOpacity = useTransform(scrollY, [0, 200], [1, 0]); // Surrounding text fades quick
-  const attentionOpacity = useTransform(scrollY, [200, 400], [1, 0]); // Attention text fades later
-  const blur = useTransform(scrollY, [0, 300], [0, 10]);
 
   return (
     <section ref={containerRef} className="relative w-screen h-screen flex-shrink-0 flex items-center justify-center overflow-hidden">
@@ -35,28 +31,28 @@ export default function Hero({ onGetStarted: _ }: HeroProps) {
 
         {/* Headline - The Hook */}
         <h1 className="text-6xl md:text-8xl lg:text-9xl font-bold tracking-tight text-white mb-8 leading-[0.9]">
-          <motion.div style={{ opacity: textOpacity, filter: blur }} className="overflow-hidden">
+          <div className="overflow-hidden">
             <RevealText delay={0.4} direction="up" className="block text-gray-300">
               Turn
             </RevealText>
-          </motion.div>
+          </div>
 
-          <motion.div style={{ scale, opacity: attentionOpacity }} className="overflow-visible relative z-20 origin-center">
-            <RevealText delay={0.5} direction="up" className="block text-transparent bg-clip-text bg-gradient-to-r from-custom-bright via-white to-custom-violet pb-2">
-              Attention
-            </RevealText>
-          </motion.div>
+          <div className="overflow-visible relative z-20">
+            <TextRotator
+              words={["Views", "Watch Time", "Content", "Stories", "Footage"]}
+              className="text-transparent bg-clip-text bg-gradient-to-r from-custom-bright via-white to-custom-violet pb-2"
+            />
+          </div>
 
-          <motion.div style={{ opacity: textOpacity, filter: blur }} className="overflow-hidden">
+          <div className="overflow-hidden">
             <RevealText delay={0.6} direction="up" className="block text-gray-300">
               Into Revenue.
             </RevealText>
-          </motion.div>
+          </div>
         </h1>
 
         {/* Subline */}
         <motion.p
-          style={{ opacity: textOpacity }}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8, duration: 1 }}

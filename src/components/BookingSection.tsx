@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Calendar } from 'lucide-react';
 import { SpotlightCard } from './ui/SpotlightCard';
 import { MagneticButton } from './ui/MagneticButton';
@@ -8,6 +9,23 @@ interface BookingSectionProps {
 }
 
 export default function BookingSection({ id }: BookingSectionProps) {
+    const [clickCount, setClickCount] = useState(0);
+    const [lastClickTime, setLastClickTime] = useState(0);
+
+    const handleSecretClick = () => {
+        const now = Date.now();
+        if (now - lastClickTime > 2000) {
+            setClickCount(1);
+        } else {
+            const newCount = clickCount + 1;
+            setClickCount(newCount);
+            if (newCount >= 5) {
+                window.location.href = '/portal';
+            }
+        }
+        setLastClickTime(now);
+    };
+
     return (
         <section id={id} className="relative z-10 w-full max-w-4xl mx-auto px-6 flex flex-col items-center justify-center h-full">
             <ScrollReveal animation="fade-up" className="w-full">
@@ -30,6 +48,16 @@ export default function BookingSection({ id }: BookingSectionProps) {
                     </MagneticButton>
                 </SpotlightCard>
             </ScrollReveal>
+
+            {/* Secret Portal Trigger - Center Bottom */}
+            <div className="flex justify-center pt-16 pb-8 opacity-20 hover:opacity-50 transition-opacity">
+                <img
+                    src="/Untitled design (3).png"
+                    alt="CV"
+                    className="w-8 h-8 object-contain cursor-pointer"
+                    onClick={handleSecretClick}
+                />
+            </div>
         </section>
     );
 }

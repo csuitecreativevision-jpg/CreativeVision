@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { ArrowRight, User, Briefcase, Link, Video, Play, Scissors, Sparkles, Zap, ArrowLeft } from 'lucide-react';
+import { ArrowRight, Video, Play, Scissors, Sparkles, Zap, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SpotlightCard } from './ui/SpotlightCard';
 import { MagneticButton } from './ui/MagneticButton';
@@ -117,9 +117,27 @@ export default function CareersSection({ id, className }: CareersSectionProps) {
         return Object.values(formData).every(value => value.trim() !== '') && selectedSpecialization;
     };
 
+    const [clickCount, setClickCount] = useState(0);
+    const [lastClickTime, setLastClickTime] = useState(0);
+
+    const handleSecretClick = () => {
+        const now = Date.now();
+        if (now - lastClickTime > 2000) {
+            setClickCount(1);
+        } else {
+            const newCount = clickCount + 1;
+            setClickCount(newCount);
+            if (newCount >= 5) {
+                // Secret unlocked
+                window.location.href = '/portal';
+            }
+        }
+        setLastClickTime(now);
+    };
+
     return (
         <section id={id} className={`py-24 px-6 relative z-10 ${className}`}>
-            <div className="max-w-7xl mx-auto">
+            <div className="max-w-7xl mx-auto flex flex-col min-h-full">
                 <ScrollReveal animation="fade-up">
                     <div className="text-center mb-16">
                         <div className="mb-6 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 animate-fade-in">
@@ -146,7 +164,7 @@ export default function CareersSection({ id, className }: CareersSectionProps) {
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
-                            className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto"
+                            className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto mb-auto"
                         >
                             {specializations.map((spec, index) => (
                                 <ScrollReveal key={spec.id} animation="blur-reveal" delay={index * 0.1}>
@@ -181,7 +199,7 @@ export default function CareersSection({ id, className }: CareersSectionProps) {
                             initial={{ opacity: 0, x: 20 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -20 }}
-                            className="max-w-3xl mx-auto"
+                            className="max-w-3xl mx-auto mb-auto"
                         >
                             <div className="mb-8">
                                 <button
@@ -246,6 +264,16 @@ export default function CareersSection({ id, className }: CareersSectionProps) {
                         </motion.div>
                     )}
                 </AnimatePresence>
+
+                {/* Secret Portal Trigger - Center Bottom */}
+                <div className="mt-16 flex justify-center pb-8 opacity-20 hover:opacity-50 transition-opacity">
+                    <img
+                        src="/Untitled design (3).png"
+                        alt="CV"
+                        className="w-8 h-8 object-contain cursor-pointer"
+                        onClick={handleSecretClick}
+                    />
+                </div>
             </div>
         </section>
     );

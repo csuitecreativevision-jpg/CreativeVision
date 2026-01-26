@@ -3,14 +3,14 @@ import { motion, useScroll, useTransform } from "framer-motion";
 
 interface HorizontalScrollWrapperProps {
     children: ReactNode;
-    contentWidth?: string; // e.g. "400vw" for 4 sections
+    contentWidth?: string;
+    overrideIndex: number | null;
 }
 
-export const HorizontalScrollWrapper = ({ children, contentWidth = "400vw" }: HorizontalScrollWrapperProps) => {
+export const HorizontalScrollWrapper = ({ children, overrideIndex }: HorizontalScrollWrapperProps) => {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [isMobile, setIsMobile] = useState(false);
 
-    // Check for mobile to disable horizontal scroll if needed for better UX
     useEffect(() => {
         const checkMobile = () => {
             setIsMobile(window.innerWidth < 768);
@@ -25,14 +25,18 @@ export const HorizontalScrollWrapper = ({ children, contentWidth = "400vw" }: Ho
         offset: ["start start", "end end"]
     });
 
-    // We map 0-1 progress to the total horizontal scrolling distance.
-    const totalSlides = 9; // Hero, Trust, About, Services, Portfolio, START_PROJECT, Pricing, Booking, Careers
-    // The total width of content is totalSlides * 100vw
-    // We want to translate from 0 to -(totalSlides - 1) * 100vw
-    const finalX = `-${(totalSlides - 1) * 100}vw`;
+    const visibleSlides = 6; // Hero, Trust, About, Services, Portfolio, Booking
+    // We only create scroll height for the VISIBLE slides.
+    // The others are waiting off-screen.
 
-    // Direct mapping for snappy 1:1 scroll response
-    const x = useTransform(scrollYProgress, [0, 1], ["0%", finalX]);
+    // Normal scroll logic
+    const finalVisibleX = `-${(visibleSlides - 1) * 100}vw`;
+    const scrollX = useTransform(scrollYProgress, [0, 1], ["0%", finalVisibleX]);
+
+    // Construct the transform style
+    // IF overrideIndex is set, ignore scrollX and manually set translate
+    // We can't use useState for MotionValues. We rely on the layout.
+    // When overrideIndex is !== null, we force the style.
 
     if (isMobile) {
         return (
@@ -45,24 +49,21 @@ export const HorizontalScrollWrapper = ({ children, contentWidth = "400vw" }: Ho
     }
 
     return (
-        <>
-            {/* 
-        Length should remain proportional to number of slides.
-      */}
-            <div ref={scrollRef} style={{ height: `${totalSlides * 100}vh` }} className="relative bg-custom-bg">
-                {/* Scroll Snap Points - Center Aligned */}
-                <div className="absolute inset-0 flex flex-col pointer-events-none">
-                    {Array.from({ length: totalSlides }).map((_, i) => (
-                        <div key={i} className="h-[100vh] w-full snap-center" />
-                    ))}
-                </div>
-
-                <div className="sticky top-0 h-screen w-screen overflow-hidden">
-                    <motion.div style={{ x }} className="flex h-full w-max">
-                        {children}
-                    </motion.div>
-                </div>
+        <div ref={scrollRef} style={{ height: `${visibleSlides * 100}vh` }} className="relative bg-custom-bg">
+            <div className="absolute inset-0 flex flex-col pointer-events-none">
+                {Array.from({ length: visibleSlides }).map((_, i) => (
+                    <div key={i} className="h-[100vh] w-full snap-center" />
+                ))}
             </div>
-        </>
+
+            <div className="sticky top-0 h-screen w-screen overflow-hidden">
+                <motion.div
+                    className={`flex h-full w-max ${overrideIndex !== null ? 'transition-transform duration-1000 ease-in-out' : ''}`}
+                    style={{ x: overrideIndex !== null ? `-${overrideIndex * 100}vw` : scrollX }}
+                >
+                    {children}
+                </motion.div>
+            </div>
+        </div>
     );
 };

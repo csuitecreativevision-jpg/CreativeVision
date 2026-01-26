@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Routes, Route, useNavigate } from 'react-router-dom';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 
 import { BackgroundLayout } from './components/layout/BackgroundLayout';
 import { CinematicOverlay } from './components/ui/CinematicOverlay';
@@ -8,10 +8,11 @@ import HomePage from './components/HomePage';
 import HireUsPage from './components/HireUsPage';
 import JoinTeamPage from './components/JoinTeamPage';
 import ThankYouPage from './components/ThankYouPage';
-import LoginPage from './components/LoginPage';
+import PortalPage from './components/PortalPage';
 
 export default function App() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     // Lenis removed for native scroll feel
@@ -27,7 +28,7 @@ export default function App() {
 
   return (
     <BackgroundLayout>
-      <Preloader />
+      {location.pathname !== '/portal' && <Preloader />}
       <CinematicOverlay />
       {/* Main Routing */}
       <Routes>
@@ -35,7 +36,7 @@ export default function App() {
         <Route path="/hire" element={<HireUsPage onBack={handleBack} />} />
         <Route path="/join" element={<JoinTeamPage onBack={handleBack} onThankYou={handleThankYou} />} />
         <Route path="/thank-you" element={<ThankYouPage onBack={handleBack} />} />
-        <Route path="/cvportal" element={<LoginPage />} />
+        <Route path="/portal" element={<PortalPage />} />
       </Routes>
     </BackgroundLayout>
   );
