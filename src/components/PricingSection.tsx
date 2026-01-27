@@ -1,6 +1,5 @@
 
-import { Check, Calendar, Sparkles } from 'lucide-react';
-import { SpotlightCard } from './ui/SpotlightCard';
+import { Check, Sparkles } from 'lucide-react';
 import { MagneticButton } from './ui/MagneticButton';
 import { ScrollReveal } from './ui/ScrollReveal';
 
@@ -11,6 +10,20 @@ interface PricingSectionProps {
 
 export default function PricingSection({ id, className }: PricingSectionProps) {
     const packages = [
+        {
+            name: "Trial",
+            price: 0,
+            duration: "one-time",
+            description: "Experience our quality risk-free",
+            features: [
+                "30 Minute Consultation",
+                "Free Trial Video"
+            ],
+            popular: false,
+            gradient: "from-blue-500/20 to-indigo-500/10",
+            borderColor: "border-blue-500/30",
+            iconGradient: "from-blue-400 to-indigo-500"
+        },
         {
             name: "Bronze",
             price: 390,
@@ -125,7 +138,7 @@ export default function PricingSection({ id, className }: PricingSectionProps) {
                     </div>
                 </ScrollReveal>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                     {packages.map((pkg, index) => (
                         <ScrollReveal key={pkg.name} animation="scale-up" delay={index * 0.1} className="h-full">
                             <div
@@ -186,33 +199,6 @@ export default function PricingSection({ id, className }: PricingSectionProps) {
                     ))}
                 </div>
 
-                {/* Ready to Scale CTA */}
-                <ScrollReveal animation="fade-up" delay={0.5} className="mt-20">
-                    <div className="max-w-3xl mx-auto text-center p-10 rounded-3xl bg-gradient-to-br from-custom-purple/20 via-custom-blue/10 to-transparent border border-white/10 backdrop-blur-xl relative overflow-hidden">
-                        {/* Glow effect */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-custom-purple/10 via-transparent to-custom-blue/10 pointer-events-none" />
-
-                        <div className="relative z-10">
-                            <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center">
-                                <Calendar className="w-8 h-8 text-custom-bright" />
-                            </div>
-                            <h3 className="text-3xl md:text-4xl font-bold text-white mb-4">Ready to Scale?</h3>
-                            <p className="text-gray-400 text-lg mb-8 max-w-xl mx-auto">
-                                Book a free 30-minute consultation. No commitment, just value.
-                            </p>
-                            <MagneticButton className="inline-block">
-                                <a
-                                    href="https://calendly.com/creativevision"
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center gap-3 px-8 py-4 bg-white text-black font-bold rounded-full hover:bg-gray-100 transition-all shadow-lg shadow-white/10"
-                                >
-                                    <Calendar className="w-5 h-5" /> Book Free Consultation
-                                </a>
-                            </MagneticButton>
-                        </div>
-                    </div>
-                </ScrollReveal>
             </div>
         </section>
     );
