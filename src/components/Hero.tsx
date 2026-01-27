@@ -67,10 +67,10 @@ export default function Hero({ onGetStarted: _ }: HeroProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1.5, duration: 1 }}
-        className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4"
+        className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3"
       >
-        <span className="text-[10px] uppercase tracking-[0.3em] text-gray-400 animate-pulse">Scroll to Begin</span>
-        <div className="w-[1px] h-24 bg-gradient-to-b from-gray-800 via-white to-gray-800 animate-pulse"></div>
+        <span className="text-[10px] uppercase tracking-[0.3em] text-gray-500 animate-pulse">Scroll to Begin</span>
+        <div className="w-[1px] h-12 bg-gradient-to-b from-gray-800/0 via-white/20 to-gray-800/0"></div>
       </motion.div>
     </section>
   );
