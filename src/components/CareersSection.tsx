@@ -180,20 +180,7 @@ export default function CareersSection({ id, className }: CareersSectionProps) {
         setSubmitStatus('idle');
     };
 
-    // Secret portal logic preserved
-    const [clickCount, setClickCount] = useState(0);
-    const [lastClickTime, setLastClickTime] = useState(0);
-    const handleSecretClick = () => {
-        const now = Date.now();
-        if (now - lastClickTime > 2000) {
-            setClickCount(1);
-        } else {
-            const newCount = clickCount + 1;
-            setClickCount(newCount);
-            if (newCount >= 5) window.location.href = '/portal';
-        }
-        setLastClickTime(now);
-    };
+
 
     // Animation Variants
     const variants = {
@@ -461,19 +448,7 @@ export default function CareersSection({ id, className }: CareersSectionProps) {
                                 </SpotlightCard>
                             </div>
                         </motion.div>
-                    </AnimatePresence>
-
-                    {/* Secret Portal Trigger - Center Bottom */}
-                    <div className="mt-8 flex justify-center pb-8 opacity-20 hover:opacity-50 transition-opacity">
-                        <img
-                            src="/Untitled design (3).png"
-                            alt="CV"
-                            className="w-8 h-8 object-contain cursor-pointer"
-                            onClick={handleSecretClick}
-                        />
-                    </div>
-
-                </div>
+                    </AnimatePresence>                </div>
             </div>
         </section>
     );

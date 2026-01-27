@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 
 import { BackgroundLayout } from './components/layout/BackgroundLayout';
@@ -13,6 +13,21 @@ import PortalPage from './components/PortalPage';
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Secret portal logic
+  const [clickCount, setClickCount] = useState(0);
+  const [lastClickTime, setLastClickTime] = useState(0);
+  const handleSecretClick = () => {
+    const now = Date.now();
+    if (now - lastClickTime > 2000) {
+      setClickCount(1);
+    } else {
+      const newCount = clickCount + 1;
+      setClickCount(newCount);
+      if (newCount >= 5) window.location.href = '/portal';
+    }
+    setLastClickTime(now);
+  };
 
   useEffect(() => {
     // Lenis removed for native scroll feel
@@ -30,6 +45,19 @@ export default function App() {
     <BackgroundLayout>
       {location.pathname !== '/portal' && <Preloader />}
       <CinematicOverlay />
+
+      {/* Global Floating Secret Portal Trigger - Bottom Left */}
+      {location.pathname !== '/portal' && (
+        <div className="fixed left-6 bottom-6 z-50 opacity-10 hover:opacity-40 transition-opacity duration-300">
+          <img
+            src="/Untitled design (3).png"
+            alt="CV"
+            className="w-10 h-10 object-contain cursor-pointer"
+            onClick={handleSecretClick}
+          />
+        </div>
+      )}
+
       {/* Main Routing */}
       <Routes>
         <Route path="/" element={<HomePage />} />
