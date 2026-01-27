@@ -6,7 +6,19 @@ export interface ApplicationData {
     email: string;
     specialization: string;
     portfolioLink: string;
-    message: string;
+
+    // 13 Questions Data
+    hasWorkedBefore: string;
+    experienceDescription: string;
+    toolsUsed: string;
+    motionGraphicsExp: string;
+    workflowDescription: string;
+    successMetric: string;
+    whyJoin: string;
+    employmentStatus: string;
+    isStudent: string;
+    expectedRate: string;
+
     resumeFile?: File;
     [key: string]: any;
 }
@@ -26,11 +38,12 @@ async function mondayRequest(query: string, variables?: any) {
 
         const data = await response.json();
         if (data.errors) {
+            console.error("Monday API Error Details:", JSON.stringify(data.errors, null, 2));
             throw new Error(data.errors[0].message);
         }
         return data.data;
     } catch (error) {
-        console.error("Monday API Error:", error);
+        console.error("Monday API Request Failed:", error);
         throw error;
     }
 }
@@ -59,16 +72,51 @@ async function getOrCreateBoard(): Promise<string> {
   }`;
 
     const createData = await mondayRequest(createBoardQuery);
-    const boardId = createData.create_board.id;
+    return createData.create_board.id;
+    // Columns will be created by ensureColumnsExist called in submitApplication
+}
 
-    // 3. Create Columns
-    await createColumn(boardId, "email", "text", "Email");
-    await createColumn(boardId, "specialization", "text", "Specialization");
-    await createColumn(boardId, "portfolio", "link", "Portfolio");
-    await createColumn(boardId, "file", "file", "Resume");
-    await createColumn(boardId, "message", "long_text", "Message"); // Add Message column
+async function ensureColumnsExist(boardId: string) {
+    const columnsQuery = `query {
+        boards (ids: [${boardId}]) {
+            columns {
+                id
+                title
+                type
+            }
+        }
+    }`;
+    const columnsData = await mondayRequest(columnsQuery);
+    const existingColumns = columnsData.boards[0]?.columns || [];
 
-    return boardId;
+    const requiredColumns = [
+        { title: "Email", type: "text" },
+        { title: "Specialization", type: "text" },
+        { title: "Portfolio", type: "link" },
+        // { title: "Resume", type: "file" }, // Removed
+
+        { title: "Worked Before", type: "status" },
+        { title: "Experience Desc", type: "long_text" },
+        { title: "Tools Used", type: "long_text" },
+        { title: "Motion Graphics", type: "long_text" },
+        { title: "Workflow", type: "long_text" },
+        { title: "Success Metric", type: "long_text" },
+        { title: "Why Join", type: "long_text" },
+
+        { title: "Employment Status", type: "status" },
+        { title: "Is Student", type: "status" },
+        { title: "Expected Rate", type: "status" },
+        { title: "Application Status", type: "status" } // The one missing
+    ];
+
+    for (const col of requiredColumns) {
+        // loose matching for existence check
+        const exists = existingColumns.some((c: any) => c.title.toLowerCase() === col.title.toLowerCase());
+        if (!exists) {
+            console.log(`Creating missing column: ${col.title}`);
+            await createColumn(boardId, col.title, col.type, col.title);
+        }
+    }
 }
 
 async function getOrCreateGroup(boardId: string, groupName: string): Promise<string> {
@@ -114,16 +162,18 @@ export async function submitApplicationToMonday(data: ApplicationData) {
     try {
         const boardId = await getOrCreateBoard();
 
-        // Get or Create Group for Specialization
+        // NEW: Ensure all columns exist before we try to look them up
+        await ensureColumnsExist(boardId);
+
         const groupId = await getOrCreateGroup(boardId, data.specialization || "General");
 
-        // Fetch columns to map data
         const columnsQuery = `query {
             boards (ids: [${boardId}]) {
                 columns {
                     id
                     title
                     type
+                    settings_str
                 }
             }
         }`;
@@ -131,30 +181,90 @@ export async function submitApplicationToMonday(data: ApplicationData) {
         const columnsData = await mondayRequest(columnsQuery);
         const columns = columnsData.boards[0]?.columns || [];
 
-        const getColId = (title: string) => columns.find((c: any) => c.title.toLowerCase().includes(title.toLowerCase()))?.id;
+        // Helper: Find exact match first, then partial.
+        const getColId = (title: string, strict = false) => {
+            const exact = columns.find((c: any) => c.title.toLowerCase() === title.toLowerCase());
+            if (exact) return exact.id;
+            if (strict) return undefined;
+            return columns.find((c: any) => c.title.toLowerCase().includes(title.toLowerCase()))?.id;
+        };
+
+        // Helper: Format value based on column type
+        const formatValue = (colId: string | undefined, value: string | object) => {
+            if (!colId) return null;
+            const col = columns.find((c: any) => c.id === colId);
+            if (!col) return null;
+
+            if (['status', 'color', 'dropdown', 'type'].includes(col.type)) {
+                return { label: value };
+            }
+            if (col.type === 'text') {
+                if (typeof value === 'object') return JSON.stringify(value);
+                return value;
+            }
+            if (col.type === 'long_text') {
+                return { text: typeof value === 'object' ? JSON.stringify(value) : value };
+            }
+            if (col.type === 'link' && typeof value === 'string') {
+                return { url: value, text: value };
+            }
+
+            return value;
+        };
 
         const emailColId = getColId("Email");
         const specColId = getColId("Specialization");
         const portfolioColId = getColId("Portfolio");
-        const messageColId = getColId("Message");
 
-        // Robust File Column Lookup
-        const fileColumn = columns.find((c: any) => c.type === "file" || c.title.toLowerCase() === "resume");
-        const resumeColId = getColId("Resume") || fileColumn?.id || "files";
+        // NEW: Specific Application Status Column
+        const appStatusColId = getColId("Application Status");
+        const statusColId = columns.find((c: any) => c.title.toLowerCase() === "status")?.id;
+
+        // Detailed Columns Lookup
+        const workedBeforeId = getColId("Worked Before");
+        const expDescId = getColId("Experience Desc");
+        const toolsId = getColId("Tools Used");
+        const motionId = getColId("Motion Graphics");
+        const workflowId = getColId("Workflow");
+        const successId = getColId("Success Metric");
+        const whyJoinId = getColId("Why Join");
+        const empStatusId = getColId("Employment Status");
+        const isStudentId = getColId("Is Student");
+        const rateId = getColId("Expected Rate");
 
         const columnValues: any = {};
-        if (emailColId) columnValues[emailColId] = data.email;
-        if (specColId) columnValues[specColId] = data.specialization;
+
+        // Basic Info
+        if (emailColId) columnValues[emailColId] = formatValue(emailColId, data.email);
+        if (specColId) columnValues[specColId] = formatValue(specColId, data.specialization);
         if (portfolioColId && data.portfolioLink) {
-            columnValues[portfolioColId] = { url: data.portfolioLink, text: "Portfolio Link" };
-        }
-        if (messageColId && data.message) {
-            columnValues[messageColId] = { text: data.message };
+            columnValues[portfolioColId] = { url: data.portfolioLink, text: "Portfolio / Resume" };
         }
 
-        // Create Item in specific Group
+        // Detailed Fields Mapping
+        if (workedBeforeId) columnValues[workedBeforeId] = formatValue(workedBeforeId, data.hasWorkedBefore);
+        if (expDescId) columnValues[expDescId] = formatValue(expDescId, data.experienceDescription);
+        if (toolsId) columnValues[toolsId] = formatValue(toolsId, data.toolsUsed);
+        if (motionId) columnValues[motionId] = formatValue(motionId, data.motionGraphicsExp);
+        if (workflowId) columnValues[workflowId] = formatValue(workflowId, data.workflowDescription);
+        if (successId) columnValues[successId] = formatValue(successId, data.successMetric);
+        if (whyJoinId) columnValues[whyJoinId] = formatValue(whyJoinId, data.whyJoin);
+
+        if (empStatusId) columnValues[empStatusId] = formatValue(empStatusId, data.employmentStatus);
+        if (isStudentId) columnValues[isStudentId] = formatValue(isStudentId, data.isStudent);
+        if (rateId) columnValues[rateId] = formatValue(rateId, data.expectedRate);
+
+
+        // STATUS LOGIC
+        if (appStatusColId) {
+            columnValues[appStatusColId] = { label: "New" };
+        }
+        else if (statusColId) {
+            columnValues[statusColId] = { label: "New" };
+        }
+
         const createItemQuery = `mutation ($boardId: ID!, $groupId: String!, $itemName: String!, $columnValues: JSON!) {
-            create_item (board_id: $boardId, group_id: $groupId, item_name: $itemName, column_values: $columnValues) {
+            create_item (board_id: $boardId, group_id: $groupId, item_name: $itemName, column_values: $columnValues, create_labels_if_missing: true) {
                 id
             }
         }`;
@@ -167,54 +277,10 @@ export async function submitApplicationToMonday(data: ApplicationData) {
         };
 
         const itemData = await mondayRequest(createItemQuery, variables);
-        const itemId = itemData.create_item.id;
-
-        // Upload Resume to Column ONLY
-        if (data.resumeFile) {
-            // console.log(`Uploading resume to column ID: ${resumeColId}`);
-            try {
-                await uploadFileToMonday(itemId, data.resumeFile, resumeColId);
-            } catch (err: any) {
-                console.error("Critical: Resume upload failed", err);
-                alert(`Application submitted, but Resume failed to upload.\nReason: ${err.message || "Unknown error"}`);
-            }
-        }
-
-        return itemId;
+        return itemData.create_item.id;
 
     } catch (error) {
         console.error("Failed to submit to Monday.com", error);
         throw error;
     }
-}
-
-async function uploadFileToMonday(itemId: string, file: File, columnId: string) {
-    const query = `mutation ($file: File!) {
-        add_file_to_column (item_id: ${itemId}, column_id: "${columnId}", file: $file) {
-            id
-        }
-    }`;
-    await performUpload(query, file);
-}
-
-async function performUpload(query: string, file: File) {
-    const formData = new FormData();
-    formData.append("query", query);
-    formData.append("map", JSON.stringify({ "image": ["variables.file"] }));
-    formData.append("image", file);
-
-    const response = await fetch(MONDAY_API_URL, {
-        method: "POST",
-        headers: {
-            "Authorization": MONDAY_API_TOKEN,
-        },
-        body: formData,
-    });
-    const json = await response.json();
-    if (json.errors) throw new Error(json.errors[0].message);
-    if (json.data && json.data.add_file_to_column) {
-        return json.data.add_file_to_column;
-    }
-    // Fallback if structure is different
-    return json;
 }
