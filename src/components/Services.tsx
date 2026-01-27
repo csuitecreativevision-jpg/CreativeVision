@@ -20,7 +20,7 @@ export default function Services({ onGetStarted, onJoinTeam }: ServicesProps) {
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 mb-4">
               <div className="w-1.5 h-1.5 rounded-full bg-custom-bright" />
-              <span className="text-xs font-medium text-gray-300">Our Expertise</span>
+              <span className="text-xs font-medium text-gray-300">Choose Your Path</span>
             </div>
             <h2 className="text-6xl md:text-8xl font-bold text-white leading-tight">
               Cinematic{' '}

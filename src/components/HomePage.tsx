@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import Hero from './Hero';
-import About from './About';
 import Services from './Services';
 import Portfolio from './Portfolio';
-import BookingSection from './BookingSection';
 import TrustSignals from './sections/TrustSignals';
+import ProblemSection from './sections/ProblemSection';
 import CareersSection from './CareersSection';
 import PricingSection from './PricingSection';
 import { HorizontalScrollWrapper } from './layout/HorizontalScrollWrapper';
@@ -66,37 +65,32 @@ export default function HomePage() {
 
   const Content = (
     <>
-      {/* 0 */}
+      {/* 0: Hero - The Hook */}
       <Slide id="hero" className="hero-slide">
-        <Hero onGetStarted={() => setNavOverride(6)} />
+        <Hero onGetStarted={() => setNavOverride(5)} />
       </Slide>
 
-      {/* 1 */}
-      <Slide className="trust-slide" enableFlash>
+      {/* 1: Problem - Create Tension */}
+      <Slide className="problem-slide">
+        <ProblemSection />
+      </Slide>
+
+      {/* 2: Portfolio - The Solution (Let work speak) */}
+      <Slide className="portfolio-slide" enableFlash>
+        <Portfolio onGetStarted={() => setNavOverride(5)} />
+      </Slide>
+
+      {/* 3: Trust Signals - Social Proof */}
+      <Slide className="trust-slide">
         <TrustSignals />
       </Slide>
 
-      {/* 2 */}
-      <Slide className="about-slide">
-        <About />
-      </Slide>
-
-      {/* 3 */}
+      {/* 4: Services - Decision Point (Hire or Join) */}
       <Slide className="services-slide">
-        <Services onGetStarted={() => setNavOverride(6)} onJoinTeam={() => setNavOverride(7)} />
+        <Services onGetStarted={() => setNavOverride(5)} onJoinTeam={() => setNavOverride(6)} />
       </Slide>
 
-      {/* 4 */}
-      <Slide className="portfolio-slide">
-        <Portfolio onGetStarted={() => setNavOverride(6)} />
-      </Slide>
-
-      {/* 5 */}
-      <Slide className="booking-slide">
-        <BookingSection id="booking" />
-      </Slide>
-
-      {/* 6: Hidden - Pricing Plans */}
+      {/* 5: Hidden - Pricing Plans */}
       <Slide className="pricing-slide">
         <div className="relative w-full h-full">
           <button
@@ -109,7 +103,7 @@ export default function HomePage() {
         </div>
       </Slide>
 
-      {/* 7: Hidden - Careers */}
+      {/* 6: Hidden - Careers */}
       <Slide className="careers-slide">
         <div className="relative w-full h-full">
           <button
@@ -132,13 +126,13 @@ export default function HomePage() {
       {isMobile ? (
         <main className="flex flex-col">
           <div id="hero"><Hero onGetStarted={() => navigate('/hire')} /></div>
-          <About />
-          <Services onGetStarted={() => navigate('/hire')} onJoinTeam={() => navigate('/join')} />
+          <ProblemSection />
           <Portfolio onGetStarted={() => navigate('/hire')} />
-          <BookingSection id="booking" />
+          <TrustSignals />
+          <Services onGetStarted={() => navigate('/hire')} onJoinTeam={() => navigate('/join')} />
         </main>
       ) : (
-        <HorizontalScrollWrapper contentWidth="800vh" overrideIndex={navOverride}>
+        <HorizontalScrollWrapper contentWidth="700vh" overrideIndex={navOverride}>
           {Content}
         </HorizontalScrollWrapper>
       )}
