@@ -103,6 +103,7 @@ export default function HomePage() {
         </div>
       </Slide>
 
+
       {/* 6: Hidden - Careers */}
       <Slide className="careers-slide">
         <div className="relative w-full h-full">
@@ -115,6 +116,7 @@ export default function HomePage() {
           <CareersSection id="careers" />
         </div>
       </Slide>
+
     </>
   );
 

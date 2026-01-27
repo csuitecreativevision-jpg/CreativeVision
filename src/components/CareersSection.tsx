@@ -1,10 +1,10 @@
-import { useState, useEffect, FormEvent } from 'react';
-import { ArrowRight, Video, Play, Scissors, Sparkles, Zap, ArrowLeft } from 'lucide-react';
+import { useState, useEffect, FormEvent, useRef } from 'react';
+import { ArrowRight, Video, Play, Scissors, Sparkles, Zap, ArrowLeft, Upload, ChevronDown, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SpotlightCard } from './ui/SpotlightCard';
 import { MagneticButton } from './ui/MagneticButton';
 import { ScrollReveal } from './ui/ScrollReveal';
-import { sendApplicationEmail, initEmailJS } from '../services/emailService';
+import { submitApplicationToMonday } from '../services/mondayService';
 
 interface CareersSectionProps {
     id?: string;
@@ -12,70 +12,31 @@ interface CareersSectionProps {
 }
 
 export default function CareersSection({ id, className }: CareersSectionProps) {
-    const [selectedSpecialization, setSelectedSpecialization] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<{
+        fullName: string;
+        email: string;
+        specialization: string;
+        portfolioLink: string;
+        resumeFile: File | null;
+        message: string;
+    }>({
         fullName: '',
         email: '',
-        hasExperience: '',
-        contentType: '',
-        successfulVideo: '',
-        comfortableVideoTypes: '',
-        editingProcess: '',
-        engagementTechnique: '',
-        successMeasurement: '',
-        motionGraphicsExperience: '',
-        stayUpdated: '',
-        toolsSoftware: '',
-        whyJoin: '',
-        portfolioLink: ''
+        specialization: '',
+        portfolioLink: '',
+        resumeFile: null,
+        message: '' // Kept for generic message/why join if needed, or we can hide it
     });
 
-    useEffect(() => {
-        initEmailJS();
-    }, []);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const specializations = [
-        {
-            id: 'short-form',
-            title: 'Short-form Video Editor',
-            description: 'Create engaging short-form content for social media platforms like TikTok, Instagram Reels, and YouTube Shorts.',
-            icon: <Play className="w-8 h-8" />,
-            color: '#7424f5',
-            gradient: 'linear-gradient(135deg, #7424f5 0%, #581cd9 100%)'
-        },
-        {
-            id: 'clipper',
-            title: 'Clipper',
-            description: 'Extract and edit the best moments from long-form content to create compelling highlight reels and clips.',
-            icon: <Scissors className="w-8 h-8" />,
-            color: '#581cd9',
-            gradient: 'linear-gradient(135deg, #581cd9 0%, #3a14b7 100%)'
-        },
-        {
-            id: 'animator',
-            title: 'Animator',
-            description: 'Bring stories to life through creative animation, character design, and dynamic visual storytelling.',
-            icon: <Sparkles className="w-8 h-8" />,
-            color: '#3a14b7',
-            gradient: 'linear-gradient(135deg, #3a14b7 0%, #01077c 100%)'
-        },
-        {
-            id: 'motion-graphics',
-            title: 'Motion Graphics Editor',
-            description: 'Design and animate graphics, titles, and visual effects that enhance the storytelling experience.',
-            icon: <Zap className="w-8 h-8" />,
-            color: '#01077c',
-            gradient: 'linear-gradient(135deg, #01077c 0%, #00034d 100%)'
-        },
-        {
-            id: 'long-form',
-            title: 'Long-form Video Editor',
-            description: 'Craft comprehensive narratives for documentaries, tutorials, and extended content that captivates audiences.',
-            icon: <Video className="w-8 h-8" />,
-            color: '#00034d',
-            gradient: 'linear-gradient(135deg, #00034d 0%, #7424f5 100%)'
-        }
+        { id: 'short-form', title: 'Short-form Video Editor' },
+        { id: 'clipper', title: 'Clipper' },
+        { id: 'animator', title: 'Animator' },
+        { id: 'motion-graphics', title: 'Motion Graphics Editor' },
+        { id: 'long-form', title: 'Long-form Video Editor' }
     ];
 
     const handleInputChange = (field: string, value: string) => {
@@ -85,26 +46,52 @@ export default function CareersSection({ id, className }: CareersSectionProps) {
         }));
     };
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            setFormData(prev => ({
+                ...prev,
+                resumeFile: e.target.files![0]
+            }));
+        }
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            setFormData(prev => ({
+                ...prev,
+                resumeFile: e.dataTransfer.files[0]
+            }));
+        }
+    };
+
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
-        if (!selectedSpecialization) return;
+        if (!formData.specialization) {
+            alert("Please select a position.");
+            return;
+        }
 
         setIsSubmitting(true);
 
         try {
-            const result = await sendApplicationEmail({
+            await submitApplicationToMonday({
                 ...formData,
-                specialization: specializations.find(s => s.id === selectedSpecialization)?.title || selectedSpecialization
+                specialization: specializations.find(s => s.id === formData.specialization)?.title || formData.specialization,
+                message: formData.message || "No additional message",
             });
 
-            if (result.success) {
-                alert('Application sent successfully! We will get back to you soon.');
-                setSelectedSpecialization(null);
-                setFormData(prev => ({ ...prev, fullName: '', email: '' })); // Reset key fields
-            } else {
-                console.error('Failed to send application:', result.error);
-                alert('Failed to send application. Please try again.');
-            }
+            alert('Application sent successfully!');
+            setFormData({
+                fullName: '',
+                email: '',
+                specialization: '',
+                portfolioLink: '',
+                resumeFile: null,
+                message: ''
+            });
+            if (fileInputRef.current) fileInputRef.current.value = '';
         } catch (error) {
             console.error('Error submitting application:', error);
             alert('An error occurred. Please try again.');
@@ -114,12 +101,15 @@ export default function CareersSection({ id, className }: CareersSectionProps) {
     };
 
     const isFormValid = () => {
-        return Object.values(formData).every(value => value.trim() !== '') && selectedSpecialization;
+        return formData.fullName.trim() !== '' &&
+            formData.email.trim() !== '' &&
+            formData.specialization !== '' &&
+            formData.portfolioLink.trim() !== '';
     };
 
+    // Secret portal logic preserved
     const [clickCount, setClickCount] = useState(0);
     const [lastClickTime, setLastClickTime] = useState(0);
-
     const handleSecretClick = () => {
         const now = Date.now();
         if (now - lastClickTime > 2000) {
@@ -127,143 +117,144 @@ export default function CareersSection({ id, className }: CareersSectionProps) {
         } else {
             const newCount = clickCount + 1;
             setClickCount(newCount);
-            if (newCount >= 5) {
-                // Secret unlocked
-                window.location.href = '/portal';
-            }
+            if (newCount >= 5) window.location.href = '/portal';
         }
         setLastClickTime(now);
     };
 
     return (
-        <section id={id} className={`w-screen h-screen flex-shrink-0 flex items-center justify-center relative overflow-hidden px-6 ${className}`}>
-            <div className="max-w-7xl mx-auto flex flex-col w-full">
+        <section id={id} className={`w-screen min-h-screen flex-shrink-0 flex items-center justify-center relative overflow-hidden px-6 py-20 ${className}`}>
+            <div className="max-w-4xl mx-auto flex flex-col w-full">
                 <ScrollReveal animation="fade-up">
-                    <div className="text-center mb-16">
+                    <div className="text-center mb-12">
                         <div className="mb-6 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 animate-fade-in">
                             <div className="w-2 h-2 rounded-full bg-custom-bright animate-pulse" />
                             <span className="text-xs font-medium text-gray-300 tracking-wider uppercase">We are hiring</span>
                         </div>
 
                         <h2 className="text-4xl md:text-6xl font-bold mb-6 text-glow leading-[1.1]">
-                            What Do You <br />
+                            Join The <br />
                             <span className="text-transparent bg-clip-text bg-gradient-to-r from-custom-bright via-white to-custom-violet">
-                                Specialize In?
+                                Team
                             </span>
                         </h2>
                         <p className="text-xl text-gray-300 max-w-2xl mx-auto mb-8">
-                            Join a distributed team of elite creatives. Choose your path below.
+                            Ready to create? Restore your legacy.
                         </p>
                     </div>
                 </ScrollReveal>
 
-                <AnimatePresence mode="wait">
-                    {!selectedSpecialization ? (
-                        <motion.div
-                            key="grid"
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto mb-auto"
-                        >
-                            {specializations.map((spec, index) => (
-                                <ScrollReveal key={spec.id} animation="blur-reveal" delay={index * 0.1}>
-                                    <div
-                                        onClick={() => setSelectedSpecialization(spec.id)}
-                                        className="h-full"
-                                    >
-                                        <SpotlightCard
-                                            className="rounded-3xl p-8 cursor-pointer border-white/10 bg-white/5 hover:bg-white/10 transition-colors group h-full flex flex-col"
-                                            spotlightColor={spec.color}
-                                        >
-                                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6 transition-transform duration-300 group-hover:scale-110" style={{ background: spec.gradient + '40' }}>
-                                                <div className="text-white">{spec.icon}</div>
-                                            </div>
-
-                                            <h3 className="text-2xl font-bold text-white mb-3" style={{ color: spec.color }}>{spec.title}</h3>
-                                            <p className="text-gray-400 leading-relaxed flex-grow">
-                                                {spec.description}
-                                            </p>
-
-                                            <div className="mt-6 flex items-center gap-2 text-sm font-bold uppercase tracking-wider opacity-60 group-hover:opacity-100 transition-opacity">
-                                                <span>Select Role</span> <ArrowRight className="w-4 h-4" />
-                                            </div>
-                                        </SpotlightCard>
-                                    </div>
-                                </ScrollReveal>
-                            ))}
-                        </motion.div>
-                    ) : (
-                        <motion.div
-                            key="form"
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -20 }}
-                            className="max-w-3xl mx-auto mb-auto"
-                        >
-                            <div className="mb-8">
-                                <button
-                                    onClick={() => setSelectedSpecialization(null)}
-                                    className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="bg-white/5 border border-white/10 rounded-3xl p-8 md:p-12 backdrop-blur-sm"
+                >
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        {/* Position Selection */}
+                        <div className="space-y-2">
+                            <label className="block text-sm font-medium text-gray-400 mb-2">Position</label>
+                            <div className="relative">
+                                <select
+                                    value={formData.specialization}
+                                    onChange={e => handleInputChange('specialization', e.target.value)}
+                                    className="w-full px-4 py-4 rounded-xl bg-black/20 border border-white/10 text-white appearance-none focus:outline-none focus:border-custom-bright/50 focus:bg-black/40 transition-all cursor-pointer"
+                                    required
                                 >
-                                    <ArrowLeft className="w-4 h-4" /> Back to roles
-                                </button>
+                                    <option value="" disabled>Select a position...</option>
+                                    {specializations.map(spec => (
+                                        <option key={spec.id} value={spec.id} className="bg-gray-900">{spec.title}</option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none w-5 h-5" />
                             </div>
+                        </div>
 
-                            <div className="bg-white/5 border border-white/10 rounded-3xl p-8 md:p-12 backdrop-blur-sm">
-                                <div className="mb-8 flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: specializations.find(s => s.id === selectedSpecialization)?.gradient }}>
-                                        {specializations.find(s => s.id === selectedSpecialization)?.icon}
-                                    </div>
-                                    <div>
-                                        <h3 className="text-2xl font-bold">Apply for {specializations.find(s => s.id === selectedSpecialization)?.title}</h3>
-                                        <p className="text-gray-400">Join the team</p>
-                                    </div>
+                        <div className="grid md:grid-cols-2 gap-6">
+                            <InputGroup
+                                label="Full Name"
+                                value={formData.fullName}
+                                onChange={v => handleInputChange('fullName', v)}
+                                placeholder="John Doe"
+                            />
+                            <InputGroup
+                                label="Email Address"
+                                value={formData.email}
+                                onChange={v => handleInputChange('email', v)}
+                                placeholder="john@example.com"
+                                type="email"
+                            />
+                        </div>
+
+                        {/* Resume Upload - Drag n Drop */}
+                        <div className="space-y-2">
+                            <label className="block text-sm font-medium text-gray-400 mb-2">Resume / CV</label>
+                            <div
+                                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                onDrop={handleDrop}
+                                onClick={() => fileInputRef.current?.click()}
+                                className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all cursor-pointer group ${formData.resumeFile ? 'border-custom-bright bg-custom-bright/10' : 'border-white/10 hover:border-white/30 hover:bg-white/5'}`}
+                            >
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    onChange={handleFileChange}
+                                    className="hidden"
+                                    accept=".pdf,.doc,.docx"
+                                />
+                                <div className="flex flex-col items-center gap-3">
+                                    {formData.resumeFile ? (
+                                        <>
+                                            <div className="w-12 h-12 rounded-full bg-custom-bright flex items-center justify-center">
+                                                <Check className="w-6 h-6 text-white" />
+                                            </div>
+                                            <p className="font-medium text-white">{formData.resumeFile.name}</p>
+                                            <p className="text-sm text-gray-400">Click to change</p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-custom-bright/20 transition-colors">
+                                                <Upload className="w-6 h-6 text-gray-400 group-hover:text-custom-bright transition-colors" />
+                                            </div>
+                                            <p className="font-medium text-gray-300 group-hover:text-white transition-colors">Click or drag resume here</p>
+                                            <p className="text-sm text-gray-500">PDF, DOC (Max 10MB)</p>
+                                        </>
+                                    )}
                                 </div>
-
-                                <form onSubmit={handleSubmit} className="space-y-6">
-                                    <div className="grid md:grid-cols-2 gap-6">
-                                        <InputGroup
-                                            label="Full Name"
-                                            value={formData.fullName}
-                                            onChange={v => handleInputChange('fullName', v)}
-                                            placeholder="John Doe"
-                                        />
-                                        <InputGroup
-                                            label="Email Address"
-                                            value={formData.email}
-                                            onChange={v => handleInputChange('email', v)}
-                                            placeholder="john@example.com"
-                                            type="email"
-                                        />
-                                    </div>
-
-                                    <TextAreaGroup
-                                        label="Relevant Experience & Links"
-                                        value={formData.hasExperience}
-                                        onChange={v => handleInputChange('hasExperience', v)}
-                                        placeholder="Tell us about your experience and drop your portfolio links here..."
-                                    />
-
-                                    <div className="pt-4">
-                                        <MagneticButton className="w-full">
-                                            <button
-                                                type="submit"
-                                                disabled={!isFormValid() || isSubmitting}
-                                                className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${isFormValid() && !isSubmitting
-                                                    ? 'bg-custom-bright text-white hover:bg-custom-purple'
-                                                    : 'bg-white/10 text-gray-500 cursor-not-allowed'
-                                                    }`}
-                                            >
-                                                {isSubmitting ? 'Sending...' : 'Submit Application'}
-                                            </button>
-                                        </MagneticButton>
-                                    </div>
-                                </form>
                             </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                        </div>
+
+                        <InputGroup
+                            label="Portfolio Link"
+                            value={formData.portfolioLink}
+                            onChange={v => handleInputChange('portfolioLink', v)}
+                            placeholder="https://your-portfolio.com"
+                        />
+
+                        {/* Hidden/Optional Message field needed for API interface or keep as generic "Why Join?" */}
+                        <div className="hidden">
+                            <textarea
+                                value={formData.message}
+                                onChange={e => handleInputChange('message', e.target.value)}
+                            />
+                        </div>
+
+                        <div className="pt-4">
+                            <MagneticButton className="w-full">
+                                <button
+                                    type="submit"
+                                    disabled={!isFormValid() || isSubmitting}
+                                    className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${isFormValid() && !isSubmitting
+                                        ? 'bg-custom-bright text-white hover:bg-custom-purple'
+                                        : 'bg-white/10 text-gray-500 cursor-not-allowed'
+                                        }`}
+                                >
+                                    {isSubmitting ? 'Sending...' : 'Submit Application'}
+                                </button>
+                            </MagneticButton>
+                        </div>
+                    </form>
+                </motion.div>
 
                 {/* Secret Portal Trigger - Center Bottom */}
                 <div className="mt-16 flex justify-center pb-8 opacity-20 hover:opacity-50 transition-opacity">
@@ -295,26 +286,6 @@ const InputGroup = ({ label, value, onChange, placeholder, type = "text" }: Inpu
             value={value}
             onChange={e => onChange(e.target.value)}
             className="w-full px-4 py-3 rounded-xl bg-black/20 border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:border-custom-bright/50 focus:bg-black/40 transition-all"
-            placeholder={placeholder}
-            required
-        />
-    </div>
-);
-
-interface TextAreaGroupProps {
-    label: string;
-    value: string;
-    onChange: (value: string) => void;
-    placeholder: string;
-}
-
-const TextAreaGroup = ({ label, value, onChange, placeholder }: TextAreaGroupProps) => (
-    <div>
-        <label className="block text-sm font-medium text-gray-400 mb-2">{label}</label>
-        <textarea
-            value={value}
-            onChange={e => onChange(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl bg-black/20 border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:border-custom-bright/50 focus:bg-black/40 transition-all min-h-[120px]"
             placeholder={placeholder}
             required
         />

@@ -1,23 +1,27 @@
 import { useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { AlertTriangle, TrendingDown, Clock, Eye } from 'lucide-react';
+import { CountingNumber } from '../ui/CountingNumber';
 
 const problems = [
     {
         icon: TrendingDown,
-        stat: '87%',
+        value: 87,
+        suffix: '%',
         label: 'of videos fail to convert',
         description: 'Poor hooks, weak pacing, amateur edits.'
     },
     {
         icon: Clock,
-        stat: '3 sec',
+        value: 3,
+        suffix: ' sec',
         label: 'to capture attention',
         description: 'Most brands lose viewers before the message lands.'
     },
     {
         icon: Eye,
-        stat: '10x',
+        value: 10,
+        suffix: 'x',
         label: 'cost of bad content',
         description: 'Missed ads, lost leads, wasted production budgets.'
     }
@@ -94,7 +98,9 @@ export default function ProblemSection() {
                             <div className="w-12 h-12 rounded-xl bg-custom-bright/10 flex items-center justify-center mb-6 group-hover:bg-custom-bright/20 transition-colors">
                                 <problem.icon className="w-6 h-6 text-custom-bright" />
                             </div>
-                            <div className="text-4xl font-bold text-white mb-1">{problem.stat}</div>
+                            <div className="text-4xl font-bold text-white mb-1">
+                                <CountingNumber value={problem.value} suffix={problem.suffix} />
+                            </div>
                             <div className="text-sm text-custom-violet font-medium uppercase tracking-wide mb-3">{problem.label}</div>
                             <p className="text-gray-500 text-sm">{problem.description}</p>
                         </motion.div>

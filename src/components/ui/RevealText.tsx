@@ -18,12 +18,14 @@ export const RevealText = ({
     classNameWrapper
 }: RevealTextProps) => {
     const ref = useRef(null);
-    const isInView = useInView(ref, { once: true, margin: "-20%" });
+    const isInView = useInView(ref, { once: false, margin: "-10%" }); // Changed to once: false to allow replay
     const controls = useAnimation();
 
     useEffect(() => {
         if (isInView) {
             controls.start("visible");
+        } else {
+            controls.start("hidden");
         }
     }, [isInView, controls]);
 
@@ -45,7 +47,7 @@ export const RevealText = ({
                 stiffness: 70,
                 duration: 0.8,
                 delay: delay
-            }
+            } as const
         }
     };
 

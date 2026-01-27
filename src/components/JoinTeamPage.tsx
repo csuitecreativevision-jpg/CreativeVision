@@ -5,7 +5,7 @@ import MainNavigation from './MainNavigation';
 import Footer from './Footer';
 import { SpotlightCard } from './ui/SpotlightCard';
 import { MagneticButton } from './ui/MagneticButton';
-import { sendApplicationEmail, initEmailJS } from '../services/emailService';
+import { submitApplicationToMonday } from '../services/mondayService';
 
 interface SpecializationPageProps {
   onBack: () => void;
@@ -20,23 +20,13 @@ export default function SpecializationPage({ onBack, onThankYou }: Specializatio
     fullName: '',
     email: '',
     hasExperience: '',
-    contentType: '',
     successfulVideo: '',
-    comfortableVideoTypes: '',
-    editingProcess: '',
-    engagementTechnique: '',
-    successMeasurement: '',
-    motionGraphicsExperience: '',
-    stayUpdated: '',
-    toolsSoftware: '',
-    whyJoin: '',
-    portfolioLink: ''
+    portfolioLink: '',
+    whyJoin: ''
   });
 
 
-  useEffect(() => {
-    initEmailJS();
-  }, []);
+
 
   const specializations = [
     {
@@ -95,22 +85,19 @@ export default function SpecializationPage({ onBack, onThankYou }: Specializatio
     setIsSubmitting(true);
 
     try {
-      const result = await sendApplicationEmail({
+      await submitApplicationToMonday({
         ...formData,
-        specialization: specializations.find(s => s.id === selectedSpecialization)?.title || selectedSpecialization
+        specialization: specializations.find(s => s.id === selectedSpecialization)?.title || selectedSpecialization,
+        message: `Experience: ${formData.hasExperience}\nPortfolio: ${formData.portfolioLink}\nWhy Join: ${formData.whyJoin}`
       });
 
-      if (result.success) {
-        // Scroll to top before navigating to thank you page
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        // Small delay to ensure scroll completes before navigation
-        setTimeout(() => {
-          onThankYou();
-        }, 300);
-      } else {
-        console.error('Failed to send application:', result.error);
-        alert('Failed to send application. Please try again.');
-      }
+      // Scroll to top before navigating to thank you page
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      // Small delay to ensure scroll completes before navigation
+      setTimeout(() => {
+        onThankYou();
+      }, 300);
+
     } catch (error) {
       console.error('Error submitting application:', error);
       alert('An error occurred. Please try again.');
