@@ -13,10 +13,11 @@ interface CareersSectionProps {
 
 export default function CareersSection({ id, className }: CareersSectionProps) {
     const [currentStep, setCurrentStep] = useState(0);
+    const [subStep, setSubStep] = useState(0); // For Step 3 sub-steps
     const [direction, setDirection] = useState(0);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+    const [submitStatus, setSubmitStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
     const [errorMessage, setErrorMessage] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Form State (Matching 13 specific questions)
     const [formData, setFormData] = useState({
@@ -133,6 +134,31 @@ export default function CareersSection({ id, className }: CareersSectionProps) {
     };
 
     const nextStep = () => {
+        // Handle Step 3 sub-steps
+        if (currentStep === 3) {
+            if (subStep === 0) {
+                // Move to sub-step 1 (second part of Step 3)
+                if (formData.workflowDescription) {
+                    setSubStep(1);
+                    setDirection(1);
+                } else {
+                    alert("Please fill in all required fields to proceed.");
+                }
+                return;
+            } else if (subStep === 1) {
+                // Move to Step 4 after completing sub-step 1
+                if (formData.successMetric) {
+                    setSubStep(0); // Reset sub-step
+                    setDirection(1);
+                    setCurrentStep(prev => Math.min(prev + 1, steps.length - 1));
+                } else {
+                    alert("Please fill in all required fields to proceed.");
+                }
+                return;
+            }
+        }
+
+        // Normal step validation
         if (isStepValid(currentStep)) {
             setDirection(1);
             setCurrentStep(prev => Math.min(prev + 1, steps.length - 1));
@@ -142,8 +168,16 @@ export default function CareersSection({ id, className }: CareersSectionProps) {
     };
 
     const prevStep = () => {
+        // Handle Step 3 sub-steps when going back
+        if (currentStep === 3 && subStep === 1) {
+            setSubStep(0);
+            setDirection(-1);
+            return;
+        }
+
         setDirection(-1);
         setCurrentStep(prev => Math.max(prev - 1, 0));
+        setSubStep(0); // Reset sub-step when changing steps
     };
 
     const handleSubmit = async (e: FormEvent) => {
@@ -289,26 +323,105 @@ export default function CareersSection({ id, className }: CareersSectionProps) {
 
                                             {/* Step 0: Specialization Cards */}
                                             {currentStep === 0 && (
-                                                <div className="grid md:grid-cols-2 gap-4">
-                                                    {specializations.map((spec) => (
-                                                        <div
+                                                <div className="grid md:grid-cols-2 gap-6">
+                                                    {specializations.map((spec, index) => (
+                                                        <motion.div
                                                             key={spec.id}
+                                                            initial={{ opacity: 0, y: 20 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            transition={{
+                                                                delay: index * 0.1,
+                                                                duration: 0.5,
+                                                                ease: "easeOut"
+                                                            }}
+                                                            whileHover={{
+                                                                scale: 1.02,
+                                                                transition: { duration: 0.2 }
+                                                            }}
+                                                            whileTap={{ scale: 0.98 }}
                                                             onClick={() => handleSpecializationSelect(spec.id)}
-                                                            className={`cursor-pointer rounded-2xl p-6 border transition-all group relative overflow-hidden ${formData.specialization === spec.id ? 'bg-white/10 border-custom-bright ring-2 ring-custom-bright/50' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+                                                            className={`cursor-pointer rounded-2xl p-6 border-2 transition-all duration-300 group relative overflow-hidden ${formData.specialization === spec.id
+                                                                ? 'bg-white/10 border-custom-bright ring-4 ring-custom-bright/30 shadow-2xl shadow-custom-bright/20'
+                                                                : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-custom-bright/50 hover:shadow-xl hover:shadow-custom-bright/10'
+                                                                }`}
                                                         >
-                                                            {/* Background Gradient Hint */}
-                                                            <div className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500" style={{ background: spec.gradient }} />
+                                                            {/* Animated Background Gradient */}
+                                                            <motion.div
+                                                                className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-500"
+                                                                style={{ background: spec.gradient }}
+                                                                initial={false}
+                                                                animate={{
+                                                                    opacity: formData.specialization === spec.id ? 0.15 : 0
+                                                                }}
+                                                            />
+
+                                                            {/* Glow Effect on Selection */}
+                                                            {formData.specialization === spec.id && (
+                                                                <motion.div
+                                                                    className="absolute inset-0 rounded-2xl"
+                                                                    style={{
+                                                                        background: `radial-gradient(circle at 50% 50%, ${spec.color}20, transparent 70%)`,
+                                                                    }}
+                                                                    initial={{ opacity: 0 }}
+                                                                    animate={{ opacity: 1 }}
+                                                                    transition={{ duration: 0.3 }}
+                                                                />
+                                                            )}
 
                                                             <div className="relative z-10 flex items-start gap-4">
-                                                                <div className="p-3 rounded-xl bg-black/30 text-white" style={{ color: spec.color }}>
+                                                                {/* Icon Container with Animation */}
+                                                                <motion.div
+                                                                    className={`p-3 rounded-xl backdrop-blur-sm border transition-all duration-300 ${formData.specialization === spec.id
+                                                                        ? 'bg-custom-bright/20 border-custom-bright/50'
+                                                                        : 'bg-black/40 border-white/10'
+                                                                        }`}
+                                                                    style={{
+                                                                        color: 'white',
+                                                                        boxShadow: formData.specialization === spec.id
+                                                                            ? `0 0 20px ${spec.color}60, 0 0 40px ${spec.color}30`
+                                                                            : 'none'
+                                                                    }}
+                                                                    whileHover={{
+                                                                        rotate: [0, -5, 5, -5, 0],
+                                                                        scale: 1.1,
+                                                                        transition: { duration: 0.5 }
+                                                                    }}
+                                                                >
                                                                     {spec.icon}
-                                                                </div>
-                                                                <div>
-                                                                    <h3 className="text-lg font-bold text-white mb-1 group-hover:text-custom-bright transition-colors">{spec.title}</h3>
-                                                                    <p className="text-sm text-gray-400 leading-snug">{spec.description}</p>
+                                                                </motion.div>
+
+                                                                {/* Text Content */}
+                                                                <div className="flex-1">
+                                                                    <h3 className={`text-lg font-bold mb-2 transition-all duration-300 ${formData.specialization === spec.id
+                                                                        ? 'text-custom-bright'
+                                                                        : 'text-white'
+                                                                        }`}>
+                                                                        {spec.title}
+                                                                    </h3>
+                                                                    <p className="text-sm text-gray-400 leading-relaxed">
+                                                                        {spec.description}
+                                                                    </p>
                                                                 </div>
                                                             </div>
-                                                        </div>
+
+                                                            {/* Selection Indicator */}
+                                                            {formData.specialization === spec.id && (
+                                                                <motion.div
+                                                                    initial={{ scale: 0, rotate: -180 }}
+                                                                    animate={{ scale: 1, rotate: 0 }}
+                                                                    transition={{
+                                                                        type: "spring",
+                                                                        stiffness: 200,
+                                                                        damping: 15
+                                                                    }}
+                                                                    className="absolute top-4 right-4 z-20"
+                                                                >
+                                                                    <div className="w-6 h-6 rounded-full bg-custom-bright flex items-center justify-center shadow-lg shadow-custom-bright/50">
+                                                                        <Check className="w-4 h-4 text-white" />
+                                                                    </div>
+                                                                </motion.div>
+                                                            )}
+                                                        </motion.div>
                                                     ))}
                                                 </div>
                                             )}
@@ -352,8 +465,12 @@ export default function CareersSection({ id, className }: CareersSectionProps) {
                                             {/* Step 3: Workflow & Quality */}
                                             {currentStep === 3 && (
                                                 <div className="space-y-6">
-                                                    <TextAreaGroup label="8. Describe your editing workflow from raw footage to final delivery*" subLabel="(Include steps like organizing footage, rough cut, revisions, color, sound, export)" value={formData.workflowDescription} onChange={v => handleInputChange('workflowDescription', v)} placeholder="My process..." />
-                                                    <TextAreaGroup label="9. How do you determine if a video edit is successful?*" subLabel="(e.g., client feedback, engagement metrics, retention, storytelling clarity)" value={formData.successMetric} onChange={v => handleInputChange('successMetric', v)} placeholder="Client satisfaction..." />
+                                                    {subStep === 0 && (
+                                                        <TextAreaGroup label="8. Describe your editing workflow from raw footage to final delivery*" subLabel="(Include steps like organizing footage, rough cut, revisions, color, sound, export)" value={formData.workflowDescription} onChange={v => handleInputChange('workflowDescription', v)} placeholder="My process..." minHeight="80px" />
+                                                    )}
+                                                    {subStep === 1 && (
+                                                        <TextAreaGroup label="9. How do you determine if a video edit is successful?*" subLabel="(e.g., client feedback, engagement metrics, retention, storytelling clarity)" value={formData.successMetric} onChange={v => handleInputChange('successMetric', v)} placeholder="Client satisfaction..." minHeight="80px" />
+                                                    )}
                                                 </div>
                                             )}
 
@@ -460,7 +577,14 @@ interface InputGroupProps {
 }
 const InputGroup = ({ label, subLabel, value, onChange, placeholder, type = "text", icon }: InputGroupProps) => (
     <div>
-        <label className="block text-sm font-medium text-gray-400 mb-2">{label} {subLabel && <span className="block text-xs text-gray-500 mt-0.5 font-normal">{subLabel}</span>}</label>
+        <label className="flex flex-col justify-end text-sm font-medium text-gray-400 mb-2 min-h-[44px]">
+            <span>{label}</span>
+            {subLabel ? (
+                <span className="block text-xs text-gray-500 mt-0.5 font-normal">{subLabel}</span>
+            ) : (
+                <span className="block text-xs text-transparent mt-0.5 font-normal select-none hidden">placeholder</span>
+            )}
+        </label>
         <div className="relative">
             <input type={type} value={value} onChange={e => onChange(e.target.value)} className={`w-full px-4 py-3 rounded-xl bg-black/20 border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:border-custom-bright/50 focus:bg-black/40 transition-all ${icon ? 'pl-10' : ''}`} placeholder={placeholder} required />
             {icon && <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">{icon}</div>}
@@ -468,12 +592,12 @@ const InputGroup = ({ label, subLabel, value, onChange, placeholder, type = "tex
     </div>
 );
 interface TextAreaGroupProps {
-    label: string; subLabel?: string; value: string; onChange: (value: string) => void; placeholder: string; maxLength?: number;
+    label: string; subLabel?: string; value: string; onChange: (value: string) => void; placeholder: string; maxLength?: number; minHeight?: string;
 }
-const TextAreaGroup = ({ label, subLabel, value, onChange, placeholder, maxLength }: TextAreaGroupProps) => (
+const TextAreaGroup = ({ label, subLabel, value, onChange, placeholder, maxLength, minHeight = "120px" }: TextAreaGroupProps) => (
     <div>
         <label className="block text-sm font-medium text-gray-400 mb-2">{label} {subLabel && <span className="block text-xs text-gray-500 mt-0.5 font-normal">{subLabel}</span>}</label>
-        <textarea value={value} onChange={e => onChange(e.target.value)} maxLength={maxLength} className="w-full px-4 py-3 rounded-xl bg-black/20 border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:border-custom-bright/50 focus:bg-black/40 transition-all min-h-[120px]" placeholder={placeholder} required />
+        <textarea value={value} onChange={e => onChange(e.target.value)} maxLength={maxLength} className="w-full px-4 py-3 rounded-xl bg-black/20 border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:border-custom-bright/50 focus:bg-black/40 transition-all resize-none" style={{ minHeight }} placeholder={placeholder} required />
         {maxLength && <div className="text-right text-xs text-gray-600 mt-1">{value.length} / {maxLength}</div>}
     </div>
 );
