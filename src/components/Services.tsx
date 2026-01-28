@@ -62,7 +62,7 @@ export default function Services({ onGetStarted, onJoinTeam }: ServicesProps) {
         </div>
 
         {/* Cards Grid - Elastic Fitting */}
-        <div className="flex flex-col md:grid md:grid-cols-2 gap-[clamp(0.75rem,2vw,1.5rem)] flex-1 min-h-0 w-full">
+        <div className="flex flex-col md:grid md:grid-cols-2 gap-[clamp(0.75rem,2vw,1.5rem)] flex-1 min-h-0 w-full md:flex-none md:h-auto">
 
           {/* Hire Us Card */}
           <motion.div variants={itemVariants} className="flex-1 min-h-0 w-full">

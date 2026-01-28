@@ -61,7 +61,7 @@ export default function Portfolio(_props: PortfolioProps) {
           </motion.div>
         </div>
 
-        <div className="flex flex-col md:grid md:grid-cols-3 gap-[clamp(0.75rem,2vw,1.5rem)] w-full flex-1 min-h-0">
+        <div className="flex flex-col md:grid md:grid-cols-3 gap-[clamp(0.75rem,2vw,1.5rem)] w-full flex-1 min-h-0 md:flex-none md:h-auto">
           <ProjectCard
             category="Brand Film"
             title="Neon Nights"
@@ -77,12 +77,6 @@ export default function Portfolio(_props: PortfolioProps) {
             title="Urban Stories"
             image="https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2670&auto=format&fit=crop"
           />
-          {/* Note: In strict horizontal mode, showing 3 cards on mobile vertically is very tight for 100svh.
-              The 'flex-1 min-h-0' strategy will force them to shrink. 
-              If they get too small, the user can tap to expand or we rely on the visual density.
-              For mobile polish, hiding the 3rd card is safer, but "elastic" allows 3 if they fit.
-              Let's keep the 3rd card hidden on mobile for "best fit" unless explicitly asked to crowd it.
-          */}
         </div>
       </motion.div>
     </section>
@@ -90,7 +84,7 @@ export default function Portfolio(_props: PortfolioProps) {
 }
 
 const ProjectCard = ({ category, title, image }: { category: string, title: string, image: string }) => (
-  <motion.div variants={itemVariants} className="flex-1 min-h-0 w-full">
+  <motion.div variants={itemVariants} className="flex-1 min-h-0 w-full md:flex-none md:aspect-[3/4]">
     <SpotlightCard className="group h-full w-full rounded-xl md:rounded-2xl bg-gray-900 border-none relative overflow-hidden">
       <div className="absolute inset-0">
         <img src={image} alt={title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-60 group-hover:opacity-40" />
