@@ -50,17 +50,17 @@ export default function ProblemSection() {
                 backgroundSize: '60px 60px'
             }} />
 
-            <div className="relative z-10 max-w-6xl w-full px-6 flex flex-col items-center">
+            <div className="relative z-10 max-w-5xl w-full px-[clamp(1rem,3vw,2rem)] flex flex-col items-center justify-center h-full py-[clamp(1rem,4vh,2rem)]">
 
                 {/* Alert Badge - Brand Aligned */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
                     transition={{ duration: 0.6 }}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 mb-8"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 mb-[clamp(0.5rem,2vh,1.5rem)] shrink-0"
                 >
                     <AlertTriangle className="w-4 h-4 text-custom-bright" />
-                    <span className="text-sm font-medium text-gray-300 uppercase tracking-widest">Reality Check</span>
+                    <span className="text-[clamp(0.7rem,1vw,0.875rem)] font-medium text-gray-300 uppercase tracking-widest">Reality Check</span>
                 </motion.div>
 
                 {/* Main Headline */}
@@ -68,7 +68,7 @@ export default function ProblemSection() {
                     initial={{ opacity: 0, y: 30 }}
                     animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
                     transition={{ duration: 0.8, delay: 0.1 }}
-                    className="text-4xl md:text-6xl lg:text-7xl font-bold text-center leading-tight mb-6"
+                    className="text-[clamp(2.5rem,5vw,5rem)] font-bold text-center leading-tight mb-[clamp(0.25rem,1vh,1rem)] shrink-0"
                 >
                     <span className="text-white">Your content is </span>
                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-custom-bright via-white to-custom-violet">
@@ -80,29 +80,29 @@ export default function ProblemSection() {
                     initial={{ opacity: 0 }}
                     animate={isInView ? { opacity: 1 } : { opacity: 0 }}
                     transition={{ duration: 0.8, delay: 0.3 }}
-                    className="text-gray-400 text-lg md:text-xl text-center max-w-2xl mb-16"
+                    className="text-gray-400 text-[clamp(1rem,1.5vw,1.25rem)] text-center max-w-2xl mb-[clamp(1rem,3vh,2rem)] shrink-0"
                 >
                     You're paying for production, ads, and distribution—but your videos aren't converting. Here's why.
                 </motion.p>
 
-                {/* Problem Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+                {/* Problem Cards - Elastic Grid */}
+                <div className="flex flex-col md:grid md:grid-cols-3 gap-[clamp(0.5rem,1.5vw,1.5rem)] w-full flex-1 min-h-0 md:flex-none md:h-auto">
                     {problems.map((problem, index) => (
                         <motion.div
                             key={index}
                             initial={{ opacity: 0, y: 40 }}
                             animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }}
                             transition={{ duration: 0.6, delay: 0.4 + index * 0.15 }}
-                            className="group p-8 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-custom-bright/30 transition-all duration-500"
+                            className="group p-[clamp(1rem,2vw,2rem)] rounded-2xl bg-white/[0.02] border border-white/5 hover:border-custom-bright/30 transition-all duration-500 flex flex-col justify-center h-full"
                         >
-                            <div className="w-12 h-12 rounded-xl bg-custom-bright/10 flex items-center justify-center mb-6 group-hover:bg-custom-bright/20 transition-colors">
-                                <problem.icon className="w-6 h-6 text-custom-bright" />
+                            <div className="w-[clamp(2.5rem,4vw,3rem)] h-[clamp(2.5rem,4vw,3rem)] rounded-xl bg-custom-bright/10 flex items-center justify-center mb-[clamp(0.5rem,1.5vh,1.5rem)] group-hover:bg-custom-bright/20 transition-colors shrink-0">
+                                <problem.icon className="w-[clamp(1.25rem,2vw,1.5rem)] h-[clamp(1.25rem,2vw,1.5rem)] text-custom-bright" />
                             </div>
-                            <div className="text-4xl font-bold text-white mb-1">
+                            <div className="text-[clamp(2rem,4vw,3rem)] font-bold text-white mb-1 shrink-0">
                                 <CountingNumber value={problem.value} suffix={problem.suffix} />
                             </div>
-                            <div className="text-sm text-custom-violet font-medium uppercase tracking-wide mb-3">{problem.label}</div>
-                            <p className="text-gray-500 text-sm">{problem.description}</p>
+                            <div className="text-[clamp(0.6rem,0.9vw,0.875rem)] text-custom-violet font-medium uppercase tracking-wide mb-2 shrink-0">{problem.label}</div>
+                            <p className="text-gray-500 text-[clamp(0.75rem,1vw,0.875rem)] line-clamp-3 md:line-clamp-none">{problem.description}</p>
                         </motion.div>
                     ))}
                 </div>
@@ -112,7 +112,7 @@ export default function ProblemSection() {
                     initial={{ opacity: 0 }}
                     animate={isInView ? { opacity: 1 } : { opacity: 0 }}
                     transition={{ duration: 0.8, delay: 1 }}
-                    className="text-gray-600 text-base mt-16 text-center"
+                    className="text-gray-600 text-[clamp(0.8rem,1vw,1rem)] mt-[clamp(1rem,2vh,2rem)] text-center shrink-0"
                 >
                     But it doesn't have to be this way →
                 </motion.p>

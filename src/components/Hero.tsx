@@ -69,7 +69,10 @@ export default function Hero({ onGetStarted: _ }: HeroProps) {
         transition={{ delay: 1.5, duration: 1 }}
         className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3"
       >
-        <span className="text-[10px] uppercase tracking-[0.3em] text-gray-500 animate-pulse">Scroll to Begin</span>
+        <span className="text-[10px] uppercase tracking-[0.3em] text-gray-500 animate-pulse">
+          <span className="md:hidden">Swipe to Begin</span>
+          <span className="hidden md:inline">Scroll to Begin</span>
+        </span>
         <div className="w-[1px] h-12 bg-gradient-to-b from-gray-800/0 via-white/20 to-gray-800/0"></div>
       </motion.div>
     </section>

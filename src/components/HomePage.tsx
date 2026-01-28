@@ -95,8 +95,8 @@ export default function HomePage() {
       </Slide>
 
 
-      {/* 6: Hidden - Careers */}
-      <Slide className="careers-slide">
+      {/* 6: Hidden - Careers (APPLICATION FORM) - Hidden on Mobile */}
+      <Slide className="careers-slide hidden md:flex">
         <div className="relative w-full h-full">
           <button
             onClick={() => setNavOverride(null)}
