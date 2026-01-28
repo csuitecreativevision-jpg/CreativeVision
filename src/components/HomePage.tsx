@@ -7,13 +7,13 @@ import ProblemSection from './sections/ProblemSection';
 import CareersSection from './CareersSection';
 import PricingSection from './PricingSection';
 import { HorizontalScrollWrapper } from './layout/HorizontalScrollWrapper';
-import { useNavigate } from 'react-router-dom';
+
 
 import { motion } from 'framer-motion';
 
 const Slide = ({ children, id, className = "", enableFlash = false }: { children: React.ReactNode, id?: string, className?: string, enableFlash?: boolean }) => {
   return (
-    <section id={id} className={`w-screen h-screen flex-shrink-0 flex items-center justify-center relative overflow-hidden ${className}`}>
+    <section id={id} className={`w-screen h-screen flex-shrink-0 flex items-center justify-center relative overflow-hidden snap-center ${className}`}>
       <motion.div
         initial={{ opacity: 0, scale: 0.9, filter: 'blur(10px)' }}
         whileInView={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
@@ -45,16 +45,7 @@ const Slide = ({ children, id, className = "", enableFlash = false }: { children
 };
 
 export default function HomePage() {
-  const [isMobile, setIsMobile] = useState(false);
   const [navOverride, setNavOverride] = useState<number | null>(null);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   useEffect(() => {
     // Force scroll to top on mount to restart the experience
@@ -125,19 +116,9 @@ export default function HomePage() {
       {/* Global Camera Flash Overlay */}
       <div id="camera-flash" className="fixed inset-0 bg-white pointer-events-none z-[100] opacity-0 mix-blend-overlay"></div>
 
-      {isMobile ? (
-        <main className="flex flex-col">
-          <div id="hero"><Hero onGetStarted={() => navigate('/hire')} /></div>
-          <ProblemSection />
-          <Portfolio onGetStarted={() => navigate('/hire')} />
-          <TrustSignals />
-          <Services onGetStarted={() => navigate('/hire')} onJoinTeam={() => navigate('/join')} />
-        </main>
-      ) : (
-        <HorizontalScrollWrapper contentWidth="700vh" overrideIndex={navOverride}>
-          {Content}
-        </HorizontalScrollWrapper>
-      )}
+      <HorizontalScrollWrapper contentWidth="700vh" overrideIndex={navOverride}>
+        {Content}
+      </HorizontalScrollWrapper>
     </div>
   );
 }

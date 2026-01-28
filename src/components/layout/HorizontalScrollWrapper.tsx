@@ -26,30 +26,49 @@ export const HorizontalScrollWrapper = ({ children, overrideIndex }: HorizontalS
     });
 
     const visibleSlides = 6; // Hero, Trust, About, Services, Portfolio, Booking
-    // We only create scroll height for the VISIBLE slides.
-    // The others are waiting off-screen.
 
-    // Normal scroll logic
+    // Normal scroll logic for DESKTOP
     const finalVisibleX = `-${(visibleSlides - 1) * 100}vw`;
     const scrollX = useTransform(scrollYProgress, [0, 1], ["0%", finalVisibleX]);
 
-    // Construct the transform style
-    // IF overrideIndex is set, ignore scrollX and manually set translate
-    // We can't use useState for MotionValues. We rely on the layout.
-    // When overrideIndex is !== null, we force the style.
+    // MOBILE IMPLEMENTATION:
+    // We used to return a vertical layout here. Now we return a horizontal container
+    // with overflow-x-auto and snap-x.
+    // Mobile container ref
+    const mobileRef = useRef<HTMLDivElement>(null);
+
+    // Handle overrideIndex for MOBILE
+    useEffect(() => {
+        if (isMobile && overrideIndex !== null && mobileRef.current) {
+            const width = window.innerWidth;
+            mobileRef.current.scrollTo({
+                left: overrideIndex * width,
+                behavior: 'smooth'
+            });
+        }
+    }, [isMobile, overrideIndex]);
 
     if (isMobile) {
         return (
-            <div className="relative w-full overflow-hidden bg-custom-bg text-white">
-                <main className="flex flex-col w-full">
-                    {children}
-                </main>
+            <div
+                ref={mobileRef}
+                className="fixed inset-0 w-screen h-[100svh] overflow-x-auto overflow-y-hidden snap-x snap-mandatory flex flex-row flex-nowrap bg-custom-bg text-white z-50 touch-pan-x pointer-events-auto"
+                style={{ WebkitOverflowScrolling: 'touch' }} // iOS momentum scroll
+            >
+                {/* 
+                   We need to ensure children are treated as horizontal items.
+                   Since children are passed as a fragment from HomePage, we might need to wrap them 
+                   or ensure they have the right classes.
+                */}
+                {children}
             </div>
         );
     }
 
+    // DESKTOP IMPLEMENTATION (unchanged mostly, but ensured sticky/overflow)
     return (
-        <div ref={scrollRef} style={{ height: `${visibleSlides * 100}vh` }} className="relative bg-custom-bg">
+        <div ref={scrollRef} style={{ height: `${visibleSlides * 100}vh` }} className="relative bg-custom-bg w-full">
+            {/* Snap points for desktop feeling (optional, helping the scroll progress) */}
             <div className="absolute inset-0 flex flex-col pointer-events-none">
                 {Array.from({ length: visibleSlides }).map((_, i) => (
                     <div key={i} className="h-[100vh] w-full snap-center" />

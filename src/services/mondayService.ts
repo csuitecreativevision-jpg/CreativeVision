@@ -1,5 +1,5 @@
 const MONDAY_API_URL = "https://api.monday.com/v2";
-const MONDAY_API_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjYxMjU0OTQwNSwiYWFpIjoxMSwidWlkIjo5ODc3ODIxNCwiaWFkIjoiMjAyNi0wMS0yN1QwMDo1Mjo0My4wMDBaIiwicGVyIjoibWU6d3JpdGUiLCJhY3RpZCI6MzM0NTU2MDksInJnbiI6InVzZTEifQ.pTRaasIgMFRcIcpZY_-vZIGmzhkKBXBiSC9NtxGEBhI"; // TODO: Replace with your actual API Token
+const MONDAY_API_TOKEN = import.meta.env.VITE_MONDAY_API_TOKEN;
 
 export interface ApplicationData {
     fullName: string;
