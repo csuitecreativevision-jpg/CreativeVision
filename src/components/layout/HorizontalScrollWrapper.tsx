@@ -7,7 +7,7 @@ interface HorizontalScrollWrapperProps {
     overrideIndex: number | null;
 }
 
-export const HorizontalScrollWrapper = ({ children, overrideIndex }: HorizontalScrollWrapperProps) => {
+export const HorizontalScrollWrapper = ({ children, contentWidth, overrideIndex }: HorizontalScrollWrapperProps) => {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [isMobile, setIsMobile] = useState(false);
 
@@ -25,10 +25,10 @@ export const HorizontalScrollWrapper = ({ children, overrideIndex }: HorizontalS
         offset: ["start start", "end end"]
     });
 
-    const visibleSlides = 6; // Hero, Trust, About, Services, Portfolio, Booking
+    const slideCount = contentWidth ? parseInt(contentWidth) / 100 : 6;
 
     // Normal scroll logic for DESKTOP
-    const finalVisibleX = `-${(visibleSlides - 1) * 100}vw`;
+    const finalVisibleX = `-${(slideCount - 1) * 100}vw`;
     const scrollX = useTransform(scrollYProgress, [0, 1], ["0%", finalVisibleX]);
 
     // MOBILE IMPLEMENTATION:
@@ -67,10 +67,10 @@ export const HorizontalScrollWrapper = ({ children, overrideIndex }: HorizontalS
 
     // DESKTOP IMPLEMENTATION (unchanged mostly, but ensured sticky/overflow)
     return (
-        <div ref={scrollRef} style={{ height: `${visibleSlides * 100}vh` }} className="relative bg-custom-bg w-full">
+        <div ref={scrollRef} style={{ height: contentWidth || '600vh' }} className="relative bg-custom-bg w-full">
             {/* Snap points for desktop feeling (optional, helping the scroll progress) */}
             <div className="absolute inset-0 flex flex-col pointer-events-none">
-                {Array.from({ length: visibleSlides }).map((_, i) => (
+                {Array.from({ length: Math.floor(slideCount) }).map((_, i) => (
                     <div key={i} className="h-[100vh] w-full snap-center" />
                 ))}
             </div>
