@@ -65,7 +65,7 @@ export default function Services({ onGetStarted, onJoinTeam }: ServicesProps) {
         <div className="flex flex-col md:grid md:grid-cols-2 gap-[clamp(0.5rem,2vw,1.5rem)] flex-1 min-h-0 w-full md:flex-none md:h-auto overflow-y-auto md:overflow-visible no-scrollbar">
 
           {/* Hire Us Card */}
-          <motion.div variants={itemVariants} className="flex-1 min-h-0 w-full md:flex-none md:aspect-[4/5]">
+          <motion.div variants={itemVariants} className="flex-1 min-h-0 w-full md:flex-none md:aspect-[16/10]">
             <SpotlightCard className="h-full rounded-2xl md:rounded-3xl bg-white/5 p-[clamp(1rem,2.5vw,2.5rem)] border-white/10 relative overflow-hidden group flex flex-col justify-center">
               <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity duration-500 hidden md:block">
                 <Briefcase className="w-[clamp(4rem,10vw,10rem)] h-[clamp(4rem,10vw,10rem)] text-custom-bright -mr-8 -mt-8 transform rotate-12" />
@@ -102,7 +102,7 @@ export default function Services({ onGetStarted, onJoinTeam }: ServicesProps) {
           </motion.div>
 
           {/* Join Team Card */}
-          <motion.div variants={itemVariants} className="flex-1 min-h-0 w-full md:flex-none md:aspect-[4/5]">
+          <motion.div variants={itemVariants} className="flex-1 min-h-0 w-full md:flex-none md:aspect-[16/10]">
             <SpotlightCard className="h-full rounded-2xl md:rounded-3xl bg-custom-purple/10 p-[clamp(1rem,2.5vw,2.5rem)] border-white/10 relative overflow-hidden group flex flex-col justify-center">
               <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity duration-500 hidden md:block">
                 <Users className="w-[clamp(4rem,10vw,10rem)] h-[clamp(4rem,10vw,10rem)] text-white -mr-8 -mt-8 transform -rotate-12" />
