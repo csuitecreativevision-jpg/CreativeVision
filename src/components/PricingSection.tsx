@@ -111,35 +111,35 @@ export default function PricingSection({ id, className }: PricingSectionProps) {
     ];
 
     return (
-        <section id={id} className={`w-screen h-screen flex-shrink-0 flex items-center justify-center relative overflow-hidden bg-[#050511] px-[clamp(1rem,3vw,2rem)] ${className}`}>
+        <section id={id} className={`w-screen h-[100svh] flex-shrink-0 flex items-start justify-center relative overflow-hidden bg-[#050511] px-[clamp(1rem,3vw,2rem)] ${className}`}>
             {/* Background glow */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-custom-purple/10 rounded-full blur-[150px]" />
-                <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-custom-blue/10 rounded-full blur-[150px]" />
+                <div className="absolute top-1/4 left-1/4 w-[300px] md:w-[600px] h-[300px] md:h-[600px] bg-custom-purple/10 rounded-full blur-[150px]" />
+                <div className="absolute bottom-1/4 right-1/4 w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-custom-blue/10 rounded-full blur-[150px]" />
             </div>
 
-            <div className="max-w-[1600px] w-full mx-auto relative z-10 h-full flex flex-col py-[clamp(1rem,4vh,3rem)]">
+            <div className="max-w-[1600px] w-full mx-auto relative z-10 h-full flex flex-col justify-start md:justify-center py-[clamp(1rem,4vh,3rem)] pt-[clamp(5rem,10vh,6rem)] md:pt-[clamp(1rem,4vh,3rem)]">
                 <ScrollReveal animation="fade-up" className="flex-shrink-0">
-                    <div className="text-center mb-[clamp(1rem,3vh,2rem)]">
+                    <div className="text-center mb-[clamp(0.5rem,2vh,2rem)]">
                         {/* Pill badge like other sections */}
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 mb-[clamp(0.5rem,2vh,1.5rem)]">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 mb-[clamp(0.25rem,1.5vh,1rem)]">
                             <div className="w-1.5 h-1.5 rounded-full bg-custom-bright" />
                             <span className="text-[clamp(0.6rem,1vw,0.75rem)] font-medium text-gray-300">Pricing</span>
                         </div>
-                        <h2 className="text-[clamp(2rem,5vw,5rem)] font-bold text-white mb-2 leading-tight">
+                        <h2 className="text-[clamp(2rem,5vw,5rem)] font-bold text-white mb-1 leading-tight">
                             Invest in{' '}
                             <span className="text-transparent bg-clip-text bg-gradient-to-r from-custom-bright via-white to-custom-violet">
                                 Quality.
                             </span>
                         </h2>
-                        <p className="text-gray-400 text-[clamp(0.8rem,1vw,1.1rem)] max-w-2xl mx-auto">
+                        <p className="text-gray-400 text-[clamp(0.75rem,1vw,1.1rem)] max-w-2xl mx-auto">
                             Transparent pricing. No hidden fees. Cancel anytime.
                         </p>
                     </div>
                 </ScrollReveal>
 
                 {/* Packages Grid - Scrollable on mobile, Fitted on desktop */}
-                <div className="flex-1 min-h-0 w-full overflow-y-auto no-scrollbar p-[clamp(0.5rem,1vh,1rem)]">
+                <div className="flex-1 min-h-0 w-full overflow-y-auto no-scrollbar p-[clamp(0.25rem,1vh,1rem)]">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-[clamp(0.75rem,1.5vw,1.5rem)] h-full lg:h-auto items-stretch">
                         {packages.map((pkg, index) => (
                             <ScrollReveal key={pkg.name} animation="scale-up" delay={index * 0.1} className="h-full flex flex-col">

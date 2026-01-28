@@ -11,7 +11,7 @@ export default function Hero({ onGetStarted: _ }: HeroProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   return (
-    <section ref={containerRef} className="relative w-screen h-screen flex-shrink-0 flex items-center justify-center overflow-hidden">
+    <section ref={containerRef} className="relative w-screen h-[100svh] flex-shrink-0 flex items-center justify-center overflow-hidden">
 
       {/* Background Elements */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-custom-purple/20 via-custom-bg to-custom-bg opacity-40" />

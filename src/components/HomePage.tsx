@@ -13,7 +13,7 @@ import { motion } from 'framer-motion';
 
 const Slide = ({ children, id, className = "", enableFlash = false }: { children: React.ReactNode, id?: string, className?: string, enableFlash?: boolean }) => {
   return (
-    <section id={id} className={`w-screen h-screen flex-shrink-0 flex items-center justify-center relative overflow-hidden snap-center ${className}`}>
+    <section id={id} className={`w-screen h-[100svh] flex-shrink-0 flex items-center justify-center relative overflow-hidden snap-center ${className}`}>
       <motion.div
         initial={{ opacity: 0, scale: 0.9, filter: 'blur(10px)' }}
         whileInView={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
