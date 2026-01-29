@@ -284,3 +284,92 @@ export async function submitApplicationToMonday(data: ApplicationData) {
         throw error;
     }
 }
+
+// --- New Dashboard Integration Functions ---
+
+export async function getAllBoards() {
+    const query = `query {
+        boards(limit: 50) {
+            id
+            name
+            items_count
+        }
+    }`;
+    const data = await mondayRequest(query);
+    return data.boards || [];
+}
+
+export async function getBoardItems(boardId: string) {
+    const query = `query {
+        boards (ids: [${boardId}]) {
+            name
+            columns {
+                id
+                title
+                type
+                settings_str
+            }
+            groups {
+                id
+                title
+                color
+            }
+            items_page (limit: 50) {
+                items {
+                    id
+                    name
+                    group {
+                        id
+                    }
+                    column_values {
+                        id
+                        text
+                        value
+                        type
+                    }
+                }
+            }
+        }
+    }`;
+    const data = await mondayRequest(query);
+    const board = data.boards[0];
+    // Flatten items structure for easier consumption
+    if (board && board.items_page) {
+        board.items = board.items_page.items;
+    }
+    return board;
+}
+
+export async function createNewBoard(name: string) {
+    const query = `mutation {
+        create_board (board_name: "${name}", board_kind: public) {
+            id
+        }
+    }`;
+    const data = await mondayRequest(query);
+    return data.create_board.id;
+}
+
+export async function createNewGroup(boardId: string, groupName: string) {
+    const query = `mutation {
+        create_group (board_id: ${boardId}, group_name: "${groupName}") {
+            id
+        }
+    }`;
+    const data = await mondayRequest(query);
+    return data.create_group.id;
+}
+
+export async function updateItemValue(boardId: string, itemId: string, columnId: string, value: string) {
+    // For status/dropdown, value should be the label. For text, it's the text.
+    // change_simple_column_value is easiest for text/status
+    const query = `mutation {
+        change_simple_column_value (board_id: ${boardId}, item_id: ${itemId}, column_id: "${columnId}", value: "${value}") {
+            id
+        }
+    }`;
+    const data = await mondayRequest(query);
+    return data;
+}
+
+

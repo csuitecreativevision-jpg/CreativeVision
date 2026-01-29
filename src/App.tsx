@@ -10,6 +10,8 @@ import JoinTeamPage from './components/JoinTeamPage';
 import ThankYouPage from './components/ThankYouPage';
 import PortalPage from './components/PortalPage';
 
+import AdminDashboard from './components/AdminDashboard';
+
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -43,11 +45,11 @@ export default function App() {
 
   return (
     <BackgroundLayout>
-      {location.pathname !== '/portal' && <Preloader />}
+      {location.pathname !== '/portal' && location.pathname !== '/admin-dashboard' && <Preloader />}
       <CinematicOverlay />
 
       {/* Global Floating Secret Portal Trigger - Bottom Left */}
-      {location.pathname !== '/portal' && (
+      {location.pathname !== '/portal' && location.pathname !== '/admin-dashboard' && (
         <div className="fixed left-6 bottom-6 z-50 opacity-10 hover:opacity-40 transition-opacity duration-300">
           <img
             src="/Untitled design (3).png"
@@ -65,6 +67,7 @@ export default function App() {
         <Route path="/join" element={<JoinTeamPage onBack={handleBack} onThankYou={handleThankYou} />} />
         <Route path="/thank-you" element={<ThankYouPage onBack={handleBack} />} />
         <Route path="/portal" element={<PortalPage />} />
+        <Route path="/admin-dashboard" element={<AdminDashboard />} />
       </Routes>
     </BackgroundLayout>
   );

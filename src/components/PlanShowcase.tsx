@@ -74,19 +74,17 @@ export default function PlanShowcase({ packageData, onNext, onSelect }: PlanShow
                         <div className={`w-[clamp(4rem,8vw,6rem)] h-[clamp(4rem,8vw,6rem)] rounded-2xl md:rounded-3xl bg-gradient-to-br ${packageData.iconGradient} flex items-center justify-center shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-white/20 mx-auto md:mx-0 backdrop-blur-lg`}>
                             <span className="text-3xl md:text-5xl font-bold text-white drop-shadow-md">{packageData.name.charAt(0)}</span>
                         </div>
-                        {packageData.popular && (
-                            <motion.div
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                className="absolute -top-3 -right-3 md:-top-4 md:-right-8 px-3 py-1 md:px-4 md:py-1.5 rounded-full bg-gradient-to-r from-yellow-500 to-amber-500 text-black font-black text-[10px] md:text-xs shadow-lg border border-yellow-200 flex items-center gap-1 z-20 whitespace-nowrap"
-                            >
-                                <Sparkles className="w-2 h-2 md:w-3 md:h-3 fill-current" /> BEST VALUE
-                            </motion.div>
-                        )}
                     </motion.div>
 
                     <motion.h2 variants={itemVariants} className="text-[clamp(2.5rem,5vw,6rem)] font-black text-white mb-[0.5rem] leading-[0.9] tracking-tight text-glow">
-                        <span className="block text-[clamp(1rem,1.5vw,1.8rem)] font-bold tracking-widest uppercase opacity-60 mb-1">{packageData.name} Plan</span>
+                        <span className="flex items-center justify-center md:justify-start gap-3 text-[clamp(1rem,1.5vw,1.8rem)] font-bold tracking-widest uppercase opacity-80 mb-1">
+                            {packageData.name} Plan
+                            {packageData.popular && (
+                                <span className="px-3 py-1 md:px-4 md:py-1.5 rounded-lg bg-gradient-to-r from-yellow-500 to-amber-500 text-black font-black text-[10px] md:text-xs uppercase tracking-wider shadow-lg flex items-center gap-1.5 transform translate-y-[-2px]">
+                                    <Sparkles className="w-3 h-3 fill-current" /> Best Value
+                                </span>
+                            )}
+                        </span>
                         {packageData.headline}
                     </motion.h2>
 
