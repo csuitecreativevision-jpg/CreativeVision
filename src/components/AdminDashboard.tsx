@@ -23,12 +23,15 @@ import {
     MoreHorizontal,
     FileText,
     Download,
-    AlertCircle
+    AlertCircle,
+    Clock,
+    LayoutGrid
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getAllBoards, getAllFolders, getBoardItems, createNewBoard, createNewGroup, updateItemValue, getAllWorkspaces } from '../services/mondayService';
+import { getAllBoards, getAllFolders, getBoardItems, createNewBoard, createNewGroup, updateItemValue, getAllWorkspaces, getMultipleBoardItems } from '../services/mondayService';
 
 // --- Helpers ---
+// (Updated)
 const getBoardIcon = (name: string) => {
     const n = name.toLowerCase();
     if (n.includes('dashboard')) return LayoutDashboard;
@@ -481,8 +484,25 @@ export default function AdminDashboard() {
     const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
     const [newGroupName, setNewGroupName] = useState('');
 
+    // Overview Stats State
+    const [overviewStats, setOverviewStats] = useState({
+        activeClientsCount: 0,
+        activeProjectsCount: 0,
+        activeEditorsCount: 0,
+        topEditor: { name: 'N/A', count: 0 },
+        systemStatus: 'Stable',
+        clientProjectDistribution: [] as { name: string, count: number }[],
+        editorPerformance: [] as { name: string, count: number }[]
+    });
+    const [overviewLoading, setOverviewLoading] = useState(false);
+
     // Collapsed Groups State
     const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+    // Fulfillment View Toggle State
+    const [fulfillmentViewMode, setFulfillmentViewMode] = useState<'recent' | 'overview'>('recent');
+    // Carousel Index for "Recent" view in Fulfillment (iterating sorted list)
+    const [fulfillmentRecentIndex, setFulfillmentRecentIndex] = useState(0);
+    const [fulfillmentMonthFilter, setFulfillmentMonthFilter] = useState<string>('All');
 
     const handleLogout = () => {
         navigate('/');
@@ -507,10 +527,233 @@ export default function AdminDashboard() {
             if (workspacesData && workspacesData.length > 0) {
                 setSelectedWorkspaceId(workspacesData[0].id);
             }
+
+            // --- REAL-TIME OVERVIEW STATS FETCH ---
+            setOverviewLoading(true);
+
+            // 1. Identify Target Folders
+            // "Clients" or "Active Clients"
+            // "Workspace" or "Editors" or "Team"
+            const allFetchedBoards = boardsData || [];
+
+
+
+            // 1. Identify Target Boards Strategy
+
+            // A) Client/Project Data Source: "Fulfillment Board"
+            const fulfillmentBoard = allFetchedBoards.find((b: any) =>
+                b.name.toLowerCase().includes('fulfillment') ||
+                b.name.toLowerCase().includes('fullfillment')
+            );
+
+            // B) Editor Data Source: Boards with "Workspace" in name
+            const editorBoards = allFetchedBoards.filter((b: any) => {
+                const name = b.name.toLowerCase();
+                return name.includes('workspace') &&
+                    !name.includes('subitem') &&
+                    !name.includes('template');
+            });
+            const editorBoardIds = editorBoards.map((b: any) => String(b.id));
+
+
+
+
+            // 3. Fetch Data
+            const idsToFetch = [];
+            if (fulfillmentBoard) idsToFetch.push(String(fulfillmentBoard.id));
+            editorBoardIds.forEach(id => idsToFetch.push(id)); // Keep fetching items just in case
+
+            // Activity Logs Timeframe (Last 2 Weeks)
+            const twoWeeksAgo = new Date();
+            twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+            const isoDate = twoWeeksAgo.toISOString();
+
+            // FETCH ITEMS WITH UPDATED_AT 
+            const [allFetchedItemsData] = await Promise.all([
+                getMultipleBoardItems(idsToFetch)
+            ]);
+
+            // Separate Data
+            // Note: getMultipleBoardItems usually returns array of boards with items.
+            // We need to map back to our board objects.
+
+            const fulfillmentBoardData = fulfillmentBoard ? allFetchedItemsData.find((b: any) => String(b.id) === String(fulfillmentBoard.id)) : null;
+            const editorBoardsData = allFetchedItemsData.filter((b: any) => editorBoardIds.includes(String(b.id)));
+
+            // 4. Calculate Metrics
+
+            // A) Active Clients & Projects (From Fulfillment Board)
+            let activeClientsCount = 0;
+            let totalActiveProjects = 0;
+            const clientProjectDistribution: { name: string, count: number }[] = [];
+
+            if (fulfillmentBoardData) {
+                // Active Clients = Groups (assuming each group is a client)
+                // Note: 'fulfillmentBoard' from 'allFetchedBoards' (getAllBoards) likely has 'groups' metadata. 
+                // 'fulfillmentBoardData' from 'getMultipleBoardItems' has 'items'.
+
+                const groups = fulfillmentBoard.groups || [];
+                const validGroups = groups.filter((g: any) => g.title.toLowerCase() !== 'hidden');
+
+                activeClientsCount = validGroups.length;
+
+                // Count Active Items (excluding Done?)
+                // User said "Active Projects"... typically means not Done.
+                const activeItems = fulfillmentBoardData.items.filter((i: any) => {
+                    const isDone = i.column_values.some((v: any) => (v.title === 'Status' || v.type === 'status' || v.type === 'color') && (v.text === 'Done' || v.text === 'Completed'));
+                    return !isDone;
+                });
+                totalActiveProjects = activeItems.length;
+
+                // Distribution: Items per Group
+                const groupMap = new Map();
+                groups.forEach((g: any) => groupMap.set(g.id, g.title));
+
+                // Count items per group
+                const groupCounts = new Map();
+                activeItems.forEach((item: any) => {
+                    const gId = item.group?.id; // items have group { id }
+                    if (gId) {
+                        const current = groupCounts.get(gId) || 0;
+                        groupCounts.set(gId, current + 1);
+                    }
+                });
+
+                groupCounts.forEach((count, gId) => {
+                    const name = groupMap.get(gId) || 'Unknown Group';
+                    if (name.toLowerCase() !== 'hidden' && count > 0) {
+                        clientProjectDistribution.push({ name, count });
+                    }
+                });
+            }
+
+            // Sort Distribution by Count
+            clientProjectDistribution.sort((a, b) => b.count - a.count);
+
+
+            // C) Active Editors & Performance (From Workspace Boards)
+            // C) Active Editors & Performance (From Activity Logs)
+            const activeEditorsCount = editorBoards.length;
+            const editorPerformance: { name: string, count: number }[] = [];
+
+            let maxDoneCount = 0;
+            let topEditorName = 'None';
+
+            // DEBUG: Verify Boards and Logs
+            console.log('Found Editor Boards:', editorBoards.map((b: any) => b.name));
+            if (fulfillmentBoard) console.log('Fulfillment Board:', fulfillmentBoard.name, fulfillmentBoard.id);
+            console.log('Total Boards with Logs:', editorBoardsData.length);
+
+            if (fulfillmentBoardData && fulfillmentBoardData.items.length > 0) {
+                const sampleItem = fulfillmentBoardData.items[0];
+                console.log('Fulfillment Item Columns:', sampleItem.column_values.map((c: any) => `${c.title} (${c.id})`));
+            }
+
+            // Iterate over boards to calculate performance based on ITEMS (Snapshot)
+            editorBoards.forEach((b: any) => {
+                const boardData = editorBoardsData.find((bd: any) => String(bd.id) === String(b.id));
+                const items = boardData ? boardData.items : [];
+
+                // DEBUG: Inspect Board Data
+                console.log(`Checking Board: ${b.name}`);
+                console.log(`Found ${items.length} items`);
+
+                let approvedCount = 0;
+
+                items.forEach((item: any, index: number) => {
+                    // 1. Date Check (Last 2 Weeks)
+                    const updatedAt = new Date(item.updated_at);
+
+                    if (updatedAt < twoWeeksAgo) {
+                        // EXPANDED SEARCH: We are keeping the date filter OFF/Log-only for now to debug
+                        // console.log(`[Date Skip] ${item.name}`);
+                    }
+
+                    // 2. WILDCARD STATUS CHECK
+                    // Check EVERY column. If ANY column has "Approved", we count it.
+                    let isApproved = false;
+                    let matchedColId = '';
+                    let matchedText = '';
+
+                    isApproved = item.column_values.some((c: any) => {
+                        if (c.text) {
+                            const t = c.text.toLowerCase();
+                            if (t.includes('approved (cv)') ||
+                                t.includes('(client) approved') ||
+                                t.includes('client approved') ||
+                                t.includes('cv approved')) {
+                                matchedColId = c.id;
+                                matchedText = c.text;
+                                return true;
+                            }
+                        }
+                        return false;
+                    });
+
+                    if (isApproved) {
+                        approvedCount++;
+                        if (index < 10) console.log(`  -> MATCH [${item.name}]: Found "${matchedText}" in column "${matchedColId}"`);
+                    } else {
+                        // Diagnostic: Why NOT matched? print columns for first item
+                        if (index === 0) {
+                            console.log(`  -> NO MATCH [${item.name}]. Columns:`);
+                            console.log(item.column_values.map((c: any) => `${c.id}=${c.text}`));
+                        }
+                    }
+                });
+
+                // Clean Name
+                let cleanName = b.name.replace(/workspace/gi, '').replace(/editor/gi, '').replace(/-/g, '').trim();
+                if (b.name.includes('(')) {
+                    // Extract name before parenthesis if possible, or just keep it simple
+                    cleanName = b.name.split('(')[0].trim();
+                }
+                if (!cleanName || cleanName.length < 2) cleanName = b.name;
+
+                if (approvedCount > 0) {
+                    editorPerformance.push({ name: cleanName, count: approvedCount });
+                } else {
+                    // Push even if 0 to show on board? User implementation shows 0s in screenshot.
+                    // Let's push to list so they appear in leaderboard with 0 if needed, or filter later.
+                    editorPerformance.push({ name: cleanName, count: 0 });
+                }
+
+                if (approvedCount > maxDoneCount) {
+                    maxDoneCount = approvedCount;
+                    topEditorName = cleanName;
+                }
+            });
+
+            // Fallback for Top Editor (if no done items found but boards exist)
+            if (maxDoneCount === 0 && editorBoardsData.length > 0) {
+                // Maybe pick one with most items overall?
+                const busiestBoard = editorBoardsData.sort((a: any, b: any) => b.items.length - a.items.length)[0];
+                if (busiestBoard) {
+                    let cleanName = busiestBoard.name.replace(/workspace/gi, '').replace(/editor/gi, '').replace(/-/g, '').trim();
+                    if (!cleanName) cleanName = busiestBoard.name;
+                    // Still 0 done, but we can set name
+                    // topEditorName = cleanName; 
+                }
+            }
+
+            // Sort Editors
+            editorPerformance.sort((a, b) => b.count - a.count);
+
+            setOverviewStats({
+                activeClientsCount,
+                activeProjectsCount: totalActiveProjects,
+                activeEditorsCount,
+                topEditor: { name: topEditorName, count: maxDoneCount },
+                systemStatus: 'Stable',
+                clientProjectDistribution,
+                editorPerformance
+            });
+
         } catch (error) {
             console.error("Failed to load initial data", error);
         } finally {
             setLoading(false);
+            setOverviewLoading(false);
         }
     };
 
@@ -655,12 +898,113 @@ export default function AdminDashboard() {
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                                    <StatCard title="Total Views" value="124.5K" change="+12.5%" icon={<Eye className="w-5 h-5 text-blue-400" />} delay={0.1} />
-                                    <StatCard title="Active Projects" value="14" change="+4" icon={<Briefcase className="w-5 h-5 text-purple-400" />} delay={0.2} />
-                                    <StatCard title="Conversion Rate" value="3.2%" change="+0.8%" icon={<TrendingUp className="w-5 h-5 text-green-400" />} delay={0.3} />
-                                    <StatCard title="System Status" value="99.9%" change="Stable" icon={<Activity className="w-5 h-5 text-custom-bright" />} delay={0.4} />
+                                    <StatCard
+                                        title="Active Clients"
+                                        value={overviewLoading ? "..." : String(overviewStats.activeClientsCount)}
+                                        change="Boards"
+                                        icon={<Briefcase className="w-5 h-5 text-blue-400" />}
+                                        delay={0.1}
+                                    />
+                                    <StatCard
+                                        title="Active Projects"
+                                        value={overviewLoading ? "..." : String(overviewStats.activeProjectsCount)}
+                                        change="In Progress"
+                                        icon={<Activity className="w-5 h-5 text-purple-400" />}
+                                        delay={0.2}
+                                    />
+                                    <StatCard
+                                        title="Top Editor"
+                                        value={overviewLoading ? "..." : overviewStats.topEditor.name}
+                                        change={`${overviewStats.topEditor.count} Videos`}
+                                        icon={<TrendingUp className="w-5 h-5 text-green-400" />}
+                                        delay={0.3}
+                                    />
+                                    <StatCard
+                                        title="Active Editors"
+                                        value={overviewLoading ? "..." : String(overviewStats.activeEditorsCount)}
+                                        change="In Workspace"
+                                        icon={<Users className="w-5 h-5 text-custom-bright" />}
+                                        delay={0.4}
+                                    />
                                 </div>
-                                {/* ... other overview content ... */}
+
+                                {/* --- REAL GRAPH & LEADERBOARD --- */}
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
+
+                                    {/* Client Portfolio Graph */}
+                                    <div className="lg:col-span-2 p-6 rounded-3xl bg-black/20 border border-white/5 backdrop-blur-xl">
+                                        <div className="flex items-center justify-between mb-6">
+                                            <h3 className="text-white font-bold text-lg">Client Portfolio</h3>
+                                            <div className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Active Projects Distribution</div>
+                                        </div>
+
+                                        <div className="h-64 flex items-end gap-2 overflow-x-auto pb-2 custom-scrollbar">
+                                            {overviewLoading ? (
+                                                <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">Loading data...</div>
+                                            ) : overviewStats.clientProjectDistribution.length === 0 ? (
+                                                <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs italic">No active client data found</div>
+                                            ) : (
+                                                overviewStats.clientProjectDistribution.map((client, idx) => {
+                                                    const maxVal = Math.max(...overviewStats.clientProjectDistribution.map(c => c.count), 5); // scale max
+                                                    const heightPct = (client.count / maxVal) * 100;
+
+                                                    return (
+                                                        <div key={idx} className="flex flex-col items-center gap-2 group min-w-[60px] flex-1">
+                                                            <div className="relative w-full flex justify-center">
+                                                                <div
+                                                                    className="w-full max-w-[40px] rounded-t-lg bg-gradient-to-t from-blue-600/20 to-blue-500/80 group-hover:to-blue-400 transition-all duration-300 relative"
+                                                                    style={{ height: `${Math.max(heightPct, 5)}px`, minHeight: '4px' }}
+                                                                >
+                                                                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-bold text-white bg-black/80 px-2 py-0.5 rounded pointer-events-none whitespace-nowrap">
+                                                                        {client.count} Projects
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-[10px] text-gray-400 text-center truncate w-full max-w-[80px]" title={client.name}>
+                                                                {client.name}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Editor Performance Leaderboard */}
+                                    <div className="p-6 rounded-3xl bg-black/20 border border-white/5 backdrop-blur-xl flex flex-col">
+                                        <div className="flex items-center justify-between mb-6">
+                                            <h3 className="text-white font-bold text-lg">Top Editors</h3>
+                                            <div className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Videos Done</div>
+                                        </div>
+
+                                        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3">
+                                            {overviewLoading ? (
+                                                <div className="text-center text-gray-500 text-xs py-10">Loading...</div>
+                                            ) : overviewStats.editorPerformance.length === 0 ? (
+                                                <div className="text-center text-gray-500 text-xs italic py-10">No editor data available</div>
+                                            ) : (
+                                                overviewStats.editorPerformance.map((editor, idx) => (
+                                                    <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors group">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${idx === 0 ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'bg-gray-700/30 text-gray-400'}`}>
+                                                                {idx + 1}
+                                                            </div>
+                                                            <div className="flex flex-col">
+                                                                <span className={`text-xs font-bold ${idx === 0 ? 'text-white' : 'text-gray-300'}`}>{editor.name}</span>
+                                                                {idx === 0 && <span className="text-[9px] text-yellow-500 uppercase tracking-wider">Top Performer</span>}
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-sm font-black text-white px-2 py-1 rounded bg-black/20">
+                                                            {editor.count}
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+
+                                </div>
+                                {/* End Real Data Section */}
                             </div>
                         )}
 
@@ -849,93 +1193,288 @@ export default function AdminDashboard() {
                                                         </button>
                                                     </div>
 
-                                                    {/* Groups */}
-                                                    {boardData.groups?.map((group: any) => {
-                                                        const groupItems = boardData.items?.filter((item: any) => item.group?.id === group.id) || [];
-                                                        const isCollapsed = collapsedGroups.has(group.id);
+                                                    {/* FULFILLMENT DASHBOARD (Top Level) */}
+                                                    {(boardData.name.toLowerCase().includes('fulfillment') || boardData.name.toLowerCase().includes('fullfillment')) ? (() => {
+                                                        const allItems = boardData.groups?.flatMap((g: any) => boardData.items?.filter((i: any) => i.group.id === g.id)) || [];
+
+                                                        // --- Date Filter Logic ---
+                                                        const months = new Set<string>();
+                                                        allItems.forEach((item: any) => {
+                                                            if (item.created_at) {
+                                                                const date = new Date(item.created_at);
+                                                                if (!isNaN(date.getTime())) {
+                                                                    const monthStr = date.toLocaleString('default', { month: 'short', year: 'numeric' }); // e.g., "Oct 2023"
+                                                                    months.add(monthStr);
+                                                                }
+                                                            }
+                                                        });
+                                                        const sortedMonths = Array.from(months).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+
+                                                        // Apply Filter
+                                                        const filteredItems = fulfillmentMonthFilter === 'All'
+                                                            ? allItems
+                                                            : allItems.filter((item: any) => {
+                                                                if (!item.created_at) return false;
+                                                                const date = new Date(item.created_at);
+                                                                const monthStr = date.toLocaleString('default', { month: 'short', year: 'numeric' });
+                                                                return monthStr === fulfillmentMonthFilter;
+                                                            });
+
+                                                        const totalProjects = filteredItems.length;
+
+                                                        // Sort by Recency (ID Descending)
+                                                        const sortedItems = [...filteredItems].sort((a: any, b: any) => Number(b.id) - Number(a.id));
+
+                                                        // Detect Status Column for Graph
+                                                        const statusCol = boardData.columns?.find((c: any) => c.type === 'status' || c.title.toLowerCase().includes('status'));
+                                                        const statusCounts: Record<string, number> = {};
+
+                                                        filteredItems.forEach((item: any) => { // Use filteredItems for stats
+                                                            let label = "Unassigned";
+                                                            if (statusCol) {
+                                                                const valObj = item.column_values?.find((v: any) => v.id === statusCol.id);
+                                                                if (valObj) {
+                                                                    if (valObj.text) label = valObj.text;
+                                                                    else if (valObj.display_value) label = valObj.display_value;
+                                                                }
+                                                            }
+                                                            statusCounts[label] = (statusCounts[label] || 0) + 1;
+                                                        });
+
+                                                        const sortedStatuses = Object.entries(statusCounts).sort((a, b) => b[1] - a[1]);
+                                                        const maxCount = Math.max(...Object.values(statusCounts), 1);
 
                                                         return (
-                                                            <motion.div
-                                                                key={group.id}
-                                                                className="rounded-[2rem] bg-black/20 border border-white/5 backdrop-blur-xl overflow-hidden"
-                                                            >
-                                                                <div
-                                                                    className="px-6 py-4 bg-white/5 border-b border-white/5 flex items-center gap-4 cursor-pointer hover:bg-white/10 transition-colors"
-                                                                    onClick={() => toggleGroup(group.id)}
-                                                                >
-                                                                    <div className={`transition-transform duration-300 ${isCollapsed ? '-rotate-90' : 'rotate-0'}`}>
-                                                                        <div className={`w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px]`} style={{ borderTopColor: group.color || '#fff' }} />
+                                                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
+
+                                                                {/* View Toggle Header & Filter */}
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex items-center gap-1 bg-[#0e0e1a] p-1 rounded-xl border border-white/5">
+                                                                        <button
+                                                                            onClick={() => setFulfillmentViewMode('recent')}
+                                                                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${fulfillmentViewMode === 'recent' ? 'bg-[#0073ea] text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                                                                        >
+                                                                            <Clock className="w-3.5 h-3.5" /> Most Recent Project
+                                                                        </button>
+                                                                        <div className="w-[1px] h-4 bg-white/10 mx-1" />
+                                                                        <button
+                                                                            onClick={() => setFulfillmentViewMode('overview')}
+                                                                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${fulfillmentViewMode === 'overview' ? 'bg-[#0073ea] text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                                                                        >
+                                                                            <LayoutGrid className="w-3.5 h-3.5" /> Whole Overview
+                                                                        </button>
                                                                     </div>
-                                                                    <h3 className="text-lg font-bold text-white tracking-wide" style={{ color: group.color || '#fff' }}>{group.title}</h3>
+
+                                                                    {/* Month Filter Dropdown */}
+                                                                    {sortedMonths.length > 0 && (
+                                                                        <div className="relative group z-30">
+                                                                            <div className="flex items-center gap-2 px-3 py-2 bg-[#0e0e1a] border border-white/10 rounded-xl cursor-pointer hover:bg-white/5 transition-colors">
+                                                                                <div className="p-1 rounded bg-white/5 text-gray-400"><FileText className="w-3 h-3" /></div>
+                                                                                <span className="text-xs font-bold text-white min-w-[60px]">{fulfillmentMonthFilter}</span>
+                                                                                <ChevronDown className="w-3 h-3 text-gray-500" />
+                                                                            </div>
+                                                                            {/* Dropdown Options */}
+                                                                            <div className="absolute top-full right-0 mt-2 w-40 bg-[#0A0A16] border border-white/10 rounded-xl shadow-2xl overflow-hidden hidden group-hover:block transition-all animate-in fade-in zoom-in duration-200">
+                                                                                <div
+                                                                                    onClick={() => setFulfillmentMonthFilter('All')}
+                                                                                    className={`px-4 py-3 text-xs font-bold cursor-pointer transition-colors ${fulfillmentMonthFilter === 'All' ? 'bg-custom-bright/10 text-custom-bright' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                                                                                >
+                                                                                    All Time
+                                                                                </div>
+                                                                                {sortedMonths.map(month => (
+                                                                                    <div
+                                                                                        key={month}
+                                                                                        onClick={() => setFulfillmentMonthFilter(month)}
+                                                                                        className={`px-4 py-3 text-xs font-bold cursor-pointer transition-colors ${fulfillmentMonthFilter === month ? 'bg-custom-bright/10 text-custom-bright' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                                                                                    >
+                                                                                        {month}
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
 
-                                                                {!isCollapsed && (
-                                                                    <div className="p-6">
-                                                                        {boardData.name.toLowerCase().includes('form') || boardData.name.toLowerCase().includes('board') ? (() => {
-                                                                            const currentIndex = groupCarouselIndices[group.id] || 0;
-                                                                            const currentItem = groupItems[currentIndex];
-                                                                            const hasNext = currentIndex < groupItems.length - 1;
-                                                                            const hasPrev = currentIndex > 0;
+                                                                {/* --- RECENT PROJECT VIEW --- */}
+                                                                {fulfillmentViewMode === 'recent' && (() => {
+                                                                    const currentItem = sortedItems[fulfillmentRecentIndex];
+                                                                    const hasNext = fulfillmentRecentIndex < sortedItems.length - 1;
+                                                                    const hasPrev = fulfillmentRecentIndex > 0;
 
-                                                                            if (groupItems.length === 0) return <div className="text-center text-gray-500 italic py-8">No items in this group</div>;
+                                                                    if (!currentItem) return <div className="text-center text-gray-500 italic py-12">No projects found</div>;
 
-                                                                            return (
-                                                                                <div className="space-y-4">
-                                                                                    {/* Navigation Controls */}
-                                                                                    <div className="flex items-center justify-between mb-4 px-4">
-                                                                                        <button
-                                                                                            disabled={!hasPrev}
-                                                                                            onClick={() => setGroupCarouselIndices(prev => ({ ...prev, [group.id]: currentIndex - 1 }))}
-                                                                                            className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 flex items-center gap-2 transition-all"
-                                                                                        >
-                                                                                            <ChevronDown className="w-4 h-4 rotate-90" /> Previous
-                                                                                        </button>
-                                                                                        <span className="text-sm font-mono text-gray-400 bg-black/40 px-3 py-1 rounded-full border border-white/5">
-                                                                                            <span className="text-white font-bold">{currentIndex + 1}</span> / {groupItems.length}
-                                                                                        </span>
-                                                                                        <button
-                                                                                            disabled={!hasNext}
-                                                                                            onClick={() => setGroupCarouselIndices(prev => ({ ...prev, [group.id]: currentIndex + 1 }))}
-                                                                                            className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 flex items-center gap-2 transition-all"
-                                                                                        >
-                                                                                            Next <ChevronDown className="w-4 h-4 -rotate-90" />
-                                                                                        </button>
+                                                                    return (
+                                                                        <div className="space-y-6">
+                                                                            {/* Navigation */}
+                                                                            <div className="flex items-center justify-between bg-[#0e0e1a] p-3 rounded-2xl border border-white/5">
+                                                                                <button
+                                                                                    disabled={!hasPrev}
+                                                                                    onClick={() => setFulfillmentRecentIndex(prev => Math.max(0, prev - 1))}
+                                                                                    className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 flex items-center gap-2 transition-all text-xs font-bold"
+                                                                                >
+                                                                                    <ChevronDown className="w-4 h-4 rotate-90" /> Newer
+                                                                                </button>
+
+                                                                                <div className="flex flex-col items-center">
+                                                                                    <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-0.5">Viewing Project</span>
+                                                                                    <div className="text-sm font-mono text-white">
+                                                                                        <span className="text-custom-bright font-bold">{fulfillmentRecentIndex + 1}</span> <span className="text-gray-600">/</span> {sortedItems.length}
+                                                                                    </div>
+                                                                                </div>
+
+                                                                                <button
+                                                                                    disabled={!hasNext}
+                                                                                    onClick={() => setFulfillmentRecentIndex(prev => Math.min(sortedItems.length - 1, prev + 1))}
+                                                                                    className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 flex items-center gap-2 transition-all text-xs font-bold"
+                                                                                >
+                                                                                    Older <ChevronDown className="w-4 h-4 -rotate-90" />
+                                                                                </button>
+                                                                            </div>
+
+                                                                            {/* Single Card Display */}
+                                                                            <motion.div
+                                                                                key={currentItem.id} // Key ensures animation on switch
+                                                                                initial={{ opacity: 0, x: 20 }}
+                                                                                animate={{ opacity: 1, x: 0 }}
+                                                                                exit={{ opacity: 0, x: -20 }}
+                                                                                className="relative p-8 rounded-3xl bg-[#0e0e1a] border border-white/5 shadow-2xl overflow-hidden"
+                                                                            >
+                                                                                <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+                                                                                    <Briefcase className="w-32 h-32 text-custom-bright" />
+                                                                                </div>
+
+                                                                                <div className="relative z-10 w-full max-w-3xl mx-auto">
+                                                                                    <div className="flex flex-col gap-6 mb-8 text-center">
+                                                                                        <div className="inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/5 mx-auto">
+                                                                                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                                                                                            <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">Active Project</span>
+                                                                                        </div>
+                                                                                        <h2 className="text-4xl font-black text-white leading-tight">{currentItem.name}</h2>
                                                                                     </div>
 
-                                                                                    {/* Single Item Card */}
-                                                                                    {currentItem && (
-                                                                                        <motion.div
-                                                                                            key={currentItem.id}
-                                                                                            initial={{ opacity: 0, x: 20 }}
-                                                                                            animate={{ opacity: 1, x: 0 }}
-                                                                                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                                                                                            className="group relative max-w-5xl mx-auto"
-                                                                                        >
-                                                                                            <div className="absolute inset-0 bg-gradient-to-r from-custom-blue/10 to-custom-purple/10 rounded-3xl blur-2xl opacity-50" />
-                                                                                            <div className="relative p-8 rounded-3xl bg-[#0A0A16] border border-white/10 shadow-2xl">
-                                                                                                <div className="flex flex-col md:flex-row items-start md:items-center gap-6 mb-8 pb-6 border-b border-white/5">
-                                                                                                    <div className="w-2 h-16 rounded-full shadow-[0_0_15px_rgba(255,255,255,0.3)]" style={{ backgroundColor: group.color || '#7c3aed' }} />
-                                                                                                    <div className="flex-1">
-                                                                                                        <h4 className="text-3xl font-bold text-white tracking-tight mb-2">{currentItem.name}</h4>
-                                                                                                        <div className="flex items-center gap-4">
-                                                                                                            <span className="px-3 py-1 rounded-full bg-white/5 text-[10px] text-gray-400 uppercase tracking-widest font-bold border border-white/5">ID: {currentItem.id}</span>
-                                                                                                            <span className="text-xs text-gray-500 font-medium">
-                                                                                                                {boardData.name.toLowerCase().includes('form') ? "Application Entry" : "Project Details"}
-                                                                                                            </span>
-                                                                                                        </div>
-                                                                                                    </div>
+                                                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                                                        {boardData.columns?.filter((col: any) => col.type !== 'name').map((col: any) => (
+                                                                                            <div key={col.id} className="group p-4 rounded-2xl bg-black/20 border border-white/5 hover:bg-white/5 transition-colors">
+                                                                                                <div className="flex items-center gap-2 mb-2">
+                                                                                                    <span className="text-[10px] uppercase tracking-wider text-custom-bright font-bold">{col.title}</span>
                                                                                                 </div>
+                                                                                                <div className="min-h-[32px] flex items-center">
+                                                                                                    <BoardCell
+                                                                                                        item={currentItem}
+                                                                                                        column={col}
+                                                                                                        boardId={selectedBoardId}
+                                                                                                        onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
+                                                                                                        onPreview={(url, name) => setPreviewFile({ url, name })}
+                                                                                                    />
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                </div>
+                                                                            </motion.div>
+                                                                        </div>
+                                                                    );
+                                                                })()}
 
-                                                                                                {/* Fields Grid - Larger for single view */}
-                                                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-8">
+                                                                {/* --- OVERVIEW DASHBOARD VIEW --- */}
+                                                                {fulfillmentViewMode === 'overview' && (
+                                                                    <div className="space-y-8 animate-in fade-in zoom-in duration-300">
+                                                                        {/* Metrics Header */}
+                                                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                                            <div className="bg-[#0e0e1a] border border-white/5 p-4 rounded-2xl shadow-lg relative overflow-hidden group">
+                                                                                <div className="absolute inset-0 bg-blue-500/5 group-hover:bg-blue-500/10 transition-colors" />
+                                                                                <h4 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1 px-1">Total Projects</h4>
+                                                                                <div className="text-3xl font-bold text-white max-md:text-2xl px-1">{totalProjects}</div>
+                                                                            </div>
+                                                                            <div className="bg-[#0e0e1a] border border-white/5 p-4 rounded-2xl shadow-lg relative overflow-hidden group">
+                                                                                <div className="absolute inset-0 bg-purple-500/5 group-hover:bg-purple-500/10 transition-colors" />
+                                                                                <h4 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1 px-1">Active</h4>
+                                                                                <div className="text-3xl font-bold text-[#a25ddc] max-md:text-2xl px-1">
+                                                                                    {totalProjects - (statusCounts['Completed'] || statusCounts['Approved (CV)'] || 0)}
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="bg-[#0e0e1a] border border-white/5 p-4 rounded-2xl shadow-lg relative overflow-hidden group">
+                                                                                <div className="absolute inset-0 bg-green-500/5 group-hover:bg-green-500/10 transition-colors" />
+                                                                                <h4 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1 px-1">Completed</h4>
+                                                                                <div className="text-3xl font-bold text-[#00c875] max-md:text-2xl px-1">
+                                                                                    {statusCounts['Approved (CV)'] || statusCounts['Done'] || 0}
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="bg-[#0e0e1a] border border-white/5 p-4 rounded-2xl shadow-lg relative overflow-hidden group">
+                                                                                <div className="absolute inset-0 bg-orange-500/5 group-hover:bg-orange-500/10 transition-colors" />
+                                                                                <h4 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1 px-1">In Progress</h4>
+                                                                                <div className="text-3xl font-bold text-[#fdab3d] max-md:text-2xl px-1">
+                                                                                    {(statusCounts['Working on it (CV)'] || 0) + (statusCounts['In Progress'] || 0)}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* Graph Section */}
+                                                                        <div className="bg-[#0e0e1a] border border-white/5 p-6 rounded-3xl shadow-xl">
+                                                                            <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                                                                                <div className="p-1.5 bg-custom-bright/10 rounded-lg"><LayoutDashboard className="w-4 h-4 text-custom-bright" /></div>
+                                                                                Project Status Overview
+                                                                            </h3>
+                                                                            <div className="space-y-4">
+                                                                                {sortedStatuses.length > 0 ? sortedStatuses.map(([label, count], idx) => (
+                                                                                    <div key={label} className="flex items-center gap-4 group">
+                                                                                        <div className="w-36 text-right text-xs text-gray-400 font-medium truncate shrink-0 group-hover:text-white transition-colors">{label}</div>
+                                                                                        <div className="flex-1 h-3 bg-white/5 rounded-full overflow-hidden">
+                                                                                            <motion.div
+                                                                                                initial={{ width: 0 }}
+                                                                                                animate={{ width: `${(count / maxCount) * 100}%` }}
+                                                                                                transition={{ duration: 1, delay: idx * 0.1, type: "spring" }}
+                                                                                                className="h-full rounded-full relative"
+                                                                                                style={{
+                                                                                                    backgroundColor: label.includes('Approved') ? '#00c875' :
+                                                                                                        label.includes('Working') ? '#fdab3d' :
+                                                                                                            label.includes('Break') ? '#ff158a' :
+                                                                                                                label.includes('Stuck') || label.includes('Error') ? '#df2f4a' :
+                                                                                                                    '#579bfc'
+                                                                                                }}
+                                                                                            >
+                                                                                                <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                                                            </motion.div>
+                                                                                        </div>
+                                                                                        <div className="w-8 text-xs text-white font-bold">{count}</div>
+                                                                                    </div>
+                                                                                )) : (
+                                                                                    <div className="text-center text-gray-500 italic py-8">No status data available</div>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* Whole Overview Grid */}
+                                                                        <div>
+                                                                            <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                                                                                <span className="w-1 h-6 bg-custom-bright rounded-full" />
+                                                                                Project Gallery
+                                                                            </h3>
+                                                                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                                                                {boardData.groups?.map((group: any) => {
+                                                                                    const gItems = boardData.items?.filter((i: any) => i.group.id === group.id) || [];
+                                                                                    return gItems.map((item: any) => (
+                                                                                        <motion.div
+                                                                                            key={item.id}
+                                                                                            initial={{ opacity: 0, scale: 0.95 }}
+                                                                                            animate={{ opacity: 1, scale: 1 }}
+                                                                                            whileHover={{ y: -5 }}
+                                                                                            className="group relative"
+                                                                                        >
+                                                                                            <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                                                                                            <div className="relative p-5 rounded-2xl bg-[#0e0e1a] border border-white/5 shadow-xl hover:border-white/10 hover:bg-[#131322] transition-all h-full flex flex-col gap-4">
+                                                                                                <div className="flex items-start justify-between gap-4">
+                                                                                                    <h4 className="text-base font-bold text-white leading-snug line-clamp-2">{item.name}</h4>
+                                                                                                    <span className="px-2 py-0.5 rounded bg-white/5 text-[9px] text-gray-500 font-mono border border-white/5 whitespace-nowrap" style={{ color: group.color }}>{group.title}</span>
+                                                                                                </div>
+                                                                                                <div className="w-full h-[1px] bg-white/5" />
+                                                                                                <div className="space-y-4">
                                                                                                     {boardData.columns?.map((col: any) => (
-                                                                                                        <div key={col.id} className="flex flex-col gap-2">
-                                                                                                            <span className="text-xs uppercase tracking-widest text-gray-500 font-bold ml-1 flex items-center gap-2">
-                                                                                                                {col.title}
-                                                                                                            </span>
-                                                                                                            <div className="bg-black/40 rounded-xl p-4 border border-white/5 min-h-[56px] flex items-center hover:border-white/10 transition-colors shadow-inner">
+                                                                                                        <div key={col.id} className="flex flex-col gap-1.5">
+                                                                                                            <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">{col.title}</span>
+                                                                                                            <div className="min-h-[28px] flex items-center">
                                                                                                                 <BoardCell
-                                                                                                                    item={currentItem}
+                                                                                                                    item={item}
                                                                                                                     column={col}
                                                                                                                     boardId={selectedBoardId}
                                                                                                                     onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
@@ -947,52 +1486,72 @@ export default function AdminDashboard() {
                                                                                                 </div>
                                                                                             </div>
                                                                                         </motion.div>
-                                                                                    )}
-                                                                                </div>
-                                                                            );
-                                                                        })() : (
-                                                                            <div className="overflow-x-auto rounded-xl border border-white/5 bg-black/20">
-                                                                                <table className="w-full text-left text-sm whitespace-nowrap">
-                                                                                    <thead>
-                                                                                        <tr className="bg-white/5 text-gray-400 font-bold uppercase tracking-wider text-[11px] border-b border-white/5">
-                                                                                            <th className="px-4 py-3 sticky left-0 bg-[#0A0A16] z-10 border-r border-white/5">Name</th>
-                                                                                            {boardData.columns?.map((col: any) => (
-                                                                                                <th key={col.id} className="px-4 py-3 min-w-[150px]">{col.title}</th>
-                                                                                            ))}
-                                                                                        </tr>
-                                                                                    </thead>
-                                                                                    <tbody className="divide-y divide-white/5">
-                                                                                        {groupItems.map((item: any) => (
-                                                                                            <tr key={item.id} className="hover:bg-white/5 transition-colors group">
-                                                                                                <td className="px-4 py-3 font-medium text-white sticky left-0 bg-[#0A0A16] group-hover:bg-[#1C1C2E] transition-colors border-r border-white/5">
-                                                                                                    <div className="flex flex-col">
-                                                                                                        <span>{item.name}</span>
-                                                                                                        <span className="text-[9px] text-gray-500 font-mono opacity-50">ID: {item.id}</span>
-                                                                                                    </div>
-                                                                                                </td>
-                                                                                                {boardData.columns?.map((col: any) => (
-                                                                                                    <td key={col.id} className="px-4 py-3">
-                                                                                                        <BoardCell
-                                                                                                            item={item}
-                                                                                                            column={col}
-                                                                                                            boardId={selectedBoardId}
-                                                                                                            onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
-                                                                                                            onPreview={(url, name) => setPreviewFile({ url, name })}
-                                                                                                        />
-                                                                                                    </td>
-                                                                                                ))}
-                                                                                            </tr>
-                                                                                        ))}
-                                                                                    </tbody>
-                                                                                </table>
-                                                                                {groupItems.length === 0 && <div className="text-center text-gray-500 italic py-8">No items in this group</div>}
+                                                                                    ));
+                                                                                })}
                                                                             </div>
-                                                                        )}
+                                                                            {allItems.length === 0 && <div className="text-center text-gray-500 italic py-12 bg-[#0e0e1a] rounded-3xl border border-white/5 mt-4">No projects found to display</div>}
+                                                                        </div>
                                                                     </div>
                                                                 )}
-                                                            </motion.div>
+                                                            </div>
                                                         );
-                                                    })}
+                                                    })() : (
+                                                        <div className="space-y-6">
+                                                            {boardData.groups?.map((group: any) => {
+                                                                const groupItems = boardData.items?.filter((item: any) => item.group?.id === group.id) || [];
+                                                                const isCollapsed = collapsedGroups.has(group.id);
+
+                                                                return (
+                                                                    <motion.div key={group.id} className="rounded-[2rem] bg-black/20 border border-white/5 backdrop-blur-xl overflow-hidden">
+                                                                        <div className="px-6 py-4 bg-white/5 border-b border-white/5 flex items-center gap-4 cursor-pointer hover:bg-white/10 transition-colors" onClick={() => toggleGroup(group.id)}>
+                                                                            <div className={`transition-transform duration-300 ${isCollapsed ? '-rotate-90' : 'rotate-0'}`}><div className={`w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px]`} style={{ borderTopColor: group.color || '#fff' }} /></div>
+                                                                            <h3 className="text-lg font-bold text-white tracking-wide" style={{ color: group.color || '#fff' }}>{group.title}</h3>
+                                                                        </div>
+                                                                        {!isCollapsed && (
+                                                                            <div className="p-6">
+                                                                                {boardData.name.toLowerCase().includes('form') || boardData.name.toLowerCase().includes('board') ? (() => {
+                                                                                    const currentIndex = groupCarouselIndices[group.id] || 0;
+                                                                                    const currentItem = groupItems[currentIndex];
+                                                                                    const hasNext = currentIndex < groupItems.length - 1;
+                                                                                    const hasPrev = currentIndex > 0;
+                                                                                    if (groupItems.length === 0) return <div className="text-center text-gray-500 italic py-8">No items in this group</div>;
+                                                                                    return (
+                                                                                        <div className="space-y-4">
+                                                                                            <div className="flex items-center justify-between mb-4 px-4">
+                                                                                                <button disabled={!hasPrev} onClick={() => setGroupCarouselIndices(prev => ({ ...prev, [group.id]: currentIndex - 1 }))} className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 flex items-center gap-2 transition-all"><ChevronDown className="w-4 h-4 rotate-90" /> Previous</button>
+                                                                                                <span className="text-sm font-mono text-gray-400 bg-black/40 px-3 py-1 rounded-full border border-white/5"><span className="text-white font-bold">{currentIndex + 1}</span> / {groupItems.length}</span>
+                                                                                                <button disabled={!hasNext} onClick={() => setGroupCarouselIndices(prev => ({ ...prev, [group.id]: currentIndex + 1 }))} className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 flex items-center gap-2 transition-all">Next <ChevronDown className="w-4 h-4 -rotate-90" /></button>
+                                                                                            </div>
+                                                                                            <div className="flex flex-col items-center mb-6"><h3 className="text-2xl font-black text-white mb-2 text-center">{currentItem.name}</h3><span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{boardData.name.toLowerCase().includes('form') ? 'Application Entry' : 'Project Details'}</span></div>
+                                                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                                                                                                {boardData.columns?.filter((col: any) => col.type !== 'name').map((col: any) => (
+                                                                                                    <div key={col.id} className="p-4 rounded-2xl bg-[#0e0e1a] border border-white/5"><span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-2">{col.title}</span><BoardCell item={currentItem} column={col} boardId={selectedBoardId} onUpdate={() => refreshBoardDetails(selectedBoardId!, true)} onPreview={(url, name) => setPreviewFile({ url, name })} /></div>
+                                                                                                ))}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    );
+                                                                                })() : (
+                                                                                    <div className="overflow-x-auto rounded-xl border border-white/5 bg-black/20">
+                                                                                        <table className="w-full text-left text-sm whitespace-nowrap">
+                                                                                            <thead><tr className="border-b border-white/10 bg-white/5"><th className="px-4 py-3 text-xs font-bold text-white uppercase tracking-wider w-[240px]">Name</th>{boardData.columns?.filter((c: any) => c.type !== 'name').map((col: any) => (<th key={col.id} className="px-4 py-3 text-xs font-bold text-gray-300 uppercase tracking-wider min-w-[150px]">{col.title}</th>))}</tr></thead>
+                                                                                            <tbody>
+                                                                                                {groupItems.map((item: any) => (
+                                                                                                    <tr key={item.id} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
+                                                                                                        <td className="px-4 py-3 font-medium text-white group-hover:text-custom-bright transition-colors sticky left-0 bg-[#0e0e1a] group-hover:bg-[#151525] z-10 border-r border-white/5">{item.name}</td>
+                                                                                                        {boardData.columns?.filter((c: any) => c.type !== 'name').map((col: any) => (<td key={col.id} className="px-4 py-3 text-gray-400"><BoardCell item={item} column={col} boardId={selectedBoardId} onUpdate={() => refreshBoardDetails(selectedBoardId!, true)} onPreview={(url, name) => setPreviewFile({ url, name })} /></td>))}
+                                                                                                    </tr>
+                                                                                                ))}
+                                                                                            </tbody>
+                                                                                        </table>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        )}
+                                                                    </motion.div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ) : null}
                                         </>

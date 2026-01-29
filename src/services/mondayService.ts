@@ -353,6 +353,7 @@ export async function getBoardItems(boardId: string) {
                 items {
                     id
                     name
+                    created_at
                     group {
                         id
                     }
@@ -410,4 +411,96 @@ export async function updateItemValue(boardId: string, itemId: string, columnId:
     return data;
 }
 
+export async function getMultipleBoardItems(boardIds: string[]) {
+    if (boardIds.length === 0) return [];
 
+    // Chunking to avoid query length limits (e.g., 20 boards at a time)
+    const chunkSize = 20;
+    const chunks = [];
+    for (let i = 0; i < boardIds.length; i += chunkSize) {
+        chunks.push(boardIds.slice(i, i + chunkSize));
+    }
+
+    let allBoards: any[] = [];
+
+    for (const chunk of chunks) {
+        const query = `query {
+            boards (ids: [${chunk.join(',')}]) {
+                id
+                name
+                items_page (limit: 500) {
+                    items {
+                        id
+                        name
+                        created_at
+                        updated_at
+                        group {
+                            id
+                        }
+                        column_values {
+                            id
+                            text
+                            value
+                            type
+                        }
+                    }
+                }
+            }
+        }`;
+
+        try {
+            const data = await mondayRequest(query);
+            if (data && data.boards) {
+                const processedBoards = data.boards.map((b: any) => ({
+                    ...b,
+                    items: b.items_page?.items || []
+                }));
+                allBoards = [...allBoards, ...processedBoards];
+            }
+        } catch (e) {
+            console.error("Failed to fetch chunk", chunk, e);
+        }
+    }
+
+    return allBoards;
+}
+
+export async function getMultipleBoardActivityLogs(boardIds: string[], fromDate: string, columnId?: string) {
+    if (boardIds.length === 0) return [];
+
+    const chunkSize = 20;
+    const chunks = [];
+    for (let i = 0; i < boardIds.length; i += chunkSize) {
+        chunks.push(boardIds.slice(i, i + chunkSize));
+    }
+
+    let allBoardsWithLogs: any[] = [];
+
+    for (const chunk of chunks) {
+        // limit 1000 should be enough for 2 weeks
+        const colFilter = columnId ? `, column_ids: ["${columnId}"]` : '';
+        const query = `query {
+            boards (ids: [${chunk.join(',')}]) {
+                id
+                activity_logs (from: "${fromDate}"${colFilter}, limit: 1000) {
+                    id
+                    event
+                    data
+                    entity
+                    created_at
+                }
+            }
+        }`;
+
+        try {
+            const data = await mondayRequest(query);
+            if (data && data.boards) {
+                allBoardsWithLogs = [...allBoardsWithLogs, ...data.boards];
+            }
+        } catch (e) {
+            console.error("Failed to fetch activity logs chunk", chunk, e);
+        }
+    }
+
+    return allBoardsWithLogs;
+}
