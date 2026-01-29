@@ -28,6 +28,14 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { getAllBoards, getAllFolders, getBoardItems, createNewBoard, createNewGroup, updateItemValue, getAllWorkspaces } from '../services/mondayService';
 
+// --- Helpers ---
+const getBoardIcon = (name: string) => {
+    const n = name.toLowerCase();
+    if (n.includes('dashboard')) return LayoutDashboard;
+    if (n.includes('form')) return FileText;
+    return Table;
+};
+
 // --- Folder & Tree Components ---
 
 const FolderTreeItem = ({ folder, allFolders, allBoards, onSelectBoard, selectedBoardId, depth = 0 }: any) => {
@@ -55,12 +63,7 @@ const FolderTreeItem = ({ folder, allFolders, allBoards, onSelectBoard, selected
             .sort((a: any, b: any) => a.name.localeCompare(b.name)) // Boards can stay A-Z or unsorted? Let's keep A-Z for boards inside folders for now unless user complains.
         : [];
 
-    // Helper for Icon
-    const getBoardIcon = (name: string) => {
-        if (name.toLowerCase().includes('dashboard')) return LayoutDashboard;
-        if (name.toLowerCase().includes('form')) return FileText;
-        return Table;
-    };
+
 
     // Auto-expand if selected board is inside
     useEffect(() => {
@@ -196,13 +199,21 @@ const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, 
     let linkUrl = null;
     let fileName = null;
 
+    // Fix for Mirror Columns: Use display_value if available (native or from our updated query)
+    if ((column.type === 'mirror' || column.type === 'lookup') && colValueObj.display_value) {
+        displayValue = colValueObj.display_value;
+    }
+
     if (colValueObj && colValueObj.value) {
         try {
             const val = JSON.parse(colValueObj.value);
             // Link
             if (column.type === 'link') {
                 linkUrl = val.url;
-                displayValue = val.text || val.url || displayValue;
+                // If we haven't already set displayValue from mirror logic, use the link text
+                if (!colValueObj.display_value) {
+                    displayValue = val.text || val.url || displayValue;
+                }
             }
             // Date
             if (column.type === 'date') {
@@ -225,7 +236,7 @@ const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, 
     }
 
     // Special handling if displayValue (text) is actually a raw URL for files (User Screenshot Case)
-    if (column.type === 'file' && !linkUrl && displayValue.startsWith('http')) {
+    if ((column.type === 'file' || column.type === 'mirror' || column.type === 'lookup') && !linkUrl && displayValue.startsWith('http')) {
         linkUrl = displayValue;
         // Try to extract filename from URL
         try {
@@ -277,11 +288,53 @@ const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, 
         return <div className="text-gray-500 text-xs animate-pulse flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Saving...</div>;
     }
 
-    // Status / Dropdown Rendering
-    if (column.type === 'color' || column.type === 'status') {
-        const currentOption = options.find(o => o.label === displayValue);
+    // Heuristic: If it's a mirror column that looks like a status, treat it as one
+    const isMirrorStatus = (column.type === 'mirror' || column.type === 'lookup') && column.title.toLowerCase().includes('status');
 
-        if (isEditing) {
+    // Status / Dropdown Rendering OR Mirror Status
+    if (column.type === 'color' || column.type === 'status' || isMirrorStatus) {
+        let currentOption = options.find(o => o.label === displayValue);
+
+        // Manual Color Override for Mirror Statuses if options are missing
+        if (!currentOption && isMirrorStatus) {
+            const val = displayValue;
+            // Detailed Mapping based on User Screenshot
+            if (val.includes('Unassigned')) currentOption = { label: val, color: '#595959', id: 'unassigned' }; // Dark Grey
+
+            // Yellows
+            else if (val.includes('Assigned (CV)')) currentOption = { label: val, color: '#fec12d', id: 'assigned_cv' };
+
+            // Oranges
+            else if (val.includes('Working on it (CV)')) currentOption = { label: val, color: '#fdab3d', id: 'working_cv' };
+            else if (val.includes('Exporting')) currentOption = { label: val, color: '#ffadad', id: 'exporting' }; // Light Peach/Orange
+
+            // Pinks/Reds
+            else if (val.includes('Taking a break (CV)')) currentOption = { label: val, color: '#ff158a', id: 'break_cv' };
+            else if (val.includes('Client Info')) currentOption = { label: val, color: '#e2445c', id: 'client_info' };
+            else if (val.includes('(Client) Approved')) currentOption = { label: val, color: '#cd3859', id: 'client_approved' }; // Dark Red
+
+            // Purples
+            else if (val.includes('For Approval (CV)')) currentOption = { label: val, color: '#5D24AA', id: 'for_approval_cv' }; // Deep Purple
+            else if (val.includes('(Client) Uploading')) currentOption = { label: val, color: '#904EE2', id: 'client_uploading' };
+
+            // Greens
+            else if (val.includes('1st Approval')) currentOption = { label: val, color: '#9cd326', id: '1st_approval' }; // Lime
+            else if (val.includes('Approved (CV)')) currentOption = { label: val, color: '#00c875', id: 'approved_cv' };
+            else if (val.includes('(Client) Sent for')) currentOption = { label: val, color: '#009d6c', id: 'client_sent' }; // Dark Green
+
+            // Blues
+            else if (val.includes('Waiting for Client')) currentOption = { label: val, color: '#579bfc', id: 'waiting_client' };
+            else if (val.includes('Downloading')) currentOption = { label: val, color: '#505f79', id: 'downloading' }; // Dark Blue Grey
+
+            // Fallback Heuristics
+            else if (val.includes('Approved')) currentOption = { label: val, color: '#00c875', id: 'approved_gen' };
+            else if (val.includes('Revision')) currentOption = { label: val, color: '#eebb4d', id: 'revision' }; // Goldish
+            else if (val.includes('Stuck') || val.includes('Error')) currentOption = { label: val, color: '#e2445c', id: 'error' };
+            else if (val) currentOption = { label: val, color: '#579bfc', id: 'default' };
+        }
+
+        // EDIT MODE (Only for native status, not mirrors)
+        if (isEditing && !isMirrorStatus) {
             return (
                 <div className="relative z-50">
                     <div className="fixed inset-0" onClick={() => setIsEditing(false)} />
@@ -303,11 +356,13 @@ const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, 
 
         return (
             <button
-                onClick={() => setIsEditing(true)}
-                className="px-4 py-1.5 rounded-full text-white text-[11px] font-bold text-center min-w-[90px] hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-black/20"
+                disabled={isMirrorStatus}
+                onClick={() => !isMirrorStatus && setIsEditing(true)}
+                className={`px-4 py-1.5 rounded-full text-white text-[11px] font-bold text-center min-w-[90px] transition-all shadow-lg shadow-black/20
+                    ${!isMirrorStatus ? 'hover:brightness-110 active:scale-95 cursor-pointer' : 'cursor-default opacity-90'}`}
                 style={currentOption && currentOption.label ? { backgroundColor: currentOption.color || '#7c3aed' } : { backgroundColor: '#2d2d3d', color: '#9ca3af' }}
             >
-                {displayValue || '-'}
+                {currentOption ? currentOption.label : (displayValue || 'Empty')}
             </button>
         );
     }
@@ -416,8 +471,9 @@ export default function AdminDashboard() {
     const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
     const [boardData, setBoardData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    // File Preview State
     const [previewFile, setPreviewFile] = useState<{ url: string, name: string } | null>(null);
+    // Carousel State for Form Groups
+    const [groupCarouselIndices, setGroupCarouselIndices] = useState<Record<string, number>>({});
 
     // Create Modal State
     const [isCreateBoardOpen, setIsCreateBoardOpen] = useState(false);
@@ -735,19 +791,22 @@ export default function AdminDashboard() {
                                                         />
                                                     ))}
                                                     {/* Root Boards */}
-                                                    {rootBoards.map(board => (
-                                                        <div
-                                                            key={board.id}
-                                                            onClick={() => setSelectedBoardId(board.id)}
-                                                            className={`flex items-center gap-2 px-3 py-1.5 mx-2 rounded-md cursor-pointer transition-all mb-0.5 ${selectedBoardId === board.id
-                                                                ? 'bg-[#0073ea] text-white shadow-lg shadow-blue-900/20 font-medium'
-                                                                : 'text-gray-400 hover:text-gray-200 hover:bg-[#1C212E]'
-                                                                }`}
-                                                        >
-                                                            <Table className={`w-3.5 h-3.5 flex-shrink-0 ${selectedBoardId === board.id ? 'text-white' : 'text-gray-500'}`} />
-                                                            <span className="text-[13px] truncate">{board.name}</span>
-                                                        </div>
-                                                    ))}
+                                                    {rootBoards.map(board => {
+                                                        const Icon = getBoardIcon(board.name);
+                                                        return (
+                                                            <div
+                                                                key={board.id}
+                                                                onClick={() => setSelectedBoardId(board.id)}
+                                                                className={`flex items-center gap-2 px-3 py-1.5 mx-2 rounded-md cursor-pointer transition-all mb-0.5 ${selectedBoardId === board.id
+                                                                    ? 'bg-[#0073ea] text-white shadow-lg shadow-blue-900/20 font-medium'
+                                                                    : 'text-gray-400 hover:text-gray-200 hover:bg-[#1C212E]'
+                                                                    }`}
+                                                            >
+                                                                <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${selectedBoardId === board.id ? 'text-white' : 'text-gray-500'}`} />
+                                                                <span className="text-[13px] truncate">{board.name}</span>
+                                                            </div>
+                                                        );
+                                                    })}
 
                                                     {loading && (
                                                         <div className="p-4 text-center text-gray-500 text-xs animate-pulse">Loading workspace...</div>
@@ -811,43 +870,124 @@ export default function AdminDashboard() {
                                                                 </div>
 
                                                                 {!isCollapsed && (
-                                                                    <div className="p-6 grid grid-cols-1 gap-4">
-                                                                        {groupItems.map((item: any) => (
-                                                                            <motion.div
-                                                                                key={item.id}
-                                                                                initial={{ opacity: 0, y: 10 }}
-                                                                                animate={{ opacity: 1, y: 0 }}
-                                                                                className="group relative"
-                                                                            >
-                                                                                <div className="absolute inset-0 bg-gradient-to-r from-custom-blue/10 to-custom-purple/10 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                                                                                <div className="relative p-6 rounded-2xl bg-[#0A0A16] border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all w-full">
-                                                                                    <div className="flex items-center gap-4 mb-6 pb-4 border-b border-white/5">
-                                                                                        <div className={`w-1.5 h-12 rounded-full`} style={{ backgroundColor: group.color || '#7c3aed' }} />
-                                                                                        <div>
-                                                                                            <h4 className="text-lg font-bold text-white tracking-tight">{item.name}</h4>
-                                                                                            <div className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mt-1">ID: {item.id}</div>
-                                                                                        </div>
+                                                                    <div className="p-6">
+                                                                        {boardData.name.toLowerCase().includes('form') || boardData.name.toLowerCase().includes('board') ? (() => {
+                                                                            const currentIndex = groupCarouselIndices[group.id] || 0;
+                                                                            const currentItem = groupItems[currentIndex];
+                                                                            const hasNext = currentIndex < groupItems.length - 1;
+                                                                            const hasPrev = currentIndex > 0;
+
+                                                                            if (groupItems.length === 0) return <div className="text-center text-gray-500 italic py-8">No items in this group</div>;
+
+                                                                            return (
+                                                                                <div className="space-y-4">
+                                                                                    {/* Navigation Controls */}
+                                                                                    <div className="flex items-center justify-between mb-4 px-4">
+                                                                                        <button
+                                                                                            disabled={!hasPrev}
+                                                                                            onClick={() => setGroupCarouselIndices(prev => ({ ...prev, [group.id]: currentIndex - 1 }))}
+                                                                                            className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 flex items-center gap-2 transition-all"
+                                                                                        >
+                                                                                            <ChevronDown className="w-4 h-4 rotate-90" /> Previous
+                                                                                        </button>
+                                                                                        <span className="text-sm font-mono text-gray-400 bg-black/40 px-3 py-1 rounded-full border border-white/5">
+                                                                                            <span className="text-white font-bold">{currentIndex + 1}</span> / {groupItems.length}
+                                                                                        </span>
+                                                                                        <button
+                                                                                            disabled={!hasNext}
+                                                                                            onClick={() => setGroupCarouselIndices(prev => ({ ...prev, [group.id]: currentIndex + 1 }))}
+                                                                                            className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 flex items-center gap-2 transition-all"
+                                                                                        >
+                                                                                            Next <ChevronDown className="w-4 h-4 -rotate-90" />
+                                                                                        </button>
                                                                                     </div>
-                                                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                                                                        {boardData.columns?.map((col: any) => (
-                                                                                            <div key={col.id} className="flex flex-col gap-2">
-                                                                                                <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">{col.title}</span>
-                                                                                                <div className="bg-black/20 rounded-lg p-2 border border-white/5 min-h-[40px] flex items-center">
-                                                                                                    <BoardCell
-                                                                                                        item={item}
-                                                                                                        column={col}
-                                                                                                        boardId={selectedBoardId}
-                                                                                                        onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
-                                                                                                        onPreview={(url, name) => setPreviewFile({ url, name })}
-                                                                                                    />
+
+                                                                                    {/* Single Item Card */}
+                                                                                    {currentItem && (
+                                                                                        <motion.div
+                                                                                            key={currentItem.id}
+                                                                                            initial={{ opacity: 0, x: 20 }}
+                                                                                            animate={{ opacity: 1, x: 0 }}
+                                                                                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                                                                            className="group relative max-w-5xl mx-auto"
+                                                                                        >
+                                                                                            <div className="absolute inset-0 bg-gradient-to-r from-custom-blue/10 to-custom-purple/10 rounded-3xl blur-2xl opacity-50" />
+                                                                                            <div className="relative p-8 rounded-3xl bg-[#0A0A16] border border-white/10 shadow-2xl">
+                                                                                                <div className="flex flex-col md:flex-row items-start md:items-center gap-6 mb-8 pb-6 border-b border-white/5">
+                                                                                                    <div className="w-2 h-16 rounded-full shadow-[0_0_15px_rgba(255,255,255,0.3)]" style={{ backgroundColor: group.color || '#7c3aed' }} />
+                                                                                                    <div className="flex-1">
+                                                                                                        <h4 className="text-3xl font-bold text-white tracking-tight mb-2">{currentItem.name}</h4>
+                                                                                                        <div className="flex items-center gap-4">
+                                                                                                            <span className="px-3 py-1 rounded-full bg-white/5 text-[10px] text-gray-400 uppercase tracking-widest font-bold border border-white/5">ID: {currentItem.id}</span>
+                                                                                                            <span className="text-xs text-gray-500 font-medium">
+                                                                                                                {boardData.name.toLowerCase().includes('form') ? "Application Entry" : "Project Details"}
+                                                                                                            </span>
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                </div>
+
+                                                                                                {/* Fields Grid - Larger for single view */}
+                                                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-8">
+                                                                                                    {boardData.columns?.map((col: any) => (
+                                                                                                        <div key={col.id} className="flex flex-col gap-2">
+                                                                                                            <span className="text-xs uppercase tracking-widest text-gray-500 font-bold ml-1 flex items-center gap-2">
+                                                                                                                {col.title}
+                                                                                                            </span>
+                                                                                                            <div className="bg-black/40 rounded-xl p-4 border border-white/5 min-h-[56px] flex items-center hover:border-white/10 transition-colors shadow-inner">
+                                                                                                                <BoardCell
+                                                                                                                    item={currentItem}
+                                                                                                                    column={col}
+                                                                                                                    boardId={selectedBoardId}
+                                                                                                                    onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
+                                                                                                                    onPreview={(url, name) => setPreviewFile({ url, name })}
+                                                                                                                />
+                                                                                                            </div>
+                                                                                                        </div>
+                                                                                                    ))}
                                                                                                 </div>
                                                                                             </div>
-                                                                                        ))}
-                                                                                    </div>
+                                                                                        </motion.div>
+                                                                                    )}
                                                                                 </div>
-                                                                            </motion.div>
-                                                                        ))}
-                                                                        {groupItems.length === 0 && <div className="text-center text-gray-500 italic py-8">No items in this group</div>}
+                                                                            );
+                                                                        })() : (
+                                                                            <div className="overflow-x-auto rounded-xl border border-white/5 bg-black/20">
+                                                                                <table className="w-full text-left text-sm whitespace-nowrap">
+                                                                                    <thead>
+                                                                                        <tr className="bg-white/5 text-gray-400 font-bold uppercase tracking-wider text-[11px] border-b border-white/5">
+                                                                                            <th className="px-4 py-3 sticky left-0 bg-[#0A0A16] z-10 border-r border-white/5">Name</th>
+                                                                                            {boardData.columns?.map((col: any) => (
+                                                                                                <th key={col.id} className="px-4 py-3 min-w-[150px]">{col.title}</th>
+                                                                                            ))}
+                                                                                        </tr>
+                                                                                    </thead>
+                                                                                    <tbody className="divide-y divide-white/5">
+                                                                                        {groupItems.map((item: any) => (
+                                                                                            <tr key={item.id} className="hover:bg-white/5 transition-colors group">
+                                                                                                <td className="px-4 py-3 font-medium text-white sticky left-0 bg-[#0A0A16] group-hover:bg-[#1C1C2E] transition-colors border-r border-white/5">
+                                                                                                    <div className="flex flex-col">
+                                                                                                        <span>{item.name}</span>
+                                                                                                        <span className="text-[9px] text-gray-500 font-mono opacity-50">ID: {item.id}</span>
+                                                                                                    </div>
+                                                                                                </td>
+                                                                                                {boardData.columns?.map((col: any) => (
+                                                                                                    <td key={col.id} className="px-4 py-3">
+                                                                                                        <BoardCell
+                                                                                                            item={item}
+                                                                                                            column={col}
+                                                                                                            boardId={selectedBoardId}
+                                                                                                            onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
+                                                                                                            onPreview={(url, name) => setPreviewFile({ url, name })}
+                                                                                                        />
+                                                                                                    </td>
+                                                                                                ))}
+                                                                                            </tr>
+                                                                                        ))}
+                                                                                    </tbody>
+                                                                                </table>
+                                                                                {groupItems.length === 0 && <div className="text-center text-gray-500 italic py-8">No items in this group</div>}
+                                                                            </div>
+                                                                        )}
                                                                     </div>
                                                                 )}
                                                             </motion.div>

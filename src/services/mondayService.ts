@@ -361,6 +361,9 @@ export async function getBoardItems(boardId: string) {
                         text
                         value
                         type
+                        ... on MirrorValue {
+                            display_value
+                        }
                     }
                 }
             }

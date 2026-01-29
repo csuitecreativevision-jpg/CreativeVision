@@ -1,0 +1,342 @@
+{
+  "data": {
+    "boards": [
+      {
+        "id": "8694659440",
+        "name": "Maria Alejandra - Fulfillment Board (C-F-1)",
+        "items_page": {
+          "items": [
+            {
+              "id": "8704125239",
+              "name": "Maria Clipping (3/15/2025)",
+              "column_values": [
+                {
+                  "id": "board_relation1__1",
+                  "text": null,
+                  "value": null,
+                  "type": "board_relation"
+                },
+                {
+                  "id": "mirror__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "Approved (CV)"
+                },
+                {
+                  "id": "dup__of_project_status__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "https://drive.google.com/drive/folders/1gJWZ8eUz1RDltuOAqtfUpewSXdaUZ2RI?usp=sharing"
+                },
+                {
+                  "id": "lookup__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": ""
+                },
+                {
+                  "id": "dup__of_submission_link__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "2025-03-15"
+                },
+                {
+                  "id": "button__1",
+                  "text": "Notify Us",
+                  "value": null,
+                  "type": "button"
+                },
+                {
+                  "id": "status__1",
+                  "text": null,
+                  "value": null,
+                  "type": "status"
+                },
+                {
+                  "id": "files__1",
+                  "text": "",
+                  "value": null,
+                  "type": "file"
+                },
+                {
+                  "id": "mirror9__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "2025-03-15"
+                }
+              ]
+            },
+            {
+              "id": "8718936366",
+              "name": "Being an agent is not just about selling houses",
+              "column_values": [
+                {
+                  "id": "board_relation1__1",
+                  "text": null,
+                  "value": null,
+                  "type": "board_relation"
+                },
+                {
+                  "id": "mirror__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "Approved (CV)"
+                },
+                {
+                  "id": "dup__of_project_status__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "https://creative-vision-unit.monday.com/protected_static/16352271/resources/2032295476/Being%20an%20agent%20is%20not%20just%20about%20selling%20houses.mp4"
+                },
+                {
+                  "id": "lookup__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "https://filepublisher.com/c/r/gzd8vdqeu"
+                },
+                {
+                  "id": "dup__of_submission_link__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "2025-03-19"
+                },
+                {
+                  "id": "button__1",
+                  "text": "Notify Us",
+                  "value": null,
+                  "type": "button"
+                },
+                {
+                  "id": "status__1",
+                  "text": null,
+                  "value": null,
+                  "type": "status"
+                },
+                {
+                  "id": "files__1",
+                  "text": "",
+                  "value": null,
+                  "type": "file"
+                },
+                {
+                  "id": "mirror9__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "2025-03-19"
+                }
+              ]
+            },
+            {
+              "id": "8740115759",
+              "name": "Buyers on what they are looking for",
+              "column_values": [
+                {
+                  "id": "board_relation1__1",
+                  "text": null,
+                  "value": null,
+                  "type": "board_relation"
+                },
+                {
+                  "id": "mirror__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "Approved (CV)"
+                },
+                {
+                  "id": "dup__of_project_status__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "https://creative-vision-unit.monday.com/protected_static/16352271/resources/2032329094/Buyers%20on%20what%20they%20are%20looking%20for.mp4"
+                },
+                {
+                  "id": "lookup__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "https://filepublisher.com/c/r/uzgtg5pl1"
+                },
+                {
+                  "id": "dup__of_submission_link__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "2025-03-20"
+                },
+                {
+                  "id": "button__1",
+                  "text": "Notify Us",
+                  "value": null,
+                  "type": "button"
+                },
+                {
+                  "id": "status__1",
+                  "text": null,
+                  "value": null,
+                  "type": "status"
+                },
+                {
+                  "id": "files__1",
+                  "text": "",
+                  "value": null,
+                  "type": "file"
+                },
+                {
+                  "id": "mirror9__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "2025-03-20"
+                }
+              ]
+            },
+            {
+              "id": "8748529352",
+              "name": "How coconut grove became one of the best places to live at in Miami",
+              "column_values": [
+                {
+                  "id": "board_relation1__1",
+                  "text": null,
+                  "value": null,
+                  "type": "board_relation"
+                },
+                {
+                  "id": "mirror__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "Approved (CV)"
+                },
+                {
+                  "id": "dup__of_project_status__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "https://creative-vision-unit.monday.com/protected_static/16352271/resources/2033541569/How%20coconut%20grove%20became%20one%20of%20the%20best%20places%20to%20live%20at%20in%20Miami.mp4"
+                },
+                {
+                  "id": "lookup__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "https://filepublisher.com/c/r/pd858vsqs"
+                },
+                {
+                  "id": "dup__of_submission_link__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "2025-03-21"
+                },
+                {
+                  "id": "button__1",
+                  "text": "Notify Us",
+                  "value": null,
+                  "type": "button"
+                },
+                {
+                  "id": "status__1",
+                  "text": null,
+                  "value": null,
+                  "type": "status"
+                },
+                {
+                  "id": "files__1",
+                  "text": "",
+                  "value": null,
+                  "type": "file"
+                },
+                {
+                  "id": "mirror9__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "2025-03-21"
+                }
+              ]
+            },
+            {
+              "id": "8748529446",
+              "name": "It's not only about the price",
+              "column_values": [
+                {
+                  "id": "board_relation1__1",
+                  "text": null,
+                  "value": null,
+                  "type": "board_relation"
+                },
+                {
+                  "id": "mirror__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "Approved (CV)"
+                },
+                {
+                  "id": "dup__of_project_status__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "https://creative-vision-unit.monday.com/protected_static/16352271/resources/2034330659/Its%20not%20only%20about%20the%20price.mp4"
+                },
+                {
+                  "id": "lookup__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "https://filepublisher.com/c/r/zitxczas3"
+                },
+                {
+                  "id": "dup__of_submission_link__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "2025-03-24"
+                },
+                {
+                  "id": "button__1",
+                  "text": "Notify Us",
+                  "value": null,
+                  "type": "button"
+                },
+                {
+                  "id": "status__1",
+                  "text": null,
+                  "value": null,
+                  "type": "status"
+                },
+                {
+                  "id": "files__1",
+                  "text": "",
+                  "value": null,
+                  "type": "file"
+                },
+                {
+                  "id": "mirror9__1",
+                  "text": null,
+                  "value": null,
+                  "type": "mirror",
+                  "display_value": "2025-03-24"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "extensions": {
+    "request_id": "134f73f6-e399-9ff8-9623-e927970726ae"
+  }
+}
