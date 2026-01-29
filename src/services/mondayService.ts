@@ -35,13 +35,14 @@ async function mondayRequest(query: string, variables?: any) {
             },
             body: JSON.stringify({ query, variables }),
         });
+        const json = await response.json();
 
-        const data = await response.json();
-        if (data.errors) {
-            console.error("Monday API Error Details:", JSON.stringify(data.errors, null, 2));
-            throw new Error(data.errors[0].message);
+        if (json.errors) {
+            console.error("Monday API Errors:", json.errors);
+            throw new Error(JSON.stringify(json.errors));
         }
-        return data.data;
+
+        return json.data;
     } catch (error) {
         console.error("Monday API Request Failed:", error);
         throw error;
@@ -289,14 +290,48 @@ export async function submitApplicationToMonday(data: ApplicationData) {
 
 export async function getAllBoards() {
     const query = `query {
-        boards(limit: 50) {
+        boards (limit: 500) {
             id
             name
+            type
             items_count
+            workspace {
+                id
+            }
         }
     }`;
     const data = await mondayRequest(query);
-    return data.boards || [];
+    return data.boards;
+}
+
+export async function getAllFolders() {
+    const query = `query {
+        folders (limit: 100) {
+            id
+            name
+            color
+            workspace {
+                id
+            }
+            children {
+                id
+            }
+        }
+    }`;
+    const data = await mondayRequest(query);
+    return data.folders;
+}
+
+export async function getAllWorkspaces() {
+    const query = `query {
+        workspaces {
+            id
+            name
+            kind
+        }
+    }`;
+    const data = await mondayRequest(query);
+    return data.workspaces;
 }
 
 export async function getBoardItems(boardId: string) {
