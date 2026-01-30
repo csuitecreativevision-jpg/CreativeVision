@@ -504,3 +504,13 @@ export async function getMultipleBoardActivityLogs(boardIds: string[], fromDate:
 
     return allBoardsWithLogs;
 }
+
+export async function getAssetPublicUrl(assetId: string) {
+    const query = `query {
+        assets (ids: [${assetId}]) {
+            public_url
+        }
+    }`;
+    const data = await mondayRequest(query);
+    return data.assets[0]?.public_url;
+}

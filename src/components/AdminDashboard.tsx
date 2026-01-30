@@ -35,7 +35,7 @@ import {
     PlayCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getAllBoards, getAllFolders, getBoardItems, createNewBoard, createNewGroup, updateItemValue, getAllWorkspaces, getMultipleBoardItems } from '../services/mondayService';
+import { getAllBoards, getAllFolders, getBoardItems, createNewBoard, createNewGroup, updateItemValue, getAllWorkspaces, getMultipleBoardItems, getAssetPublicUrl } from '../services/mondayService';
 
 // --- Helpers ---
 // (Updated)
@@ -171,9 +171,16 @@ const FilePreviewer = ({ url, name }: { url: string, name: string }) => {
                     <AlertCircle className="w-10 h-10 opacity-50 text-red-400" />
                 </div>
                 <p className="text-lg font-medium text-white mb-2">Preview Unavailable</p>
-                <p className="text-sm max-w-xs mx-auto mb-6">This file type ({url.split('?')[0].split('.').pop()}) cannot be played in the browser.</p>
-                <a href={url} download target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-6 py-2 bg-custom-bright hover:brightness-110 rounded-lg text-white text-sm font-bold transition-all shadow-lg shadow-custom-bright/20">
-                    <Download className="w-4 h-4" /> Download to View
+                <p className="text-sm max-w-xs mx-auto mb-6 opacity-70">
+                    Unable to play this file in the browser ({(url.split('?')[0].split('.').pop() || 'file').toLowerCase()}).
+                </p>
+                <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-6 py-2 bg-custom-bright hover:brightness-110 rounded-lg text-white text-sm font-bold transition-all shadow-lg shadow-custom-bright/20"
+                >
+                    <Download className="w-4 h-4" /> Open / Download
                 </a>
             </div>
         );
@@ -183,6 +190,7 @@ const FilePreviewer = ({ url, name }: { url: string, name: string }) => {
         return <img src={url} onError={() => setError(true)} className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" alt="Preview" />;
     }
     if (url.match(/\.(mp4|webm|ogg|mov)(\?|$)/i)) {
+        // Fix: encodeURI to handle spaces in filenames
         return <video src={encodeURI(url)} controls autoPlay onError={() => setError(true)} className="max-w-full max-h-full rounded-lg shadow-2xl outline-none" />;
     }
     if (url.match(/\.pdf(\?|$)/i)) {
@@ -205,7 +213,7 @@ const FilePreviewer = ({ url, name }: { url: string, name: string }) => {
 };
 
 // --- Board Cell Component ---
-const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, column: any, boardId: string, onUpdate: () => void, onPreview: (url: string, name: string) => void }) => {
+const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, column: any, boardId: string | null, onUpdate: () => void, onPreview: (url: string, name: string, assetId?: string) => void }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -216,6 +224,7 @@ const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, 
     // Robust Parsing for Complex Types
     let linkUrl = null;
     let fileName = null;
+    let assetId = null;
 
     // Fix for Mirror Columns: Use display_value if available (native or from our updated query)
     if ((column.type === 'mirror' || column.type === 'lookup') && colValueObj.display_value) {
@@ -248,6 +257,15 @@ const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, 
 
             // Universal File Extraction (Check for files in ANY column type)
             // This fixes cases where "Submission" or other columns act as files but aren't typed as 'file'
+            if (val.files && val.files.length > 0) {
+                // If we haven't found a linkUrl yet, or if this is definitely a file structure
+                const fileUrl = val.files[0].public_url || val.files[0].url || val.files[0].urlThumbnail;
+                if (fileUrl) {
+                    linkUrl = fileUrl;
+                    fileName = val.files[0].name;
+                    assetId = val.files[0].assetId; // Capture assetId for on-demand public URL fetch
+                }
+            }
             if (val.files && val.files.length > 0) {
                 // If we haven't found a linkUrl yet, or if this is definitely a file structure
                 const fileUrl = val.files[0].public_url || val.files[0].url || val.files[0].urlThumbnail;
@@ -304,6 +322,12 @@ const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, 
 
     const handleSave = async (newValue: string) => {
         if (newValue === displayValue) {
+            setIsEditing(false);
+            return;
+        }
+
+        if (!boardId) {
+            console.error("Cannot save: No board ID");
             setIsEditing(false);
             return;
         }
@@ -483,6 +507,22 @@ const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, 
     // If column type is NOT 'file', we don't extract `val.files`. 
     // We should try to check if `val.files` exists EVEN IF column type is not explicitly 'file' (in case of mislabeled column types from API).
 
+    // Generic Link in Text Column (Re-applied)
+    if (!isEditing && displayValue && (displayValue.startsWith('http://') || displayValue.startsWith('https://'))) {
+        return (
+            <a
+                href={displayValue}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-[#0073ea] hover:text-white hover:underline truncate text-sm flex items-center gap-1"
+            >
+                {displayValue}
+                <span className="text-[10px] opacity-50">↗</span>
+            </a>
+        );
+    }
+
     // Text / Numbers / Default Rendering
     if (isEditing) {
         return (
@@ -556,7 +596,7 @@ export default function AdminDashboard() {
     const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
     const [boardData, setBoardData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [previewFile, setPreviewFile] = useState<{ url: string, name: string } | null>(null);
+    const [previewFile, setPreviewFile] = useState<{ url: string, name: string, assetId?: string } | null>(null);
     // Carousel State for Form Groups
     const [groupCarouselIndices, setGroupCarouselIndices] = useState<Record<string, number>>({});
 
@@ -591,6 +631,7 @@ export default function AdminDashboard() {
         navigate('/');
     };
 
+
     useEffect(() => {
         refreshBoardsAndFolders();
         // Hot Reloading: Refresh every 30 seconds
@@ -600,7 +641,24 @@ export default function AdminDashboard() {
         return () => clearInterval(interval);
     }, []);
 
-    const refreshBoardsAndFolders = async (background = false) => {
+    // Effect to fetch public URL for preview if assetId is available
+    useEffect(() => {
+        if (previewFile?.assetId && previewFile.url && !previewFile.url.includes('public_url_fetched')) {
+            const fetchPublicUrl = async () => {
+                try {
+                    const publicUrl = await getAssetPublicUrl(previewFile.assetId!);
+                    if (publicUrl) {
+                        setPreviewFile(prev => prev ? { ...prev, url: publicUrl, assetId: undefined } : null); // assetId undefined to prevent loop
+                    }
+                } catch (err) {
+                    console.error("Failed to fetch public URL", err);
+                }
+            };
+            fetchPublicUrl();
+        }
+    }, [previewFile]);
+
+    async function refreshBoardsAndFolders(background = false) {
         if (!background) setLoading(true);
         try {
             const [boardsData, foldersData, workspacesData] = await Promise.all([
@@ -1540,7 +1598,7 @@ export default function AdminDashboard() {
                                                                                                         column={col}
                                                                                                         boardId={selectedBoardId}
                                                                                                         onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
-                                                                                                        onPreview={(url, name) => setPreviewFile({ url, name })}
+                                                                                                        onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
                                                                                                     />
                                                                                                 </div>
                                                                                             </div>
@@ -1654,7 +1712,7 @@ export default function AdminDashboard() {
                                                                                                                     column={col}
                                                                                                                     boardId={selectedBoardId}
                                                                                                                     onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
-                                                                                                                    onPreview={(url, name) => setPreviewFile({ url, name })}
+                                                                                                                    onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
                                                                                                                 />
                                                                                                             </div>
                                                                                                         </div>
@@ -1701,7 +1759,7 @@ export default function AdminDashboard() {
                                                                                             <div className="flex flex-col items-center mb-6"><h3 className="text-2xl font-black text-white mb-2 text-center">{currentItem.name}</h3><span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{boardData.name.toLowerCase().includes('form') ? 'Application Entry' : 'Project Details'}</span></div>
                                                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
                                                                                                 {boardData.columns?.filter((col: any) => col.type !== 'name').map((col: any) => (
-                                                                                                    <div key={col.id} className="p-4 rounded-2xl bg-[#0e0e1a] border border-white/5"><span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-2">{col.title}</span><BoardCell item={currentItem} column={col} boardId={selectedBoardId} onUpdate={() => refreshBoardDetails(selectedBoardId!, true)} onPreview={(url, name) => setPreviewFile({ url, name })} /></div>
+                                                                                                    <div key={col.id} className="p-4 rounded-2xl bg-[#0e0e1a] border border-white/5"><span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-2">{col.title}</span><BoardCell item={currentItem} column={col} boardId={selectedBoardId} onUpdate={() => refreshBoardDetails(selectedBoardId!, true)} onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })} /></div>
                                                                                                 ))}
                                                                                             </div>
                                                                                         </div>
@@ -1792,7 +1850,7 @@ export default function AdminDashboard() {
                                                                                                                                         column={col}
                                                                                                                                         boardId={selectedBoardId}
                                                                                                                                         onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
-                                                                                                                                        onPreview={(url, name) => setPreviewFile({ url, name })}
+                                                                                                                                        onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
                                                                                                                                     />
                                                                                                                                 </div>
                                                                                                                             </div>
@@ -1818,7 +1876,7 @@ export default function AdminDashboard() {
                                                                                                 {groupItems.map((item: any) => (
                                                                                                     <tr key={item.id} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
                                                                                                         <td className="px-4 py-3 font-medium text-white group-hover:text-custom-bright transition-colors sticky left-0 bg-[#0e0e1a] group-hover:bg-[#151525] z-10 border-r border-white/5">{item.name}</td>
-                                                                                                        {boardData.columns?.filter((c: any) => c.type !== 'name').map((col: any) => (<td key={col.id} className="px-4 py-3 text-gray-400"><BoardCell item={item} column={col} boardId={selectedBoardId} onUpdate={() => refreshBoardDetails(selectedBoardId!, true)} onPreview={(url, name) => setPreviewFile({ url, name })} /></td>))}
+                                                                                                        {boardData.columns?.filter((c: any) => c.type !== 'name').map((col: any) => (<td key={col.id} className="px-4 py-3 text-gray-400"><BoardCell item={item} column={col} boardId={selectedBoardId} onUpdate={() => refreshBoardDetails(selectedBoardId!, true)} onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })} /></td>))}
                                                                                                     </tr>
                                                                                                 ))}
                                                                                             </tbody>
@@ -1898,10 +1956,10 @@ export default function AdminDashboard() {
                                     <div className="p-2 bg-custom-bright/10 rounded-lg">
                                         <FileText className="w-5 h-5 text-custom-bright" />
                                     </div>
-                                    <h3 className="text-white font-bold text-lg truncate max-w-md">{previewFile.name}</h3>
+                                    <h3 className="text-white font-bold text-lg truncate max-w-md">{previewFile?.name}</h3>
                                 </div>
                                 <a
-                                    href={previewFile.url}
+                                    href={previewFile?.url}
                                     target="_blank"
                                     download
                                     className="flex items-center gap-2 px-4 py-2 bg-custom-bright text-white rounded-lg hover:brightness-110 font-bold text-sm transition-all shadow-lg shadow-custom-bright/20"
@@ -1912,7 +1970,7 @@ export default function AdminDashboard() {
 
                             {/* Modal Content */}
                             <div className="flex-1 bg-black/50 relative flex items-center justify-center p-4 overflow-hidden">
-                                <FilePreviewer url={previewFile.url} name={previewFile.name} />
+                                <FilePreviewer url={previewFile?.url || ''} name={previewFile?.name || ''} />
                             </div>
                         </div>
                     </div>
