@@ -19,13 +19,20 @@ import {
     Loader2,
     Plus,
     X,
+    Filter,
     ChevronDown,
     MoreHorizontal,
+    MoreVertical,
     FileText,
+    Image as ImageIcon,
     Download,
+    Share2,
+    Trash2,
+    CheckCircle2,
     AlertCircle,
+    LayoutGrid,
     Clock,
-    LayoutGrid
+    PlayCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getAllBoards, getAllFolders, getBoardItems, createNewBoard, createNewGroup, updateItemValue, getAllWorkspaces, getMultipleBoardItems } from '../services/mondayService';
@@ -77,24 +84,24 @@ const FolderTreeItem = ({ folder, allFolders, allBoards, onSelectBoard, selected
 
     const hasChildren = childFolders.length > 0 || childBoards.length > 0;
 
+    if (!hasChildren) return null;
+
     return (
-        <div className="select-none text-sm font-sans">
+        <div className="select-none text-[13px] font-sans">
             <div
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md cursor-pointer transition-colors mb-0.5 group ${isOpen ? '' : 'hover:bg-white/5'}`}
-                style={{ paddingLeft: `${depth * 16 + 12}px` }}
+                className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg cursor-pointer transition-all mb-0.5 group ${isOpen ? 'text-white' : 'hover:bg-white/5 text-gray-400 hover:text-gray-200'}`}
+                style={{ paddingLeft: `${depth * 12 + 12}px` }}
                 onClick={() => setIsOpen(!isOpen)}
             >
-                <div className="w-4 h-4 flex-shrink-0 flex items-center justify-center text-gray-400 group-hover:text-white transition-colors">
-                    {hasChildren ? (
-                        <div className={`transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`} style={{ color: folder.color || '#a1a1aa' }}>
-                            <svg width="6" height="8" viewBox="0 0 6 8" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M0 0L6 4L0 8V0Z" />
-                            </svg>
-                        </div>
-                    ) : <div className="w-4 h-4 flex-shrink-0" />}
+                <div className="w-4 h-4 flex-shrink-0 flex items-center justify-center transition-colors">
+                    <div className={`transition-transform duration-200 ${isOpen ? 'rotate-90 text-white' : 'text-gray-500 group-hover:text-gray-300'}`}>
+                        <svg width="6" height="8" viewBox="0 0 6 8" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M0 0L6 4L0 8V0Z" />
+                        </svg>
+                    </div>
                 </div>
                 {/* Folder Name - Colored */}
-                <span className="font-medium truncate transition-colors" style={{ color: folder.color || '#e4e4e7' }}>
+                <span className={`font-semibold truncate transition-colors ${isOpen ? 'opacity-100' : 'opacity-90'}`} style={{ color: folder.color || 'inherit' }}>
                     {folder.name}
                 </span>
             </div>
@@ -120,24 +127,32 @@ const FolderTreeItem = ({ folder, allFolders, allBoards, onSelectBoard, selected
                         ))}
                         {childBoards.map((board: any) => {
                             const Icon = getBoardIcon(board.name);
+                            // Clean Name for Display
+                            let displayName = board.name.replace(/ - Workspace/g, '').replace(/\([^)]*\)/g, '').trim();
+                            if (!displayName) displayName = board.name.replace(/ - Workspace/g, '').trim();
+                            const isSelected = selectedBoardId === board.id;
+
                             return (
                                 <div
                                     key={board.id}
                                     onClick={() => onSelectBoard(board.id)}
-                                    className={`flex items-center gap-2 px-3 py-1.5 mx-2 rounded-md cursor-pointer transition-all mb-0.5 ${selectedBoardId === board.id
-                                        ? 'bg-[#0073ea] text-white shadow-lg shadow-blue-900/20 font-medium'
-                                        : 'text-gray-400 hover:text-gray-200 hover:bg-[#1C212E]'
-                                        }`}
-                                    style={{ paddingLeft: `${(depth + 1) * 16 + 12}px` }}
+                                    className={`flex items-center gap-2.5 px-3 py-1.5 mx-2 rounded-lg cursor-pointer transition-all mb-0.5 relative group/item
+                                        ${isSelected
+                                            ? 'bg-custom-bright/10 text-white font-semibold'
+                                            : 'text-gray-400 hover:text-gray-200 hover:bg-white/5 font-medium'}`}
+                                    style={{ paddingLeft: `${(depth + 1) * 12 + 12}px` }}
+                                    title={board.name} // Show full name on hover
                                 >
-                                    <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${selectedBoardId === board.id ? 'text-white' : 'text-gray-500'}`} />
-                                    <span className="text-sm truncate">{board.name}</span>
+                                    {/* Active Indicator Bar */}
+                                    {isSelected && (
+                                        <div className="absolute left-0 top-1.5 bottom-1.5 w-0.5 bg-custom-bright rounded-r-full shadow-[0_0_8px_rgba(124,58,237,0.5)]" />
+                                    )}
+
+                                    <Icon className={`w-3.5 h-3.5 flex-shrink-0 transition-colors ${isSelected ? 'text-custom-bright' : 'text-gray-500 group-hover/item:text-gray-400'}`} />
+                                    <span className="truncate tracking-wide">{displayName}</span>
                                 </div>
                             );
                         })}
-                        {childFolders.length === 0 && childBoards.length === 0 && (
-                            <div className="pl-4 py-1 text-gray-600 text-[11px] italic" style={{ paddingLeft: `${(depth + 1) * 16 + 12}px` }}>Empty</div>
-                        )}
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -156,7 +171,7 @@ const FilePreviewer = ({ url, name }: { url: string, name: string }) => {
                     <AlertCircle className="w-10 h-10 opacity-50 text-red-400" />
                 </div>
                 <p className="text-lg font-medium text-white mb-2">Preview Unavailable</p>
-                <p className="text-sm max-w-xs mx-auto mb-6">This file type ({url.split('.').pop()}) cannot be played in the browser.</p>
+                <p className="text-sm max-w-xs mx-auto mb-6">This file type ({url.split('?')[0].split('.').pop()}) cannot be played in the browser.</p>
                 <a href={url} download target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-6 py-2 bg-custom-bright hover:brightness-110 rounded-lg text-white text-sm font-bold transition-all shadow-lg shadow-custom-bright/20">
                     <Download className="w-4 h-4" /> Download to View
                 </a>
@@ -168,7 +183,7 @@ const FilePreviewer = ({ url, name }: { url: string, name: string }) => {
         return <img src={url} onError={() => setError(true)} className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" alt="Preview" />;
     }
     if (url.match(/\.(mp4|webm|ogg|mov)(\?|$)/i)) {
-        return <video src={url} controls autoPlay onError={() => setError(true)} className="max-w-full max-h-full rounded-lg shadow-2xl outline-none" />;
+        return <video src={encodeURI(url)} controls autoPlay onError={() => setError(true)} className="max-w-full max-h-full rounded-lg shadow-2xl outline-none" />;
     }
     if (url.match(/\.pdf(\?|$)/i)) {
         return <iframe src={url} className="w-full h-full rounded-lg shadow-2xl bg-white" title="PDF Preview" onError={() => setError(true)} />;
@@ -226,10 +241,18 @@ const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, 
             if (column.type === 'email') {
                 displayValue = val.email || displayValue;
             }
-            // File
-            if (column.type === 'file') {
-                if (val.files && val.files.length > 0) {
-                    linkUrl = val.files[0].public_url || val.files[0].url || val.files[0].urlThumbnail;
+            // Email
+            if (column.type === 'email') {
+                displayValue = val.email || displayValue;
+            }
+
+            // Universal File Extraction (Check for files in ANY column type)
+            // This fixes cases where "Submission" or other columns act as files but aren't typed as 'file'
+            if (val.files && val.files.length > 0) {
+                // If we haven't found a linkUrl yet, or if this is definitely a file structure
+                const fileUrl = val.files[0].public_url || val.files[0].url || val.files[0].urlThumbnail;
+                if (fileUrl) {
+                    linkUrl = fileUrl;
                     fileName = val.files[0].name;
                 }
             }
@@ -239,11 +262,22 @@ const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, 
     }
 
     // Special handling if displayValue (text) is actually a raw URL for files (User Screenshot Case)
-    if ((column.type === 'file' || column.type === 'mirror' || column.type === 'lookup') && !linkUrl && displayValue.startsWith('http')) {
-        linkUrl = displayValue;
-        // Try to extract filename from URL
+    // OR if it's just a filename that we want to treat as a file (Universal Playback Request)
+    const isFileLike = /\.(mp4|mov|webm|ogg|pdf|jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(displayValue);
+
+    if (!linkUrl && (displayValue.startsWith('http') || isFileLike)) {
+        // If it looks like a URL, use it as the link
+        if (displayValue.startsWith('http') || displayValue.startsWith('blob:')) {
+            linkUrl = displayValue;
+        }
+        // If it's just a filename (e.g. "video.mp4") without HTTP, we might treat it as a relative path or just a file label.
+        // For the purpose of the user's request "make it playable", we assume the text MIGHT be a playable URL or at least we should try.
+        // If it's just a filename, we can't play it without a base URL.
+        // But let's at least capture the filename.
+
         try {
-            fileName = decodeURIComponent(displayValue.split('/').pop() || 'File');
+            // If it's a URL, extract filename. If it's already a filename, keep it.
+            fileName = displayValue.startsWith('http') ? decodeURIComponent(displayValue.split('/').pop() || 'File') : displayValue;
         } catch (e) {
             fileName = "Attachment";
         }
@@ -385,21 +419,69 @@ const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, 
         );
     }
 
-    // File Rendering
-    if (column.type === 'file' && linkUrl) {
+    // Auto-detect files in Text columns (Universal Playback)
+    const isFilePattern = (str: string) => /\.(mp4|mov|webm|ogg|pdf|jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(str);
+
+    // If it's a text column but contains a filename/URL, treat as file
+    if (!isEditing && isFilePattern(displayValue) && !linkUrl) {
+        // If it's just a filename without a URL, we might need a way to construct the URL 
+        // OR if it's a full URL in the text
+
+        // If we strictly have a text value that is a filename (e.g. "video.mp4") but NO URL, 
+        // we can't really play it unless we know the base path. 
+        // HOWEVER, based on the user request, it seems these MIGHT be "File" columns behaving as text, 
+        // or they just want the UI to LOOK like a file even if unplayable?
+        // BUT the user said "make it playable". 
+        // If the 'displayValue' IS the URL (common in some exports), then we use it.
+        // If it's just a filename, we might be limited, but let's assume the column might have hidden value or the text IS the link.
+
+        // Actually, looking at the code above (lines 250-258), we already try to extract linkUrl from text if it starts with http.
+        // If we found a linkUrl (even effectively from text), we should render it as a file.
+
+        // Let's broaden the "File Rendering" block above instead of adding a new one here.
+    }
+
+    // --- ENHANCED FILE RENDERING ---
+    // render if explicit file column OR if we detected a valid link/file pattern in a text column
+    const isVideo = /\.(mp4|mov|webm|ogg)(\?|$)/i.test(displayValue) || (linkUrl && /\.(mp4|mov|webm|ogg)(\?|$)/i.test(linkUrl));
+    const isImage = /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(displayValue) || (linkUrl && /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(linkUrl));
+    const isPdf = /\.pdf(\?|$)/i.test(displayValue) || (linkUrl && /\.pdf(\?|$)/i.test(linkUrl));
+
+    const shouldRenderAsFile = (column.type === 'file' && linkUrl) || (linkUrl && (isVideo || isImage || isPdf));
+
+    if (shouldRenderAsFile) {
         return (
             <button
-                onClick={() => onPreview(linkUrl!, displayValue)}
-                className="flex items-center gap-2 py-1 px-2 rounded-lg bg-[#0073ea]/10 border border-[#0073ea]/20 hover:bg-[#0073ea]/20 text-[#0073ea] transition-all group max-w-full text-left"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onPreview(linkUrl!, displayValue);
+                }}
+                className={`flex items-center gap-2 py-1.5 px-3 rounded-lg border transition-all group max-w-full text-left relative overflow-hidden
+                    ${isVideo ? 'bg-red-500/10 border-red-500/20 hover:bg-red-500/20 text-red-400' :
+                        isPdf ? 'bg-orange-500/10 border-orange-500/20 hover:bg-orange-500/20 text-orange-400' :
+                            'bg-[#0073ea]/10 border-[#0073ea]/20 hover:bg-[#0073ea]/20 text-[#0073ea]'}`}
                 title={displayValue}
             >
-                <Eye className="w-3.5 h-3.5 flex-shrink-0" />
-                <span className="text-[11px] font-medium truncate group-hover:underline decoration-current">
+                {isVideo ? <PlayCircle className="w-4 h-4 flex-shrink-0 animate-pulse" /> :
+                    isPdf ? <FileText className="w-4 h-4 flex-shrink-0" /> :
+                        <Eye className="w-4 h-4 flex-shrink-0" />}
+
+                <span className="text-[11px] font-bold truncate group-hover:underline decoration-current">
                     {displayValue}
                 </span>
             </button>
         );
     }
+
+    // Fallback: If it LOOKS like a file (has extension) but we have NO URL (just text "video.mp4")
+    // Use a "Broken Link" or "Request" style? 
+    // Or just render it as a file button that does nothing but maybe open a search?
+    // User said: "Making finding client...mp4" (Text) playable. 
+    // If it's just text, we can't play it. 
+    // BUT maybe the "Submission" column IS a file column but the data structure wasn't parsed correctly? 
+    // Let's look at lines 238-243 again. 
+    // If column type is NOT 'file', we don't extract `val.files`. 
+    // We should try to check if `val.files` exists EVEN IF column type is not explicitly 'file' (in case of mislabeled column types from API).
 
     // Text / Numbers / Default Rendering
     if (isEditing) {
@@ -503,6 +585,7 @@ export default function AdminDashboard() {
     // Carousel Index for "Recent" view in Fulfillment (iterating sorted list)
     const [fulfillmentRecentIndex, setFulfillmentRecentIndex] = useState(0);
     const [fulfillmentMonthFilter, setFulfillmentMonthFilter] = useState<string>('All');
+    const [isMonthFilterOpen, setIsMonthFilterOpen] = useState(false);
 
     const handleLogout = () => {
         navigate('/');
@@ -510,10 +593,15 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         refreshBoardsAndFolders();
+        // Hot Reloading: Refresh every 30 seconds
+        const interval = setInterval(() => {
+            refreshBoardsAndFolders(true);
+        }, 30000);
+        return () => clearInterval(interval);
     }, []);
 
-    const refreshBoardsAndFolders = async () => {
-        setLoading(true);
+    const refreshBoardsAndFolders = async (background = false) => {
+        if (!background) setLoading(true);
         try {
             const [boardsData, foldersData, workspacesData] = await Promise.all([
                 getAllBoards(),
@@ -523,10 +611,14 @@ export default function AdminDashboard() {
             setBoards(boardsData || []);
             setFolders(foldersData || []);
             setWorkspaces(workspacesData || []);
-            // Auto-select first workspace to ensure data visibility
+            setWorkspaces(workspacesData || []);
+
+            // Do NOT auto-select workspace. Allow "Main Workspace" (null) or preserve user selection.
+            /*
             if (workspacesData && workspacesData.length > 0) {
                 setSelectedWorkspaceId(workspacesData[0].id);
             }
+            */
 
             // --- REAL-TIME OVERVIEW STATS FETCH ---
             setOverviewLoading(true);
@@ -563,12 +655,12 @@ export default function AdminDashboard() {
             if (fulfillmentBoard) idsToFetch.push(String(fulfillmentBoard.id));
             editorBoardIds.forEach(id => idsToFetch.push(id)); // Keep fetching items just in case
 
-            // Activity Logs Timeframe (Last 2 Weeks)
-            const twoWeeksAgo = new Date();
-            twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-            const isoDate = twoWeeksAgo.toISOString();
 
-            // FETCH ITEMS WITH UPDATED_AT 
+
+            // Activity Logs Timeframe (Last 30 Days)
+            const oneMonthAgo = new Date();
+            oneMonthAgo.setDate(oneMonthAgo.getDate() - 30);
+
             const [allFetchedItemsData] = await Promise.all([
                 getMultipleBoardItems(idsToFetch)
             ]);
@@ -658,63 +750,23 @@ export default function AdminDashboard() {
                 console.log(`Checking Board: ${b.name}`);
                 console.log(`Found ${items.length} items`);
 
-                let approvedCount = 0;
-
-                items.forEach((item: any, index: number) => {
-                    // 1. Date Check (Last 2 Weeks)
-                    const updatedAt = new Date(item.updated_at);
-
-                    if (updatedAt < twoWeeksAgo) {
-                        // EXPANDED SEARCH: We are keeping the date filter OFF/Log-only for now to debug
-                        // console.log(`[Date Skip] ${item.name}`);
-                    }
-
-                    // 2. WILDCARD STATUS CHECK
-                    // Check EVERY column. If ANY column has "Approved", we count it.
-                    let isApproved = false;
-                    let matchedColId = '';
-                    let matchedText = '';
-
-                    isApproved = item.column_values.some((c: any) => {
-                        if (c.text) {
-                            const t = c.text.toLowerCase();
-                            if (t.includes('approved (cv)') ||
-                                t.includes('(client) approved') ||
-                                t.includes('client approved') ||
-                                t.includes('cv approved')) {
-                                matchedColId = c.id;
-                                matchedText = c.text;
-                                return true;
-                            }
-                        }
-                        return false;
-                    });
-
-                    if (isApproved) {
-                        approvedCount++;
-                        if (index < 10) console.log(`  -> MATCH [${item.name}]: Found "${matchedText}" in column "${matchedColId}"`);
-                    } else {
-                        // Diagnostic: Why NOT matched? print columns for first item
-                        if (index === 0) {
-                            console.log(`  -> NO MATCH [${item.name}]. Columns:`);
-                            console.log(item.column_values.map((c: any) => `${c.id}=${c.text}`));
-                        }
-                    }
-                });
+                // METRIC: Total Projects in Workspace (No Date/Status Filter)
+                const approvedCount = items.length;
 
                 // Clean Name
-                let cleanName = b.name.replace(/workspace/gi, '').replace(/editor/gi, '').replace(/-/g, '').trim();
-                if (b.name.includes('(')) {
-                    // Extract name before parenthesis if possible, or just keep it simple
-                    cleanName = b.name.split('(')[0].trim();
-                }
+                // 1. Remove text in parentheses and beyond (e.g. "Name (C-W-3)" -> "Name")
+                let cleanName = b.name.split('(')[0];
+
+                // 2. Remove "Workspace", "Editor", and dashes
+                cleanName = cleanName.replace(/workspace/gi, '')
+                    .replace(/editor/gi, '')
+                    .replace(/-/g, '')
+                    .trim();
                 if (!cleanName || cleanName.length < 2) cleanName = b.name;
 
                 if (approvedCount > 0) {
                     editorPerformance.push({ name: cleanName, count: approvedCount });
                 } else {
-                    // Push even if 0 to show on board? User implementation shows 0s in screenshot.
-                    // Let's push to list so they appear in leaderboard with 0 if needed, or filter later.
                     editorPerformance.push({ name: cleanName, count: 0 });
                 }
 
@@ -767,7 +819,9 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         if (selectedBoardId) {
+            setFulfillmentMonthFilter('All'); // Reset Filter
             refreshBoardDetails(selectedBoardId);
+            refreshBoardsAndFolders(true); // Background Refresh Global Data
         } else {
             setBoardData(null);
         }
@@ -931,6 +985,47 @@ export default function AdminDashboard() {
                                 {/* --- REAL GRAPH & LEADERBOARD --- */}
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
 
+                                    {/* Editor Productivity Graph */}
+                                    <div className="lg:col-span-2 p-6 rounded-3xl bg-black/20 border border-white/5 backdrop-blur-xl">
+                                        <div className="flex items-center justify-between mb-6">
+                                            <h3 className="text-white font-bold text-lg">Editor Productivity</h3>
+                                            <div className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Total Projects</div>
+                                        </div>
+
+                                        <div className="h-64 flex items-end gap-2 overflow-x-auto pb-2 custom-scrollbar">
+                                            {overviewLoading ? (
+                                                <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">Loading data...</div>
+                                            ) : overviewStats.editorPerformance.length === 0 ? (
+                                                <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs italic">No active editor data found</div>
+                                            ) : (
+                                                overviewStats.editorPerformance.map((editor, idx) => {
+                                                    const maxVal = Math.max(...overviewStats.editorPerformance.map(c => c.count), 5); // scale max
+                                                    const heightPct = (editor.count / maxVal) * 100;
+                                                    const isTop3 = idx < 3;
+
+                                                    return (
+                                                        <div key={idx} className="flex flex-col items-center gap-2 group min-w-[60px] flex-1">
+                                                            <div className="relative w-full flex justify-center">
+                                                                <div
+                                                                    className={`w-full max-w-[40px] rounded-t-lg bg-gradient-to-t ${isTop3 ? 'from-green-500/80 to-green-400' : 'from-green-900/40 to-green-800/60'} group-hover:to-green-300 transition-all duration-300 relative`}
+                                                                    style={{ height: `${Math.max(heightPct, 5)}px`, minHeight: '24px' }}
+                                                                >
+                                                                    {/* Persistent Label for Top items, Hover for others */}
+                                                                    <div className={`absolute -top-6 left-1/2 -translate-x-1/2 ${isTop3 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity text-[10px] font-bold text-white bg-black/80 px-2 py-0.5 rounded pointer-events-none whitespace-nowrap z-10 border border-white/10`}>
+                                                                        {editor.count}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className={`text-[10px] text-center truncate w-full max-w-[80px] ${isTop3 ? 'text-white font-bold' : 'text-gray-500'}`} title={editor.name}>
+                                                                {editor.name}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })
+                                            )}
+                                        </div>
+                                    </div>
+
                                     {/* Client Portfolio Graph */}
                                     <div className="lg:col-span-2 p-6 rounded-3xl bg-black/20 border border-white/5 backdrop-blur-xl">
                                         <div className="flex items-center justify-between mb-6">
@@ -983,7 +1078,7 @@ export default function AdminDashboard() {
                                             ) : overviewStats.editorPerformance.length === 0 ? (
                                                 <div className="text-center text-gray-500 text-xs italic py-10">No editor data available</div>
                                             ) : (
-                                                overviewStats.editorPerformance.map((editor, idx) => (
+                                                overviewStats.editorPerformance.slice(0, 3).map((editor, idx) => (
                                                     <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors group">
                                                         <div className="flex items-center gap-3">
                                                             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${idx === 0 ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'bg-gray-700/30 text-gray-400'}`}>
@@ -1097,14 +1192,6 @@ export default function AdminDashboard() {
                                                 .filter(b => selectedWorkspaceId ? String(b.workspace?.id) === String(selectedWorkspaceId) : !b.workspace)
                                                 .filter(b => b.type !== 'sub_items_board' && !b.name.startsWith("Subitems of"));
 
-                                            // Identify Root Items (Robust String Matching)
-                                            const childIds = new Set();
-                                            visibleFolders.forEach(f => {
-                                                if (f.children) {
-                                                    f.children.forEach((c: any) => childIds.add(String(c.id)));
-                                                }
-                                            });
-
                                             // Custom Sort Logic based on Screenshot
                                             const FOLDER_ORDER = ["Hiring and Onboarding", "Management", "Editors", "Clients", "Old"];
                                             const getSortWeight = (name: string) => {
@@ -1112,13 +1199,85 @@ export default function AdminDashboard() {
                                                 return index === -1 ? 999 : index;
                                             };
 
-                                            const rootFolders = visibleFolders
+                                            // VIRTUAL GROUPING: "Editor Workspaces" should be in "Editors" folder
+
+                                            // 1. Find key folders
+                                            const editorsFolder = visibleFolders.find(f => f.name.trim() === 'Editors');
+                                            const workspacesFolder = visibleFolders.find(f => f.name.trim() === 'Workspaces');
+
+                                            // 2. Identify "Workspace" boards
+                                            const editorBoards = visibleBoards.filter(b => b.name.includes(' - Workspace'));
+
+                                            // 3. Ensure "Editors" folder exists (Virtual or Real)
+                                            let effectiveEditorsFolder = editorsFolder;
+                                            if (!effectiveEditorsFolder && (workspacesFolder || editorBoards.length > 0)) {
+                                                effectiveEditorsFolder = {
+                                                    id: 'virtual-editors',
+                                                    name: 'Editors',
+                                                    color: '#ffcc00',
+                                                    children: []
+                                                };
+                                            }
+
+                                            // 4. Populate "Editors" folder children
+                                            if (effectiveEditorsFolder) {
+                                                if (!effectiveEditorsFolder.children) effectiveEditorsFolder.children = [];
+
+                                                // Helper to check if child exists in our effective folder
+                                                const hasChild = (id: string) => effectiveEditorsFolder!.children.some((c: any) => String(c.id) === String(id));
+
+                                                // A) Nest "Workspaces" folder inside "Editors"
+                                                if (workspacesFolder && !hasChild(workspacesFolder.id)) {
+                                                    effectiveEditorsFolder.children.push({ id: workspacesFolder.id });
+                                                }
+
+                                                // B) Nest loose "Workspace" boards inside "Editors"
+                                                editorBoards.forEach(b => {
+                                                    if (!hasChild(b.id)) {
+                                                        const isInWorkspaces = workspacesFolder && workspacesFolder.children && workspacesFolder.children.some((c: any) => String(c.id) === String(b.id));
+                                                        if (!isInWorkspaces) {
+                                                            effectiveEditorsFolder!.children.push({ id: b.id });
+                                                        }
+                                                    }
+                                                });
+                                            }
+
+                                            // 5. Construct Final Folders List
+                                            // Start with all visible folders
+                                            let finalFolders = [...visibleFolders];
+
+                                            // Remove "Workspaces" from root list (as it is now nested)
+                                            if (workspacesFolder) {
+                                                finalFolders = finalFolders.filter(f => f.id !== workspacesFolder.id);
+                                            }
+
+                                            // Ensure "Editors" is in the list (if virtual)
+                                            if (effectiveEditorsFolder && !finalFolders.some(f => f.id === effectiveEditorsFolder!.id)) {
+                                                finalFolders.push(effectiveEditorsFolder);
+                                            }
+
+                                            // 6. Calculate Root Items (Hiding nested children)
+                                            const childIds = new Set();
+                                            finalFolders.forEach(f => {
+                                                if (f.children) {
+                                                    f.children.forEach((c: any) => childIds.add(String(c.id)));
+                                                }
+                                            });
+
+                                            // Also exclude items that are children of the hidden "Workspaces" folder from root
+                                            // (Recursion in FolderTreeItem handles display, we just need to hide from root here)
+                                            if (workspacesFolder && workspacesFolder.children) {
+                                                workspacesFolder.children.forEach((c: any) => childIds.add(String(c.id)));
+                                            }
+
+                                            const rootFolders = finalFolders
                                                 .filter(f => !childIds.has(String(f.id)))
                                                 .sort((a, b) => getSortWeight(a.name) - getSortWeight(b.name));
 
-                                            // Boards A-Z fallback or manual logic if needed
+                                            // Boards A-Z fallback
                                             const rootBoards = visibleBoards
                                                 .filter(b => !childIds.has(String(b.id)))
+                                                // Functionally, this removes 'editorBoards' because we added their IDs to 'editorsFolder' children
                                                 .sort((a, b) => a.name.localeCompare(b.name));
 
                                             return (
@@ -1251,46 +1410,63 @@ export default function AdminDashboard() {
                                                                 <div className="flex items-center justify-between">
                                                                     <div className="flex items-center gap-1 bg-[#0e0e1a] p-1 rounded-xl border border-white/5">
                                                                         <button
-                                                                            onClick={() => setFulfillmentViewMode('recent')}
-                                                                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${fulfillmentViewMode === 'recent' ? 'bg-[#0073ea] text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-                                                                        >
-                                                                            <Clock className="w-3.5 h-3.5" /> Most Recent Project
-                                                                        </button>
-                                                                        <div className="w-[1px] h-4 bg-white/10 mx-1" />
-                                                                        <button
                                                                             onClick={() => setFulfillmentViewMode('overview')}
                                                                             className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${fulfillmentViewMode === 'overview' ? 'bg-[#0073ea] text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                                                                         >
                                                                             <LayoutGrid className="w-3.5 h-3.5" /> Whole Overview
                                                                         </button>
+                                                                        <div className="w-[1px] h-4 bg-white/10 mx-1" />
+                                                                        <button
+                                                                            onClick={() => setFulfillmentViewMode('recent')}
+                                                                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${fulfillmentViewMode === 'recent' ? 'bg-[#0073ea] text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                                                                        >
+                                                                            <Clock className="w-3.5 h-3.5" /> Most Recent Project
+                                                                        </button>
                                                                     </div>
 
                                                                     {/* Month Filter Dropdown */}
                                                                     {sortedMonths.length > 0 && (
-                                                                        <div className="relative group z-30">
-                                                                            <div className="flex items-center gap-2 px-3 py-2 bg-[#0e0e1a] border border-white/10 rounded-xl cursor-pointer hover:bg-white/5 transition-colors">
+                                                                        <div className="relative z-30">
+                                                                            <div
+                                                                                className="flex items-center gap-2 px-3 py-2 bg-[#0e0e1a] border border-white/10 rounded-xl cursor-pointer hover:bg-white/5 transition-colors"
+                                                                                onClick={() => setIsMonthFilterOpen(!isMonthFilterOpen)}
+                                                                            >
                                                                                 <div className="p-1 rounded bg-white/5 text-gray-400"><FileText className="w-3 h-3" /></div>
                                                                                 <span className="text-xs font-bold text-white min-w-[60px]">{fulfillmentMonthFilter}</span>
-                                                                                <ChevronDown className="w-3 h-3 text-gray-500" />
+                                                                                <ChevronDown className={`w-3 h-3 text-gray-500 transition-transform ${isMonthFilterOpen ? 'rotate-180' : ''}`} />
                                                                             </div>
+
+                                                                            {/* Backdrop for Click Outside */}
+                                                                            {isMonthFilterOpen && (
+                                                                                <div className="fixed inset-0 z-40" onClick={() => setIsMonthFilterOpen(false)} />
+                                                                            )}
+
                                                                             {/* Dropdown Options */}
-                                                                            <div className="absolute top-full right-0 mt-2 w-40 bg-[#0A0A16] border border-white/10 rounded-xl shadow-2xl overflow-hidden hidden group-hover:block transition-all animate-in fade-in zoom-in duration-200">
-                                                                                <div
-                                                                                    onClick={() => setFulfillmentMonthFilter('All')}
-                                                                                    className={`px-4 py-3 text-xs font-bold cursor-pointer transition-colors ${fulfillmentMonthFilter === 'All' ? 'bg-custom-bright/10 text-custom-bright' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-                                                                                >
-                                                                                    All Time
-                                                                                </div>
-                                                                                {sortedMonths.map(month => (
+                                                                            {isMonthFilterOpen && (
+                                                                                <div className="absolute top-full right-0 mt-2 w-40 bg-[#0A0A16] border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 z-50">
                                                                                     <div
-                                                                                        key={month}
-                                                                                        onClick={() => setFulfillmentMonthFilter(month)}
-                                                                                        className={`px-4 py-3 text-xs font-bold cursor-pointer transition-colors ${fulfillmentMonthFilter === month ? 'bg-custom-bright/10 text-custom-bright' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                                                                                        onClick={() => {
+                                                                                            setFulfillmentMonthFilter('All');
+                                                                                            setIsMonthFilterOpen(false);
+                                                                                        }}
+                                                                                        className={`px-4 py-3 text-xs font-bold cursor-pointer transition-colors ${fulfillmentMonthFilter === 'All' ? 'bg-custom-bright/10 text-custom-bright' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                                                                                     >
-                                                                                        {month}
+                                                                                        All Time
                                                                                     </div>
-                                                                                ))}
-                                                                            </div>
+                                                                                    {sortedMonths.map(month => (
+                                                                                        <div
+                                                                                            key={month}
+                                                                                            onClick={() => {
+                                                                                                setFulfillmentMonthFilter(month);
+                                                                                                setIsMonthFilterOpen(false);
+                                                                                            }}
+                                                                                            className={`px-4 py-3 text-xs font-bold cursor-pointer transition-colors ${fulfillmentMonthFilter === month ? 'bg-custom-bright/10 text-custom-bright' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                                                                                        >
+                                                                                            {month}
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            )}
                                                                         </div>
                                                                     )}
                                                                 </div>
@@ -1530,7 +1706,111 @@ export default function AdminDashboard() {
                                                                                             </div>
                                                                                         </div>
                                                                                     );
+                                                                                })() : boardData.name.toLowerCase().includes('workspace') ? (() => {
+                                                                                    // Cycle Grouping Logic for Editor Workspaces
+                                                                                    const getCycleKey = (item: any) => {
+                                                                                        if (!item.created_at) return 'Unknown';
+                                                                                        const date = new Date(item.created_at);
+                                                                                        if (isNaN(date.getTime())) return 'Unknown';
+
+                                                                                        const year = date.getFullYear();
+                                                                                        const month = date.toLocaleString('default', { month: 'long' });
+                                                                                        const day = date.getDate();
+                                                                                        const cycle = day <= 15 ? 1 : 2;
+
+                                                                                        return `${month} ${year} - Cycle ${cycle}`;
+                                                                                    };
+
+                                                                                    const getCycleSortKey = (cycleKey: string) => {
+                                                                                        if (cycleKey === 'Unknown') return 0;
+                                                                                        const match = cycleKey.match(/(\w+) (\d+) - Cycle (\d)/);
+                                                                                        if (!match) return 0;
+                                                                                        const [, month, year, cycle] = match;
+                                                                                        const monthNum = new Date(`${month} 1, ${year}`).getMonth();
+                                                                                        return parseInt(year) * 100 + monthNum * 10 + parseInt(cycle);
+                                                                                    };
+
+                                                                                    // Group items by cycle
+                                                                                    const cycleGroups: Record<string, any[]> = {};
+                                                                                    groupItems.forEach((item: any) => {
+                                                                                        const cycleKey = getCycleKey(item);
+                                                                                        if (!cycleGroups[cycleKey]) cycleGroups[cycleKey] = [];
+                                                                                        cycleGroups[cycleKey].push(item);
+                                                                                    });
+
+                                                                                    // Sort cycles in descending order (newest first)
+                                                                                    const sortedCycles = Object.keys(cycleGroups).sort((a, b) =>
+                                                                                        getCycleSortKey(b) - getCycleSortKey(a)
+                                                                                    );
+
+                                                                                    return (
+                                                                                        <div className="space-y-8">
+                                                                                            {sortedCycles.map((cycleKey) => (
+                                                                                                <div key={cycleKey} className="space-y-4">
+                                                                                                    {/* Cycle Header */}
+                                                                                                    <div className="flex items-center gap-3">
+                                                                                                        <div className="flex items-center gap-2 px-4 py-2 bg-custom-bright/10 border border-custom-bright/20 rounded-xl">
+                                                                                                            <div className="w-2 h-2 rounded-full bg-custom-bright" />
+                                                                                                            <h3 className="text-sm font-bold text-custom-bright uppercase tracking-wider">
+                                                                                                                {cycleKey}
+                                                                                                            </h3>
+                                                                                                        </div>
+                                                                                                        <div className="flex-1 h-[1px] bg-white/5" />
+                                                                                                        <span className="text-xs text-gray-500 font-mono">
+                                                                                                            {cycleGroups[cycleKey].length} {cycleGroups[cycleKey].length === 1 ? 'item' : 'items'}
+                                                                                                        </span>
+                                                                                                    </div>
+
+                                                                                                    {/* Card Grid for this Cycle */}
+                                                                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                                                                                        {cycleGroups[cycleKey].map((item: any, idx: number) => (
+                                                                                                            <motion.div
+                                                                                                                key={item.id}
+                                                                                                                initial={{ opacity: 0, y: 20 }}
+                                                                                                                animate={{ opacity: 1, y: 0 }}
+                                                                                                                transition={{ delay: idx * 0.05, duration: 0.3 }}
+                                                                                                                className="group relative"
+                                                                                                            >
+                                                                                                                <div className="absolute inset-0 bg-gradient-to-br from-custom-bright/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                                                                                                                <div className="relative p-6 rounded-2xl bg-[#0e0e1a] border border-white/5 shadow-xl hover:border-white/10 hover:bg-[#131322] transition-all h-full flex flex-col gap-5">
+                                                                                                                    {/* Item Name Header */}
+                                                                                                                    <div className="flex items-start justify-between gap-3">
+                                                                                                                        <h4 className="text-lg font-bold text-white leading-snug flex-1">{item.name}</h4>
+                                                                                                                        <div className="w-2 h-2 rounded-full bg-custom-bright animate-pulse flex-shrink-0 mt-2" />
+                                                                                                                    </div>
+
+                                                                                                                    <div className="w-full h-[1px] bg-white/5" />
+
+                                                                                                                    {/* Column Values */}
+                                                                                                                    <div className="space-y-4 flex-1">
+                                                                                                                        {boardData.columns?.filter((col: any) => col.type !== 'name').map((col: any) => (
+                                                                                                                            <div key={col.id} className="flex flex-col gap-1.5">
+                                                                                                                                <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">{col.title}</span>
+                                                                                                                                <div className="min-h-[28px] flex items-center">
+                                                                                                                                    <BoardCell
+                                                                                                                                        item={item}
+                                                                                                                                        column={col}
+                                                                                                                                        boardId={selectedBoardId}
+                                                                                                                                        onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
+                                                                                                                                        onPreview={(url, name) => setPreviewFile({ url, name })}
+                                                                                                                                    />
+                                                                                                                                </div>
+                                                                                                                            </div>
+                                                                                                                        ))}
+                                                                                                                    </div>
+                                                                                                                </div>
+                                                                                                            </motion.div>
+                                                                                                        ))}
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            ))}
+                                                                                            {groupItems.length === 0 && (
+                                                                                                <div className="text-center text-gray-500 italic py-8">No items in this group</div>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    );
                                                                                 })() : (
+                                                                                    // Default Table View
                                                                                     <div className="overflow-x-auto rounded-xl border border-white/5 bg-black/20">
                                                                                         <table className="w-full text-left text-sm whitespace-nowrap">
                                                                                             <thead><tr className="border-b border-white/10 bg-white/5"><th className="px-4 py-3 text-xs font-bold text-white uppercase tracking-wider w-[240px]">Name</th>{boardData.columns?.filter((c: any) => c.type !== 'name').map((col: any) => (<th key={col.id} className="px-4 py-3 text-xs font-bold text-gray-300 uppercase tracking-wider min-w-[150px]">{col.title}</th>))}</tr></thead>
