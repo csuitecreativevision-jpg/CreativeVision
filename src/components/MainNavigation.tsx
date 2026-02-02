@@ -125,7 +125,7 @@ export default function MainNavigation({
               <div className="flex items-center gap-2 pl-3">
                 <MagneticButton>
                   <button
-                    onClick={() => scrollToSection('pricing')}
+                    onClick={() => navigate('/start')}
                     className="px-5 py-2.5 rounded-full bg-white text-black text-sm font-semibold hover:bg-gray-200 transition-colors whitespace-nowrap"
                   >
                     Start Project
@@ -161,7 +161,7 @@ export default function MainNavigation({
             <MobileNavLink onClick={() => scrollToSection('pricing')}>Pricing</MobileNavLink>
             <MobileNavLink onClick={() => scrollToSection('careers')}>Careers</MobileNavLink>
             <div className="h-[1px] bg-white/10 my-2" />
-            <MobileNavLink onClick={() => scrollToSection('pricing')} primary>Start Project</MobileNavLink>
+            <MobileNavLink onClick={() => navigate('/start')} primary>Start Project</MobileNavLink>
           </motion.div>
         )}
       </AnimatePresence>

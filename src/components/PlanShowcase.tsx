@@ -2,6 +2,7 @@ import { motion, Variants } from 'framer-motion';
 import { Check, Sparkles, ChevronRight } from 'lucide-react';
 import { MagneticButton } from './ui/MagneticButton';
 import { PricingPackage } from '../data/pricingData';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 interface PlanShowcaseProps {
     packageData: PricingPackage;
@@ -10,6 +11,8 @@ interface PlanShowcaseProps {
 }
 
 export default function PlanShowcase({ packageData, onNext, onSelect }: PlanShowcaseProps) {
+    const isMobile = useIsMobile();
+
     // Animation variants
     const container: Variants = {
         hidden: { opacity: 0 },
@@ -34,23 +37,23 @@ export default function PlanShowcase({ packageData, onNext, onSelect }: PlanShow
             {/* Main Gradient */}
             <div className={`absolute inset-0 bg-gradient-to-br ${packageData.gradient} opacity-40 mix-blend-screen pointer-events-none transition-all duration-1000`} />
 
-            {/* Animated Orbs */}
+            {/* Animated Orbs - Static on Mobile to save battery/perf */}
             <motion.div
-                animate={{
+                animate={isMobile ? undefined : {
                     scale: [1, 1.2, 1],
                     opacity: [0.3, 0.5, 0.3],
                 }}
                 transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute top-[-20%] left-[-10%] w-[80vw] h-[80vw] rounded-full blur-[150px] pointer-events-none"
-                style={{ background: packageData.themeColor, opacity: 0.15 }}
+                className={`absolute top-[-20%] left-[-10%] w-[80vw] h-[80vw] rounded-full pointing-events-none ${isMobile ? 'blur-[60px] opacity-20' : 'blur-[150px]'}`}
+                style={{ background: packageData.themeColor, opacity: isMobile ? 0.1 : 0.15 }}
             />
             <motion.div
-                animate={{
+                animate={isMobile ? undefined : {
                     scale: [1, 1.3, 1],
                     x: [0, 50, 0],
                 }}
                 transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-                className="absolute bottom-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full blur-[150px] pointer-events-none"
+                className={`absolute bottom-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full pointing-events-none ${isMobile ? 'blur-[60px] opacity-15' : 'blur-[150px]'}`}
                 style={{ background: packageData.themeColor, opacity: 0.1 }}
             />
 

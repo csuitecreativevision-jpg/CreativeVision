@@ -6,11 +6,12 @@ import { CinematicOverlay } from './components/ui/CinematicOverlay';
 import { Preloader } from './components/ui/Preloader';
 import HomePage from './components/HomePage';
 import HireUsPage from './components/HireUsPage';
-import JoinTeamPage from './components/JoinTeamPage';
+import JoinPage from './components/JoinPage';
 import ThankYouPage from './components/ThankYouPage';
 import PortalPage from './components/PortalPage';
 
 import AdminDashboard from './components/AdminDashboard';
+import StartProjectPage from './components/StartProjectPage';
 
 export default function App() {
   const navigate = useNavigate();
@@ -64,7 +65,12 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/hire" element={<HireUsPage onBack={handleBack} />} />
-        <Route path="/join" element={<JoinTeamPage onBack={handleBack} onThankYou={handleThankYou} />} />
+        <Route path="/join" element={<JoinPage onBack={() => {
+          navigate('/', { state: { target: 'services' } });
+        }} />} />
+        <Route path="/start" element={<StartProjectPage onBack={() => {
+          navigate('/', { state: { target: 'services' } });
+        }} />} />
         <Route path="/thank-you" element={<ThankYouPage onBack={handleBack} />} />
         <Route path="/portal" element={<PortalPage />} />
         <Route path="/admin-dashboard" element={<AdminDashboard />} />

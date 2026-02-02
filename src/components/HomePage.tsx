@@ -1,16 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import Hero from './Hero';
 import Services from './Services';
 import Portfolio from './Portfolio';
 import TrustSignals from './sections/TrustSignals';
 import ProblemSection from './sections/ProblemSection';
-import CareersSection from './CareersSection';
-import PricingSection from './PricingSection';
-import PlanShowcase from './PlanShowcase';
 import SummarySection from './sections/SummarySection';
-import ExperienceIntro from './sections/ExperienceIntro';
 import { HorizontalScrollWrapper } from './layout/HorizontalScrollWrapper';
-import { packages } from '../data/pricingData';
 import { motion } from 'framer-motion';
 
 const Slide = ({ children, id, className = "", enableFlash = false }: { children: React.ReactNode, id?: string, className?: string, enableFlash?: boolean }) => {
@@ -46,52 +42,32 @@ const Slide = ({ children, id, className = "", enableFlash = false }: { children
 };
 
 export default function HomePage() {
-  const [navOverride, setNavOverride] = useState<number | null>(null);
-  const [projectFlowActive, setProjectFlowActive] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
-
-  const handlePlanNext = useCallback((currentIndex: number) => {
-    setNavOverride(currentIndex + 1);
-  }, []);
-
-  const handleStartProject = useCallback(() => {
-    setProjectFlowActive(true);
-    setTimeout(() => setNavOverride(6), 50);
-  }, []);
-
-  const handlePlanBack = (currentIndex: number) => {
-    if (currentIndex === 6) {
-      // Back from Intro Slide -> Exit Project Flow
-      setProjectFlowActive(false);
-      setNavOverride(4); // Visually lock to Services (Index 4)
-
-      // Restore scroll position after DOM update so the user can scroll again
-      // Increased timeout to ensure height reconciliation is complete
+    if (location.state && location.state.target === 'services') {
+      // Services is at index 4.
+      // Scroll target is roughly 4 * window.innerHeight
+      // We use immediate scroll or slight delay to ensure layout is ready
       setTimeout(() => {
-        const scrollTarget = 4 * window.innerHeight; // 4th slide position
         window.scrollTo({
-          top: scrollTarget,
-          behavior: 'auto' // Use auto/instant to prevent fighting
+          top: 4 * window.innerHeight,
+          behavior: 'auto'
         });
+      }, 50);
 
-        // Unlock navigation in next frame
-        requestAnimationFrame(() => {
-          setNavOverride(null);
-        });
-      }, 300);
+      // Clear state to prevent scroll on refresh (optional but good practice)
+      window.history.replaceState({}, document.title);
     } else {
-      setNavOverride(currentIndex - 1);
+      window.scrollTo(0, 0);
     }
-  };
+  }, [location]);
 
   const Content = (
     <>
       {/* 0: Hero */}
       <Slide id="hero" className="hero-slide">
-        <Hero onGetStarted={handleStartProject} />
+        <Hero onGetStarted={() => { }} />
       </Slide>
 
       {/* 1: Problem */}
@@ -100,8 +76,9 @@ export default function HomePage() {
       </Slide>
 
       {/* 2: Portfolio */}
-      <Slide className="portfolio-slide" enableFlash>
-        <Portfolio onGetStarted={handleStartProject} />
+      <Slide className="portfolio-slide">
+        {/* Pass empty handler or remove prop if optional. Portfolio might trigger start too. */}
+        <Portfolio onGetStarted={() => { }} />
       </Slide>
 
       {/* 3: Trust */}
@@ -111,100 +88,26 @@ export default function HomePage() {
 
       {/* 4: Services */}
       <Slide className="services-slide">
-        <Services onGetStarted={handleStartProject} onJoinTeam={() => setNavOverride(13)} />
+        {/* Services now uses internal navigate */}
+        <Services onGetStarted={() => { }} />
       </Slide>
 
-      {/* 5: Summary / Ending (Visible) */}
+      {/* 5: Summary / Ending */}
       <Slide className="summary-slide">
         <SummarySection />
-      </Slide>
-
-      {/* -- PROJECT FLOW START -- */}
-
-      {/* 6: Experience Intro (Conditionally Rendered) */}
-      {projectFlowActive && (
-        <Slide className="intro-slide flex">
-          <div className="relative w-full h-full">
-            <button
-              onClick={() => handlePlanBack(6)}
-              className="absolute top-8 left-8 z-50 px-6 py-2 bg-white/10 text-white rounded-full hover:bg-white/20 transition-colors backdrop-blur-md uppercase text-sm tracking-widest font-bold"
-            >
-              ← Back
-            </button>
-            <ExperienceIntro onNext={() => handlePlanNext(6)} />
-          </div>
-        </Slide>
-      )}
-
-      {/* 7-11: Individual Plan Showcases (Conditionally Rendered) */}
-      {projectFlowActive && packages.map((pkg, index) => {
-        const slideIndex = 7 + index;
-        return (
-          <Slide key={pkg.name} className={`plan-slide-${index} flex`}>
-            <div className="relative w-full h-full">
-              <button
-                onClick={() => handlePlanBack(slideIndex)}
-                className="absolute top-8 left-8 z-50 px-6 py-2 bg-white/10 text-white rounded-full hover:bg-white/20 transition-colors backdrop-blur-md uppercase text-sm tracking-widest font-bold"
-              >
-                ← Back
-              </button>
-              <PlanShowcase
-                packageData={pkg}
-                onNext={() => handlePlanNext(slideIndex)}
-                onSelect={() => {
-                  setNavOverride(12);
-                }}
-              />
-            </div>
-          </Slide>
-        );
-      })}
-
-      {/* 12: Pricing Comparison Grid (Conditionally Rendered) */}
-      {projectFlowActive && (
-        <Slide className="pricing-slide flex">
-          <div className="relative w-full h-full">
-            <button
-              onClick={() => setNavOverride(11)} // Back to last plan (Platinum is 11)
-              className="absolute top-8 left-8 z-50 px-6 py-2 bg-white/10 text-white rounded-full hover:bg-white/20 transition-colors backdrop-blur-md uppercase text-sm tracking-widest font-bold"
-            >
-              ← Back
-            </button>
-            <PricingSection id="pricing" />
-          </div>
-        </Slide>
-      )}
-
-      {/* 13: Careers (Hidden unless accessed) */}
-      <Slide className={`careers-slide ${navOverride === 13 ? 'flex' : 'hidden'}`}>
-        <div className="relative w-full h-full">
-          <button
-            onClick={() => setNavOverride(null)}
-            className="absolute top-8 left-8 z-50 px-6 py-2 bg-white/10 text-white rounded-full hover:bg-white/20 transition-colors backdrop-blur-md uppercase text-sm tracking-widest font-bold"
-          >
-            ← Back
-          </button>
-          <CareersSection id="careers" />
-        </div>
       </Slide>
     </>
   );
 
-  // Calculate effective index for scroll wrapper
-  // If Project Flow is INACTIVE, the intermediate slides (6-12) are hidden.
-  // So index 13 (Careers) physically shifts to position 6 (after Summary).
-  const effectiveIndex = navOverride === 13 && !projectFlowActive ? 6 : navOverride;
-
-  // Base 6 (0-5) + Project 7 (6-12) + Careers 1 (13)
-  const totalSlides = 6 + (projectFlowActive ? 7 : 0) + (navOverride === 13 ? 1 : 0);
-  const contentWidth = `${totalSlides * 100}vh`;
+  // Base 6 slides only
+  const contentWidth = `${6 * 100}vh`;
 
   return (
     <div className="min-h-screen text-white relative bg-[#050511]">
       {/* Global Camera Flash Overlay */}
       <div id="camera-flash" className="fixed inset-0 bg-white pointer-events-none z-[100] opacity-0 mix-blend-overlay"></div>
 
-      <HorizontalScrollWrapper contentWidth={contentWidth} overrideIndex={effectiveIndex}>
+      <HorizontalScrollWrapper contentWidth={contentWidth} overrideIndex={null}>
         {Content}
       </HorizontalScrollWrapper>
     </div>

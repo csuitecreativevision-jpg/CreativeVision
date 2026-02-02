@@ -1,4 +1,3 @@
-import React from 'react';
 import { cn } from '../../lib/utils';
 
 interface MagneticButtonProps {
@@ -6,17 +5,9 @@ interface MagneticButtonProps {
     className?: string;
 }
 
-export const MagneticButton = ({
-    children,
-    className,
-}: MagneticButtonProps) => {
+export const MagneticButton = ({ children, className }: MagneticButtonProps) => {
     return (
-        <div
-            className={cn(
-                "relative z-10 inline-block transition-all duration-300 hover:drop-shadow-[0_0_20px_rgba(255,255,255,0.4)]",
-                className
-            )}
-        >
+        <div className={cn("relative z-10 inline-block", className)}>
             {children}
         </div>
     );

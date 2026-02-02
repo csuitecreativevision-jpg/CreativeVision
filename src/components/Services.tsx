@@ -3,9 +3,10 @@ import { Briefcase, Users, ArrowRight, Star, Zap } from 'lucide-react';
 import { SpotlightCard } from './ui/SpotlightCard';
 import { MagneticButton } from './ui/MagneticButton';
 
+import { useNavigate } from 'react-router-dom';
+
 interface ServicesProps {
   onGetStarted: () => void;
-  onJoinTeam: () => void;
 }
 
 const containerVariants = {
@@ -28,7 +29,8 @@ const itemVariants = {
   }
 };
 
-export default function Services({ onGetStarted, onJoinTeam }: ServicesProps) {
+export default function Services({ onGetStarted }: ServicesProps) {
+  const navigate = useNavigate();
   return (
     <section id="services" className="w-screen h-[100svh] flex-shrink-0 flex items-center justify-center relative overflow-hidden bg-[#050511] px-[clamp(1rem,3vw,2rem)]">
       {/* Background Ambience */}
@@ -91,7 +93,7 @@ export default function Services({ onGetStarted, onJoinTeam }: ServicesProps) {
 
                 <MagneticButton className="w-full shrink-0">
                   <button
-                    onClick={onGetStarted}
+                    onClick={() => navigate('/start')}
                     className="w-full py-[clamp(0.6rem,1.5vh,1rem)] bg-white text-black font-bold rounded-xl hover:bg-gray-100 transition-colors flex items-center justify-center gap-2 text-[clamp(0.75rem,1vw,1rem)]"
                   >
                     Start Project <ArrowRight className="w-3 h-3 md:w-4 md:h-4" />
@@ -128,7 +130,7 @@ export default function Services({ onGetStarted, onJoinTeam }: ServicesProps) {
 
                 <MagneticButton className="w-full shrink-0">
                   <button
-                    onClick={onJoinTeam}
+                    onClick={() => navigate('/join')}
                     className="w-full py-[clamp(0.6rem,1.5vh,1rem)] bg-transparent border border-white/20 text-white font-bold rounded-xl hover:bg-white/10 transition-colors flex items-center justify-center gap-2 text-[clamp(0.75rem,1vw,1rem)]"
                   >
                     Apply Now <ArrowRight className="w-3 h-3 md:w-4 md:h-4" />
