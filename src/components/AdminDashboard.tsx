@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BackgroundLayout } from './layout/BackgroundLayout';
 import { CinematicOverlay } from './ui/CinematicOverlay';
@@ -6,12 +6,16 @@ import { SpotlightCard } from './ui/SpotlightCard';
 import {
     LayoutDashboard,
     Users,
+    UserPlus,
     Settings,
     Activity,
     Search,
     Menu,
     TrendingUp,
     Eye,
+    EyeOff,
+    Wand2,
+    Pencil,
     Briefcase,
     LogOut,
     AlignLeft,
@@ -19,23 +23,24 @@ import {
     Loader2,
     Plus,
     X,
-    Filter,
     ChevronDown,
     MoreHorizontal,
-    MoreVertical,
     FileText,
-    Image as ImageIcon,
     Download,
-    Share2,
     Trash2,
-    CheckCircle2,
     AlertCircle,
     LayoutGrid,
     Clock,
     PlayCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getAllBoards, getAllFolders, getBoardItems, createNewBoard, createNewGroup, updateItemValue, getAllWorkspaces, getMultipleBoardItems, getAssetPublicUrl } from '../services/mondayService';
+import {
+    getAllBoards, getAllFolders, getBoardItems, createNewBoard, createNewGroup, updateItemValue, getAllWorkspaces,
+    getMultipleBoardItems,
+    getAssetPublicUrl,
+    prefetchBoardItems
+} from '../services/mondayService';
+import { createUser, getAllUsers, updateUser, deleteUser, supabase } from '../services/boardsService';
 
 // --- Helpers ---
 // (Updated)
@@ -82,9 +87,36 @@ const FolderTreeItem = ({ folder, allFolders, allBoards, onSelectBoard, selected
         }
     }, [selectedBoardId, childBoards]);
 
-    const hasChildren = childFolders.length > 0 || childBoards.length > 0;
+    // Recursive check for content visibility
+    const hasVisibleBoards = (fId: string): boolean => {
+        // Check direct boards in this folder
+        const hasDirectBoards = allBoards.some((b: any) => String(b.folder_id) === String(fId));
+        if (hasDirectBoards) return true;
 
-    if (!hasChildren) return null;
+        // Check subfolders
+        const thisFolder = allFolders.find(f => String(f.id) === String(fId));
+        if (!thisFolder || !thisFolder.children) return false;
+
+        return thisFolder.children.some((child: any) => {
+            // Is child a folder?
+            const isFolder = allFolders.find(f => String(f.id) === String(child.id));
+            if (isFolder) return hasVisibleBoards(isFolder.id);
+            // Is child a board? (Already filtered list)
+            const isBoard = allBoards.find(b => String(b.id) === String(child.id));
+            return !!isBoard;
+        });
+    };
+
+    const hasContent = hasVisibleBoards(folder.id);
+    if (!hasContent) return null;
+
+    const hasChildren = childFolders.length > 0 || childBoards.length > 0;
+    // Redundant but safe check? No, childFolders might be populated but empty inside.
+    // Actually hasVisibleBoards covers it. But childFolders array is used for rendering.
+    // If hasContent is true, then render.
+
+    // We can rely on hasContent.
+    if (!hasChildren && !hasContent) return null;
 
     return (
         <div className="select-none text-[13px] font-sans">
@@ -187,7 +219,7 @@ const FilePreviewer = ({ url, name }: { url: string, name: string }) => {
     }
 
     if (url.match(/\.(jpeg|jpg|gif|png|webp|svg)(\?|$)/i)) {
-        return <img src={url} onError={() => setError(true)} className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" alt="Preview" />;
+        return <img src={url} onError={() => setError(true)} className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" alt={name || "Preview"} />;
     }
     if (url.match(/\.(mp4|webm|ogg|mov)(\?|$)/i)) {
         // Fix: encodeURI to handle spaces in filenames
@@ -304,7 +336,7 @@ const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, 
 
 
     // Parse column settings for Status/Dropdown
-    let options = [];
+    let options: any[] = [];
     if (column.type === 'color' || column.type === 'status') {
         try {
             const settings = JSON.parse(column.settings_str || '{}');
@@ -478,7 +510,7 @@ const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, 
             <button
                 onClick={(e) => {
                     e.stopPropagation();
-                    onPreview(linkUrl!, displayValue);
+                    onPreview(linkUrl!, displayValue, assetId || undefined);
                 }}
                 className={`flex items-center gap-2 py-1.5 px-3 rounded-lg border transition-all group max-w-full text-left relative overflow-hidden
                     ${isVideo ? 'bg-red-500/10 border-red-500/20 hover:bg-red-500/20 text-red-400' :
@@ -586,17 +618,21 @@ const StatCard = ({ title, value, change, icon, delay }: { title: string, value:
 
 export default function AdminDashboard() {
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState('Overview');
+    const [activeTab, setActiveTab] = useState<'Overview' | 'Boards' | 'Projects' | 'Analytics' | 'Team' | 'Users' | 'Settings'>('Overview');
 
     // Data State
     const [boards, setBoards] = useState<any[]>([]);
     const [folders, setFolders] = useState<any[]>([]);
     const [workspaces, setWorkspaces] = useState<any[]>([]);
-    const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null); // null = Main Workspace
+    const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(localStorage.getItem('portal_user_workspace') || null); // null = Main Workspace
     const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
     const [boardData, setBoardData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [previewFile, setPreviewFile] = useState<{ url: string, name: string, assetId?: string } | null>(null);
+    // User Permissions State
+    const [currentUserAllowedBoards, setCurrentUserAllowedBoards] = useState<string[]>([]);
+    const [currentUserWorkspaceId, setCurrentUserWorkspaceId] = useState<string | null>(null);
+
     // Carousel State for Form Groups
     const [groupCarouselIndices, setGroupCarouselIndices] = useState<Record<string, number>>({});
 
@@ -627,19 +663,230 @@ export default function AdminDashboard() {
     const [fulfillmentMonthFilter, setFulfillmentMonthFilter] = useState<string>('All');
     const [isMonthFilterOpen, setIsMonthFilterOpen] = useState(false);
 
+    // User Management State
+    const [newUserName, setNewUserName] = useState('');
+    const [newUserEmail, setNewUserEmail] = useState('');
+    const [newUserRole, setNewUserRole] = useState<'admin' | 'editor' | 'client'>('editor');
+    const [newUserPassword, setNewUserPassword] = useState('');
+    const [selectedUserWorkspace, setSelectedUserWorkspace] = useState(''); // Workspace ID for user
+    const [selectedBoardIds, setSelectedBoardIds] = useState<string[]>([]); // Specific boards for user
+    const [boardSearchQuery, setBoardSearchQuery] = useState(''); // Filter for boards list
+    const [isCreatingUser, setIsCreatingUser] = useState(false);
+    const [userSuccess, setUserSuccess] = useState<string | null>(null);
+    const [isUserListOpen, setIsUserListOpen] = useState(false);
+
+    // --- Data Fetching ---
+    const [userError, setUserError] = useState<string | null>(null);
+    const [editingUserId, setEditingUserId] = useState<string | null>(null);
+    const [showPassword, setShowPassword] = useState(false);
+
+    const generatePassword = () => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+        let pass = '';
+        for (let i = 0; i < 12; i++) {
+            pass += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        setNewUserPassword(pass);
+        setShowPassword(true);
+    };
+
+    // User List State & Logic
+    const [userList, setUserList] = useState<any[]>([]);
+    const [userListLoading, setUserListLoading] = useState(false);
+
+    const fetchUsers = async () => {
+        setUserListLoading(true);
+        const users = await getAllUsers();
+        setUserList(users);
+        setUserListLoading(false);
+    };
+
+    useEffect(() => {
+        if (activeTab === 'Users') {
+            fetchUsers();
+        }
+    }, [activeTab]);
+
+    const handleDeleteUser = async (id: string, name: string) => {
+        if (window.confirm(`Are you sure you want to delete user "${name}"?`)) {
+            const result = await deleteUser(id);
+            if (result.success) {
+                fetchUsers();
+            } else {
+                alert('Failed to delete user: ' + result.error);
+            }
+        }
+    };
+
+    // Current logged-in user info (from localStorage)
+    const currentUserRole = localStorage.getItem('portal_user_role') || 'admin';
+    const currentUserName = localStorage.getItem('portal_user_name') || '';
+
+    // Auto-generate email based on role
+    useEffect(() => {
+        if (!editingUserId) {
+            if (newUserRole === 'admin') {
+                setNewUserEmail(newUserName.toLowerCase().replace(/\s+/g, '') + '@admin.cv');
+            } else if (newUserRole === 'editor') {
+                setNewUserEmail(newUserName.toLowerCase().replace(/\s+/g, '') + '@editors.cv');
+            } else if (newUserRole === 'client') {
+                setNewUserEmail(newUserName.toLowerCase().replace(/\s+/g, '') + '@clients.cv');
+            }
+        }
+    }, [newUserRole, newUserName, editingUserId]);
+
+    const handleEditUser = (user: any) => {
+        setEditingUserId(user.id);
+        setNewUserName(user.name);
+        setNewUserRole(user.role);
+        setNewUserEmail(user.email); // Keep existing email
+        setSelectedUserWorkspace(user.workspace_id || '');
+        setSelectedBoardIds(user.allowed_board_ids || []);
+        setNewUserPassword(''); // Password not retrieved
+        setIsUserListOpen(false); // Close modal to show form
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleCancelEdit = () => {
+        setEditingUserId(null);
+        setNewUserName('');
+        setNewUserPassword('');
+        setNewUserRole('editor');
+        setSelectedUserWorkspace('');
+        setSelectedBoardIds([]);
+        setUserError(null);
+        setUserSuccess(null);
+    };
+
+    const handleCreateUser = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setUserError(null);
+        setUserSuccess(null);
+
+        if (!editingUserId) {
+            if (!newUserName.trim() || !newUserEmail.trim() || !newUserPassword.trim()) {
+                setUserError('Name, email, and password are required');
+                return;
+            }
+            if (newUserPassword.length < 4) {
+                setUserError('Password must be at least 4 characters');
+                return;
+            }
+        } else {
+            if (!newUserName.trim()) {
+                setUserError('Name is required');
+                return;
+            }
+        }
+
+        setIsCreatingUser(true);
+        const cleanEmail = newUserEmail.trim().toLowerCase();
+
+        if (editingUserId) {
+            const result = await updateUser(editingUserId, {
+                role: newUserRole,
+                workspace_id: selectedUserWorkspace,
+                allowed_board_ids: selectedBoardIds,
+                name: newUserName.trim()
+            });
+            setIsCreatingUser(false);
+            if (result.success) {
+                setUserSuccess(`User "${newUserName}" updated successfully!`);
+                setEditingUserId(null);
+                setNewUserName('');
+                setNewUserPassword('');
+                setNewUserRole('editor');
+                setSelectedUserWorkspace('');
+                setSelectedBoardIds([]);
+                fetchUsers();
+            } else {
+                setUserError(result.error || 'Failed to update user');
+            }
+        } else {
+            const result = await createUser(
+                newUserName.trim(),
+                cleanEmail,
+                newUserPassword,
+                newUserRole,
+                selectedUserWorkspace || undefined,
+                selectedBoardIds
+            );
+
+            setIsCreatingUser(false);
+
+            if (result.success) {
+                setUserSuccess(`User "${result.user?.name}" created successfully!`);
+                setNewUserName('');
+                setNewUserPassword('');
+                setNewUserRole('editor');
+                setSelectedUserWorkspace('');
+                setSelectedBoardIds([]);
+                fetchUsers();
+            } else {
+                setUserError(result.error || 'Failed to create user');
+            }
+        }
+    };
+
     const handleLogout = () => {
-        navigate('/');
+        localStorage.removeItem('portal_user_email');
+        localStorage.removeItem('portal_user_role');
+        localStorage.removeItem('portal_user_name');
+        localStorage.removeItem('portal_user_workspace');
+        navigate('/portal');
     };
 
 
+
+    const [checkingPermissions, setCheckingPermissions] = useState(true);
+
+    // Stabilize reference to prevent infinite loops
+    const stableAllowedBoards = useMemo(() => currentUserAllowedBoards, [JSON.stringify(currentUserAllowedBoards)]);
+
+
     useEffect(() => {
+        // Fetch User Permissions on Mount
+        const email = localStorage.getItem('portal_user_email');
+        if (email) {
+            supabase
+                .from('users')
+                .select('allowed_board_ids, workspace_id')
+                .eq('email', email)
+                .single()
+                .then(({ data }) => {
+                    if (data) {
+                        setCurrentUserAllowedBoards(data.allowed_board_ids || []);
+                        setCurrentUserWorkspaceId(data.workspace_id || null);
+                    }
+                    setCheckingPermissions(false);
+                })
+                .catch(() => setCheckingPermissions(false));
+        } else {
+            setCheckingPermissions(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (checkingPermissions) return; // Wait for permissions
+
         refreshBoardsAndFolders();
         // Hot Reloading: Refresh every 30 seconds
         const interval = setInterval(() => {
             refreshBoardsAndFolders(true);
         }, 30000);
         return () => clearInterval(interval);
-    }, []);
+        return () => clearInterval(interval);
+    }, [stableAllowedBoards, currentUserWorkspaceId, checkingPermissions]); // Re-run when permissions load
+
+    // --- Background Prefetch ---
+    const [prefetchStarted, setPrefetchStarted] = useState(false);
+    useEffect(() => {
+        if (!checkingPermissions && boards.length > 0 && !prefetchStarted) {
+            setPrefetchStarted(true);
+            const boardIds = boards.map((b: any) => b.id);
+            prefetchBoardItems(boardIds).catch(err => console.error("Prefetch failed", err));
+        }
+    }, [boards, checkingPermissions, prefetchStarted]);
 
     // Effect to fetch public URL for preview if assetId is available
     useEffect(() => {
@@ -666,10 +913,67 @@ export default function AdminDashboard() {
                 getAllFolders(),
                 getAllWorkspaces()
             ]);
-            setBoards(boardsData || []);
-            setFolders(foldersData || []);
+            // Apply role-based board filtering
+            const rawBoards = boardsData || [];
+            // Map to flatten workspace_id and filter out subitems
+            const mappedBoards = rawBoards
+                .filter((b: any) => b.type !== 'sub_items_board' && !b.name.toLowerCase().includes('subitems'))
+                .map((b: any) => ({
+                    ...b,
+                    workspace_id: b.workspace?.id ? String(b.workspace.id) : null
+                }));
+
+            let filteredBoards = mappedBoards;
+
+            // 1. Strict Permission Check (Allowed Boards)
+            if (currentUserAllowedBoards.length > 0) {
+                filteredBoards = mappedBoards.filter((b: any) => currentUserAllowedBoards.includes(b.id));
+            }
+            // 2. Workspace Check (If no specific boards but assigned workspace)
+            else if (currentUserWorkspaceId) {
+                filteredBoards = mappedBoards.filter((b: any) => b.workspace_id === currentUserWorkspaceId);
+            }
+            // 3. Fallback Role-Based Text Matching (Legacy)
+            else if (currentUserRole === 'editor') {
+                filteredBoards = mappedBoards.filter((b: any) =>
+                    b.name?.toLowerCase().includes('workspace') ||
+                    b.name?.toLowerCase().includes('editor') ||
+                    b.name?.toLowerCase().includes('project')
+                );
+            } else if (currentUserRole === 'client') {
+                filteredBoards = mappedBoards.filter((b: any) =>
+                    b.name?.toLowerCase().includes('fulfillment') ||
+                    b.name?.toLowerCase().includes('client') ||
+                    b.name?.toLowerCase().includes('delivery')
+                );
+            }
+            setBoards(filteredBoards);
+
+            // Filter Folders as well
+            let filteredFolders = foldersData || [];
+            if (currentUserAllowedBoards.length > 0) {
+                // If specific boards allowed, show folders containing them? 
+                // Or just show workspace folders?
+                // Usually if board access is specific, we might hide folders unless they contain the board.
+                // For now, let's filter folders by workspace if workspace_id is present on the board?
+                // Harder. Let's start with Workspace filtering which is the main request.
+                const allowedWorkspaces = new Set(filteredBoards.map((b: any) => b.workspace_id).filter(Boolean));
+                filteredFolders = filteredFolders.filter((f: any) => f.workspace?.id && allowedWorkspaces.has(String(f.workspace.id)));
+            } else if (currentUserWorkspaceId) {
+                filteredFolders = filteredFolders.filter((f: any) => f.workspace?.id && String(f.workspace.id) === currentUserWorkspaceId);
+            }
+
+            setFolders(filteredFolders);
             setWorkspaces(workspacesData || []);
             setWorkspaces(workspacesData || []);
+
+            // Auto-select first board if none selected and boards exist
+            if (filteredBoards.length > 0 && !selectedBoardId) {
+                // Only auto-select if user has specific permissions or simply ALWAYS?
+                // User said "auto-load it everytime we click on board" (meaning Tab?)
+                // Yes, auto-select first board is good UX.
+                setSelectedBoardId(filteredBoards[0].id);
+            }
 
             // Do NOT auto-select workspace. Allow "Main Workspace" (null) or preserve user selection.
             /*
@@ -711,7 +1015,7 @@ export default function AdminDashboard() {
             // 3. Fetch Data
             const idsToFetch = [];
             if (fulfillmentBoard) idsToFetch.push(String(fulfillmentBoard.id));
-            editorBoardIds.forEach(id => idsToFetch.push(id)); // Keep fetching items just in case
+            editorBoardIds.forEach((id: string) => idsToFetch.push(id)); // Keep fetching items just in case
 
 
 
@@ -939,20 +1243,35 @@ export default function AdminDashboard() {
                         </div>
                         <div>
                             <h2 className="text-white font-bold text-sm tracking-tight">CreativeVision</h2>
-                            <div className="text-[9px] text-custom-bright font-bold uppercase tracking-widest">Admin Console</div>
+                            <div className="text-[9px] text-custom-bright font-bold uppercase tracking-widest">
+                                {currentUserRole === 'admin' ? 'Admin Console' : currentUserRole === 'editor' ? 'Editor Portal' : 'Client Portal'}
+                            </div>
                         </div>
                     </div>
 
                     <div className="flex-1 space-y-1">
                         <SidebarItem icon={<LayoutDashboard className="w-5 h-5" />} label="Overview" active={activeTab === 'Overview'} onClick={() => setActiveTab('Overview')} />
                         <SidebarItem icon={<AlignLeft className="w-5 h-5" />} label="Boards" active={activeTab === 'Boards'} onClick={() => setActiveTab('Boards')} />
-                        <SidebarItem icon={<Briefcase className="w-5 h-5" />} label="Projects" active={activeTab === 'Projects'} onClick={() => setActiveTab('Projects')} />
-                        <SidebarItem icon={<Activity className="w-5 h-5" />} label="Analytics" active={activeTab === 'Analytics'} onClick={() => setActiveTab('Analytics')} />
-                        <SidebarItem icon={<Users className="w-5 h-5" />} label="Team" active={activeTab === 'Team'} onClick={() => setActiveTab('Team')} />
-                        <SidebarItem icon={<Settings className="w-5 h-5" />} label="Settings" active={activeTab === 'Settings'} onClick={() => setActiveTab('Settings')} />
+                        {currentUserRole === 'admin' && (
+                            <>
+                                <SidebarItem icon={<Briefcase className="w-5 h-5" />} label="Projects" active={activeTab === 'Projects'} onClick={() => setActiveTab('Projects')} />
+                                <SidebarItem icon={<Activity className="w-5 h-5" />} label="Analytics" active={activeTab === 'Analytics'} onClick={() => setActiveTab('Analytics')} />
+                                <SidebarItem icon={<Users className="w-5 h-5" />} label="Team" active={activeTab === 'Team'} onClick={() => setActiveTab('Team')} />
+                                <SidebarItem icon={<UserPlus className="w-5 h-5" />} label="Users" active={activeTab === 'Users'} onClick={() => setActiveTab('Users')} />
+                                <SidebarItem icon={<Settings className="w-5 h-5" />} label="Settings" active={activeTab === 'Settings'} onClick={() => setActiveTab('Settings')} />
+                            </>
+                        )}
                     </div>
 
                     <div className="pt-6 border-t border-white/5">
+                        {currentUserName && (
+                            <div className="px-4 py-2 mb-2">
+                                <div className="text-white text-sm font-medium truncate">{currentUserName}</div>
+                                <div className={`text-xs capitalize ${currentUserRole === 'admin' ? 'text-purple-400' : currentUserRole === 'editor' ? 'text-blue-400' : 'text-green-400'}`}>
+                                    {currentUserRole}
+                                </div>
+                            </div>
+                        )}
                         <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-500/10 hover:text-red-400 text-gray-400 transition-colors group">
                             <LogOut className="w-5 h-5" />
                             <span className="text-sm font-medium">Log Out</span>
@@ -1160,6 +1479,397 @@ export default function AdminDashboard() {
                                 {/* End Real Data Section */}
                             </div>
                         )}
+
+                        {activeTab === 'Users' && (
+                            <div className="p-8 w-full max-w-7xl mx-auto">
+                                <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-gray-400 mb-10 tracking-tight">User Management</h1>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                                    {/* Left Column Wrapper (Form + Roles) - Wider */}
+                                    <div className="space-y-6 lg:col-span-8">
+                                        {/* Create User Form */}
+                                        <div className="bg-[#0A0A16] border border-white/10 rounded-2xl p-6">
+                                            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                                                {editingUserId ? <Pencil className="w-5 h-5 text-custom-bright" /> : <UserPlus className="w-5 h-5 text-custom-bright" />}
+                                                {editingUserId ? 'Edit User' : 'Create New User'}
+                                            </h2>
+
+                                            <form onSubmit={handleCreateUser} className="space-y-4">
+                                                {/* Role Selection */}
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Role</label>
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        {(['admin', 'editor', 'client'] as const).map(role => (
+                                                            <button
+                                                                key={role}
+                                                                type="button"
+                                                                onClick={() => setNewUserRole(role)}
+                                                                className={`py-2 rounded-lg text-sm font-bold capitalize transition-all ${newUserRole === role
+                                                                    ? 'bg-custom-bright text-white shadow-lg shadow-custom-bright/20'
+                                                                    : 'bg-white/5 text-gray-400 hover:bg-white/10 py-2 border border-transparent'
+                                                                    }`}
+                                                            >
+                                                                {role}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* Name Input */}
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Full Name</label>
+                                                    <input
+                                                        type="text"
+                                                        value={newUserName}
+                                                        onChange={(e) => setNewUserName(e.target.value)}
+                                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-custom-bright transition-colors"
+                                                        placeholder="e.g. John Doe"
+                                                    />
+                                                </div>
+
+                                                {/* Workspace Selection (For Editors/Clients) */}
+                                                {(newUserRole === 'editor' || newUserRole === 'client') && (
+                                                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Assigned Workspace</label>
+                                                        <div className="relative">
+                                                            <select
+                                                                value={selectedUserWorkspace}
+                                                                onChange={(e) => setSelectedUserWorkspace(e.target.value)}
+                                                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-custom-bright appearance-none cursor-pointer"
+                                                            >
+                                                                <option value="" className="bg-[#0A0A16] text-gray-400">Select a Workspace...</option>
+                                                                {workspaces.map(ws => (
+                                                                    <option key={ws.id} value={ws.id} className="bg-[#0A0A16]">{ws.name}</option>
+                                                                ))}
+                                                            </select>
+                                                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                                        </div>
+                                                        <p className="text-[10px] text-gray-500 mt-1">
+                                                            Associates this user with a specific Monday.com workspace
+                                                        </p>
+                                                    </div>
+                                                )}
+
+                                                {/* Board Selection (Dependent on Workspace) */}
+                                                {(selectedUserWorkspace && (newUserRole === 'editor' || newUserRole === 'client')) && (
+                                                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
+                                                            Allowed Boards <span className="text-gray-600 normal-case ml-1">(Optional - Select none for all)</span>
+                                                        </label>
+
+                                                        {/* Board Search Input */}
+                                                        <div className="relative mb-2">
+                                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-500" />
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Filter boards..."
+                                                                value={boardSearchQuery}
+                                                                onChange={(e) => setBoardSearchQuery(e.target.value)}
+                                                                className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-custom-bright transition-colors"
+                                                            />
+                                                        </div>
+
+                                                        <div className="bg-white/5 border border-white/10 rounded-xl p-2 max-h-48 overflow-y-auto custom-scrollbar">
+                                                            {boards.filter(b =>
+                                                                b.workspace_id === selectedUserWorkspace &&
+                                                                b.name.toLowerCase().includes(boardSearchQuery.toLowerCase()) &&
+                                                                (newUserRole === 'editor' ? b.name.toLowerCase().includes('workspace') : newUserRole === 'client' ? b.name.toLowerCase().includes('fulfillment') : true)
+                                                            ).length === 0 ? (
+                                                                <p className="text-sm text-gray-500 p-2">No boards found.</p>
+                                                            ) : (
+                                                                <div className="space-y-1">
+                                                                    {boards
+                                                                        .filter(b =>
+                                                                            b.workspace_id === selectedUserWorkspace &&
+                                                                            b.name.toLowerCase().includes(boardSearchQuery.toLowerCase()) &&
+                                                                            (newUserRole === 'editor' ? b.name.toLowerCase().includes('workspace') : newUserRole === 'client' ? b.name.toLowerCase().includes('fulfillment') : true)
+                                                                        )
+                                                                        .map(board => (
+                                                                            <label key={board.id} className="flex items-center gap-3 p-2 hover:bg-white/5 rounded-lg cursor-pointer transition-colors group">
+                                                                                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${selectedBoardIds.includes(board.id)
+                                                                                    ? 'bg-custom-bright border-custom-bright'
+                                                                                    : 'border-gray-600 group-hover:border-gray-400'
+                                                                                    }`}>
+                                                                                    {selectedBoardIds.includes(board.id) && <div className="w-2 h-2 bg-white rounded-sm" />}
+                                                                                </div>
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    className="hidden"
+                                                                                    checked={selectedBoardIds.includes(board.id)}
+                                                                                    onChange={(e) => {
+                                                                                        if (e.target.checked) {
+                                                                                            setSelectedBoardIds([...selectedBoardIds, board.id]);
+                                                                                        } else {
+                                                                                            setSelectedBoardIds(selectedBoardIds.filter(id => id !== board.id));
+                                                                                        }
+                                                                                    }}
+                                                                                />
+                                                                                <span className={`text-sm ${selectedBoardIds.includes(board.id) ? 'text-white' : 'text-gray-400'}`}>
+                                                                                    {board.name}
+                                                                                </span>
+                                                                            </label>
+                                                                        ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex justify-end mt-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const wsBoards = boards.filter(b => b.workspace_id === selectedUserWorkspace).map(b => b.id);
+                                                                    if (selectedBoardIds.length === wsBoards.length) {
+                                                                        setSelectedBoardIds([]);
+                                                                    } else {
+                                                                        setSelectedBoardIds(wsBoards);
+                                                                    }
+                                                                }}
+                                                                className="text-[10px] text-custom-bright hover:text-white transition-colors uppercase font-bold tracking-wider"
+                                                            >
+                                                                {boards.filter(b => b.workspace_id === selectedUserWorkspace).every(b => selectedBoardIds.includes(b.id)) && boards.filter(b => b.workspace_id === selectedUserWorkspace).length > 0
+                                                                    ? 'Deselect All'
+                                                                    : 'Select All'}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Auto-Generated Email */}
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Email (Auto-Generated)</label>
+                                                    <div className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-gray-400 font-mono text-sm flex items-center gap-2">
+                                                        <span className="truncate">{newUserEmail || 'Start typing name...'}</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Password Input */}
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Password {editingUserId && <span className="text-custom-bright normal-case ml-1">(Optional)</span>}</label>
+                                                    <div className="relative flex gap-2">
+                                                        <div className="relative flex-1">
+                                                            <input
+                                                                type={showPassword ? "text" : "password"}
+                                                                value={newUserPassword}
+                                                                onChange={(e) => setNewUserPassword(e.target.value)}
+                                                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-custom-bright transition-colors pr-10"
+                                                                placeholder="Enter password"
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setShowPassword(!showPassword)}
+                                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                                                            >
+                                                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                            </button>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={generatePassword}
+                                                            className="px-4 py-2 bg-custom-bright/10 border border-custom-bright/20 rounded-xl text-custom-bright hover:bg-custom-bright/20 transition-all flex items-center gap-2"
+                                                            title="Auto-generate secure password"
+                                                        >
+                                                            <Wand2 className="w-4 h-4" />
+                                                            <span className="text-xs font-bold hidden sm:inline">Generate</span>
+                                                        </button>
+                                                    </div>
+                                                    <p className="text-[10px] text-gray-500 mt-1">Min. 4 characters</p>
+                                                </div>
+
+                                                {/* Status Messages */}
+                                                {userError && (
+                                                    <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                                                        {userError}
+                                                    </div>
+                                                )}
+                                                {userSuccess && (
+                                                    <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm">
+                                                        {userSuccess}
+                                                    </div>
+                                                )}
+
+                                                <div className="flex gap-3">
+                                                    {editingUserId && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleCancelEdit}
+                                                            className="flex-1 py-3 rounded-xl bg-white/5 text-white font-bold hover:bg-white/10 transition-all border border-white/10"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        type="submit"
+                                                        disabled={isCreatingUser}
+                                                        className="flex-1 py-3 rounded-xl bg-custom-bright text-white font-bold hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-custom-bright/20"
+                                                    >
+                                                        {isCreatingUser
+                                                            ? (editingUserId ? 'Updating...' : 'Creating...')
+                                                            : (editingUserId ? 'Update User' : 'Create User')}
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </div>
+
+                                        {/* Role Permissions Info */}
+                                        <div className="bg-[#0A0A16]/50 border border-white/5 rounded-2xl p-6 backdrop-blur-sm">
+                                            <h3 className="font-bold text-white mb-4 text-sm uppercase tracking-wider opacity-80">Role Permissions</h3>
+                                            <div className="grid grid-cols-1 gap-3">
+                                                <div className="bg-white/5 rounded-xl p-3 border border-white/5 hover:border-white/10 transition-colors flex flex-col gap-1">
+                                                    <span className="self-start px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 text-[10px] font-bold uppercase">Admin</span>
+                                                    <span className="text-xs text-gray-400 leading-relaxed">Full access to all boards, settings, and user management.</span>
+                                                </div>
+                                                <div className="bg-white/5 rounded-xl p-3 border border-white/5 hover:border-white/10 transition-colors flex flex-col gap-1">
+                                                    <span className="self-start px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 text-[10px] font-bold uppercase">Editor</span>
+                                                    <span className="text-xs text-gray-400 leading-relaxed">Access to "Editor Portal". Sees only assigned workspace boards.</span>
+                                                </div>
+                                                <div className="bg-white/5 rounded-xl p-3 border border-white/5 hover:border-white/10 transition-colors flex flex-col gap-1">
+                                                    <span className="self-start px-2 py-0.5 rounded bg-green-500/20 text-green-400 text-[10px] font-bold uppercase">Client</span>
+                                                    <span className="text-xs text-gray-400 leading-relaxed">Access to "Client Portal". Sees only fulfillment deliverable boards.</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* User List Launcher (Right Column) */}
+                                    <div className="flex flex-col gap-6 lg:col-span-4">
+                                        {/* Launcher Card - Compact */}
+                                        <div className="relative overflow-hidden bg-gradient-to-b from-[#0A0A16] to-[#0F0F1A] border border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center text-center hover:border-custom-bright/30 transition-all group cursor-pointer shadow-2xl shadow-black/50"
+                                            onClick={() => setIsUserListOpen(true)}>
+
+                                            {/* Glow Effect */}
+                                            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                                            <div className="absolute inset-0 bg-gradient-to-b from-custom-bright/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                                            <div className="relative z-10 w-16 h-16 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 shadow-xl group-hover:shadow-custom-bright/20 ring-1 ring-white/5 group-hover:ring-custom-bright/40">
+                                                <Users className="w-8 h-8 text-gray-400 group-hover:text-white transition-colors" />
+                                            </div>
+
+                                            <h2 className="relative z-10 text-2xl font-bold text-white mb-2">User Directory</h2>
+                                            <p className="relative z-10 text-gray-400 mb-8 max-w-[200px] text-xs leading-relaxed">
+                                                Manage all registered users in a centralized table view.
+                                            </p>
+
+                                            <button
+                                                className="relative z-10 w-full py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 group-hover:bg-custom-bright group-hover:shadow-lg group-hover:shadow-custom-bright/30 border border-white/10 group-hover:border-custom-bright/50"
+                                            >
+                                                <Table className="w-4 h-4" />
+                                                Open Directory
+                                            </button>
+
+                                            <div className="relative z-10 mt-6 flex items-center gap-2 text-[10px] font-mono text-gray-500 bg-black/20 px-3 py-1 rounded-full border border-white/5">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                                                {userList.length} Active Users
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* User List Modal */}
+                                <AnimatePresence>
+                                    {isUserListOpen && (
+                                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8">
+                                            <motion.div
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                exit={{ opacity: 0 }}
+                                                onClick={() => setIsUserListOpen(false)}
+                                                className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                                            />
+                                            <motion.div
+                                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                                                className="bg-[#0A0A16] border border-white/10 rounded-2xl shadow-2xl w-full max-w-6xl max-h-full flex flex-col relative z-10 overflow-hidden"
+                                            >
+                                                {/* Modal Header */}
+                                                <div className="p-6 border-b border-white/10 flex items-center justify-between bg-[#0A0A16]">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="p-2 rounded-lg bg-custom-bright/20">
+                                                            <Users className="w-6 h-6 text-custom-bright" />
+                                                        </div>
+                                                        <div>
+                                                            <h2 className="text-xl font-bold text-white">User Directory</h2>
+                                                            <p className="text-sm text-gray-400">{userList.length} active users</p>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => setIsUserListOpen(false)}
+                                                        className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors"
+                                                    >
+                                                        <X className="w-6 h-6" />
+                                                    </button>
+                                                </div>
+
+                                                {/* Modal Content (Table) */}
+                                                <div className="flex-1 overflow-auto p-6 bg-[#080816]">
+                                                    <div className="bg-[#0A0A16] border border-white/5 rounded-xl overflow-hidden">
+                                                        <table className="w-full text-left border-collapse relative">
+                                                            <thead className="sticky top-0 bg-[#0A0A16] z-10 shadow-sm shadow-black/50">
+                                                                <tr className="border-b border-white/5 bg-white/5">
+                                                                    <th className="p-4 text-xs font-bold text-gray-400 uppercase whitespace-nowrap">Name</th>
+                                                                    <th className="p-4 text-xs font-bold text-gray-400 uppercase whitespace-nowrap">Role</th>
+                                                                    <th className="p-4 text-xs font-bold text-gray-400 uppercase whitespace-nowrap">Workspace</th>
+                                                                    <th className="p-4 text-xs font-bold text-gray-400 uppercase text-right">Actions</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-white/5">
+                                                                {userListLoading ? (
+                                                                    <tr><td colSpan={4} className="p-8 text-center text-gray-500">Loading users...</td></tr>
+                                                                ) : userList.length === 0 ? (
+                                                                    <tr><td colSpan={4} className="p-8 text-center text-gray-500">No users found</td></tr>
+                                                                ) : (
+                                                                    userList.map(user => (
+                                                                        <tr key={user.id} className="hover:bg-white/5 transition-colors group">
+                                                                            <td className="p-4">
+                                                                                <div className="text-sm text-white font-medium">{user.name}</div>
+                                                                                <div className="text-xs text-gray-500 font-mono mt-0.5">{user.email}</div>
+                                                                            </td>
+                                                                            <td className="p-4">
+                                                                                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${user.role === 'admin' ? 'bg-purple-500/20 text-purple-400' :
+                                                                                    user.role === 'editor' ? 'bg-blue-500/20 text-blue-400' :
+                                                                                        'bg-green-500/20 text-green-400'
+                                                                                    }`}>
+                                                                                    {user.role}
+                                                                                </span>
+                                                                            </td>
+                                                                            <td className="p-4 text-xs text-gray-400">
+                                                                                {user.workspace_id ? (
+                                                                                    workspaces.find(w => w.id.toString() === user.workspace_id)?.name || 'Unknown WS'
+                                                                                ) : (
+                                                                                    <span className="text-gray-600">-</span>
+                                                                                )}
+                                                                            </td>
+                                                                            <td className="p-4 text-right">
+                                                                                <div className="flex items-center justify-end gap-1">
+                                                                                    <button
+                                                                                        onClick={() => handleEditUser(user)}
+                                                                                        className="p-1.5 hover:bg-blue-500/20 rounded-lg text-gray-500 hover:text-blue-400 transition-colors"
+                                                                                        title="Edit User"
+                                                                                    >
+                                                                                        <Pencil className="w-3.5 h-3.5" />
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => handleDeleteUser(user.id, user.name)}
+                                                                                        className="p-1.5 hover:bg-red-500/20 rounded-lg text-gray-500 hover:text-red-400 transition-colors"
+                                                                                        title="Delete User"
+                                                                                    >
+                                                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                                                    </button>
+                                                                                </div>
+                                                                            </td>
+                                                                        </tr>
+                                                                    ))
+                                                                )}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        </div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        )}
+
 
                         {activeTab === 'Boards' && (
                             <>

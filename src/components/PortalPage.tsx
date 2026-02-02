@@ -6,6 +6,7 @@ import { MagneticButton } from './ui/MagneticButton';
 import { SpotlightCard } from './ui/SpotlightCard';
 import { ArrowLeft, Lock, ShieldCheck, Wifi } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { loginUser } from '../services/boardsService';
 
 const FloatingWidget = ({ className, children, delay = 0 }: { className?: string, children: React.ReactNode, delay?: number }) => (
     <motion.div
@@ -22,14 +23,42 @@ export default function PortalPage() {
     const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        console.log("Portal Login:", email);
-        // Simulate login delay then navigate
+        setError(null);
+        setIsLoading(true);
+
+        const result = await loginUser(email.toLowerCase(), password);
+
+        if (!result.success || !result.user) {
+            setError(result.error || 'Invalid email or password');
+            setIsLoading(false);
+            return;
+        }
+
+        // Store user info for role-based filtering
+        localStorage.setItem('portal_user_email', result.user.email);
+        localStorage.setItem('portal_user_role', result.user.role);
+        localStorage.setItem('portal_user_name', result.user.name);
+        if (result.user.workspace_id) {
+            localStorage.setItem('portal_user_workspace', result.user.workspace_id);
+        } else {
+            localStorage.removeItem('portal_user_workspace');
+        }
+
+        // Redirect based on role
         setTimeout(() => {
-            navigate('/admin-dashboard');
-        }, 800);
+            if (result.user!.role === 'admin') {
+                navigate('/admin-dashboard');
+            } else if (result.user!.role === 'editor') {
+                navigate('/admin-dashboard'); // Editors also go to dashboard but with limited boards
+            } else {
+                navigate('/admin-dashboard'); // Clients see only their boards
+            }
+        }, 500);
     };
 
     return (
@@ -74,6 +103,12 @@ export default function PortalPage() {
                                 <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">Authenticate</h1>
                                 <p className="text-gray-400 text-sm mb-8">Access restricted internal systems.</p>
 
+                                {error && (
+                                    <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
+                                        {error}
+                                    </div>
+                                )}
+
                                 <form onSubmit={handleLogin} className="space-y-4">
                                     <div className="space-y-1">
                                         <div className="group relative">
@@ -81,10 +116,9 @@ export default function PortalPage() {
                                                 type="email"
                                                 value={email}
                                                 onChange={(e) => setEmail(e.target.value)}
-                                                onFocus={() => setIsFocused(true)}
-                                                onBlur={() => setIsFocused(false)}
                                                 placeholder="Employee ID"
                                                 className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white placeholder-gray-500 focus:outline-none focus:border-custom-bright/50 focus:bg-white/10 transition-all font-medium text-sm"
+                                                disabled={isLoading}
                                             />
                                         </div>
                                     </div>
@@ -95,10 +129,9 @@ export default function PortalPage() {
                                                 type="password"
                                                 value={password}
                                                 onChange={(e) => setPassword(e.target.value)}
-                                                onFocus={() => setIsFocused(true)}
-                                                onBlur={() => setIsFocused(false)}
                                                 placeholder="Secure Passkey"
                                                 className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white placeholder-gray-500 focus:outline-none focus:border-custom-bright/50 focus:bg-white/10 transition-all font-medium text-sm"
+                                                disabled={isLoading}
                                             />
                                         </div>
                                     </div>
@@ -107,9 +140,10 @@ export default function PortalPage() {
                                         <MagneticButton className="w-full">
                                             <button
                                                 type="submit"
-                                                className="w-full py-4 bg-gradient-to-r from-custom-blue via-custom-purple to-custom-violet text-white text-sm font-bold tracking-widest uppercase rounded-2xl hover:brightness-110 transition-all shadow-lg shadow-custom-violet/20"
+                                                disabled={isLoading}
+                                                className="w-full py-4 bg-gradient-to-r from-custom-blue via-custom-purple to-custom-violet text-white text-sm font-bold tracking-widest uppercase rounded-2xl hover:brightness-110 transition-all shadow-lg shadow-custom-violet/20 disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
-                                                Enter Portal
+                                                {isLoading ? 'Authenticating...' : 'Enter Portal'}
                                             </button>
                                         </MagneticButton>
                                     </div>

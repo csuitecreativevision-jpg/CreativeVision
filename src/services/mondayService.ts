@@ -1,5 +1,6 @@
 const MONDAY_API_URL = "https://api.monday.com/v2";
 const MONDAY_API_TOKEN = import.meta.env.VITE_MONDAY_API_TOKEN;
+import { supabase } from '../lib/supabaseClient';
 
 export interface ApplicationData {
     fullName: string;
@@ -47,6 +48,41 @@ async function mondayRequest(query: string, variables?: any) {
         console.error("Monday API Request Failed:", error);
         throw error;
     }
+}
+
+
+// --- Caching Helper ---
+const CACHE_TTL_MS = 1000 * 60 * 5; // 5 Minutes
+
+async function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>, meta: boolean = true, forceSync: boolean = false): Promise<T> {
+    const table = meta ? 'cache_monday_meta' : 'cache_monday_board_items';
+    const idColumn = meta ? 'key' : 'board_id';
+
+    try {
+        // Try Cache
+        const { data } = await supabase.from(table).select('data, updated_at').eq(idColumn, key).maybeSingle();
+        if (data?.data) {
+            // Check TTL
+            const age = Date.now() - new Date(data.updated_at).getTime();
+            const isStale = age > CACHE_TTL_MS;
+
+            if (isStale || forceSync) {
+                // Background Sync
+                fetcher().then(freshData => {
+                    supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
+                }).catch(err => console.error("Background sync failed", err));
+            }
+            return data.data;
+        }
+    } catch (e) {
+        // Continue to fetch if cache fails
+    }
+
+    // Cache Miss -> Fetch & Wait
+    const freshData = await fetcher();
+    // Update Cache
+    supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
+    return freshData;
 }
 
 async function getOrCreateBoard(): Promise<string> {
@@ -289,7 +325,8 @@ export async function submitApplicationToMonday(data: ApplicationData) {
 // --- New Dashboard Integration Functions ---
 
 export async function getAllBoards() {
-    const query = `query {
+    return getCachedOrFetch('all_boards', async () => {
+        const query = `query {
         boards (limit: 500) {
             id
             name
@@ -300,12 +337,14 @@ export async function getAllBoards() {
             }
         }
     }`;
-    const data = await mondayRequest(query);
-    return data.boards;
+        const data = await mondayRequest(query);
+        return data.boards;
+    }, true);
 }
 
 export async function getAllFolders() {
-    const query = `query {
+    return getCachedOrFetch('all_folders', async () => {
+        const query = `query {
         folders (limit: 100) {
             id
             name
@@ -318,24 +357,28 @@ export async function getAllFolders() {
             }
         }
     }`;
-    const data = await mondayRequest(query);
-    return data.folders;
+        const data = await mondayRequest(query);
+        return data.folders;
+    }, true);
 }
 
 export async function getAllWorkspaces() {
-    const query = `query {
+    return getCachedOrFetch('all_workspaces', async () => {
+        const query = `query {
         workspaces {
             id
             name
             kind
         }
     }`;
-    const data = await mondayRequest(query);
-    return data.workspaces;
+        const data = await mondayRequest(query);
+        return data.workspaces;
+    }, true);
 }
 
 export async function getBoardItems(boardId: string) {
-    const query = `query {
+    return getCachedOrFetch(boardId, async () => {
+        const query = `query {
         boards (ids: [${boardId}]) {
             name
             columns {
@@ -370,13 +413,14 @@ export async function getBoardItems(boardId: string) {
             }
         }
     }`;
-    const data = await mondayRequest(query);
-    const board = data.boards[0];
-    // Flatten items structure for easier consumption
-    if (board && board.items_page) {
-        board.items = board.items_page.items;
-    }
-    return board;
+        const data = await mondayRequest(query);
+        const board = data.boards[0];
+        // Flatten items structure for easier consumption
+        if (board && board.items_page) {
+            board.items = board.items_page.items;
+        }
+        return board;
+    }, false); // meta=false -> cache_monday_board_items
 }
 
 export async function createNewBoard(name: string) {
@@ -514,3 +558,19 @@ export async function getAssetPublicUrl(assetId: string) {
     const data = await mondayRequest(query);
     return data.assets[0]?.public_url;
 }
+
+export async function prefetchBoardItems(boardIds: string[]) {
+    if (!boardIds || boardIds.length === 0) return;
+
+    // Process in chunks of 5 parallel requests to avoid overwhelming the network/API
+    const CHUNK_SIZE = 5;
+    for (let i = 0; i < boardIds.length; i += CHUNK_SIZE) {
+        const chunk = boardIds.slice(i, i + CHUNK_SIZE);
+        // Call getBoardItems for each ID. This triggers the getCachedOrFetch logic.
+        // We use Promise.all to run them in parallel.
+        await Promise.all(chunk.map(id => getBoardItems(id).catch(err => console.error('Prefetch failed for ' + id, err))));
+        // Tiny delay to be nice to CPU?
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+}
+
