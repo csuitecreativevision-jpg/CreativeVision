@@ -10,7 +10,10 @@ import JoinPage from './components/JoinPage';
 import ThankYouPage from './components/ThankYouPage';
 import PortalPage from './components/PortalPage';
 
-import AdminDashboard from './components/AdminDashboard';
+import AdminPortal from './components/AdminPortal';
+import EditorPortal from './components/EditorPortal';
+import ClientPortal from './components/ClientPortal';
+import PortalRouter from './components/PortalRouter';
 import StartProjectPage from './components/StartProjectPage';
 
 export default function App() {
@@ -73,7 +76,10 @@ export default function App() {
         }} />} />
         <Route path="/thank-you" element={<ThankYouPage onBack={handleBack} />} />
         <Route path="/portal" element={<PortalPage />} />
-        <Route path="/admin-dashboard" element={<AdminDashboard />} />
+        <Route path="/admin-dashboard" element={<PortalRouter />} />
+        <Route path="/admin-portal" element={<AdminPortal />} />
+        <Route path="/editor-portal" element={<EditorPortal />} />
+        <Route path="/client-portal" element={<ClientPortal />} />
       </Routes>
     </BackgroundLayout>
   );

@@ -52,11 +52,11 @@ export default function PortalPage() {
         // Redirect based on role
         setTimeout(() => {
             if (result.user!.role === 'admin') {
-                navigate('/admin-dashboard');
+                navigate('/admin-portal');
             } else if (result.user!.role === 'editor') {
-                navigate('/admin-dashboard'); // Editors also go to dashboard but with limited boards
+                navigate('/editor-portal');
             } else {
-                navigate('/admin-dashboard'); // Clients see only their boards
+                navigate('/client-portal');
             }
         }, 500);
     };
