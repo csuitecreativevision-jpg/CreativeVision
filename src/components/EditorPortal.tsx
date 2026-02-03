@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { BackgroundLayout } from './layout/BackgroundLayout';
 import { CinematicOverlay } from './ui/CinematicOverlay';
 import { SpotlightCard } from './ui/SpotlightCard';
+import { FilePreviewer } from './ui/FilePreviewModal';
 import {
     LayoutDashboard,
     Users,
@@ -186,86 +187,6 @@ const FolderTreeItem = ({ folder, allFolders, allBoards, onSelectBoard, selected
     );
 };
 
-// --- File Preview Component ---
-const FilePreviewer = ({ url, name, isLoading }: { url: string, name: string, isLoading?: boolean }) => {
-    const [error, setError] = useState(false);
-
-    // Show loading state while fetching authorized URL
-    if (isLoading) {
-        return (
-            <div className="text-center text-gray-400">
-                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-white/5 flex items-center justify-center">
-                    <Loader2 className="w-10 h-10 text-blue-400 animate-spin" />
-                </div>
-                <p className="text-lg font-medium text-white mb-2">Fetching Video...</p>
-                <p className="text-sm max-w-xs mx-auto opacity-70">
-                    Requesting authorized access from Monday.com
-                </p>
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div className="text-center text-gray-400">
-                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-white/5 flex items-center justify-center">
-                    <AlertCircle className="w-10 h-10 opacity-50 text-red-400" />
-                </div>
-                <p className="text-lg font-medium text-white mb-2">Preview Unavailable</p>
-                <p className="text-sm max-w-xs mx-auto mb-6 opacity-70">
-                    Unable to play this file in the browser ({(url.split('?')[0].split('.').pop() || 'file').toLowerCase()}).
-                </p>
-                <a
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-6 py-2 bg-blue-500 hover:brightness-110 rounded-lg text-white text-sm font-bold transition-all shadow-lg shadow-blue-500/20"
-                >
-                    <Download className="w-4 h-4" /> Open / Download
-                </a>
-            </div>
-        );
-    }
-
-    if (url.match(/\.(jpeg|jpg|gif|png|webp|svg)(\?|$)/i)) {
-        return <img src={url} onError={() => setError(true)} className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" alt={name || "Preview"} />;
-    }
-    if (url.match(/\.(mp4|webm|ogg|mov)(\?|$)/i)) {
-        // Note: crossOrigin removed to avoid CORS issues with S3 signed URLs
-        // preload="auto" loads the video before playing for smoother UX
-        return (
-            <video
-                src={url}
-                controls
-                preload="auto"
-                playsInline
-                onError={(e) => {
-                    console.error('[VideoPlayer] Video failed to load:', e.currentTarget.error, url);
-                    setError(true);
-                }}
-                className="max-w-full max-h-full rounded-lg shadow-2xl outline-none"
-            />
-        );
-    }
-    if (url.match(/\.pdf(\?|$)/i)) {
-        return <iframe src={url} className="w-full h-full rounded-lg shadow-2xl bg-white" title="PDF Preview" onError={() => setError(true)} />;
-    }
-
-    // Default Fallback
-    return (
-        <div className="text-center text-gray-400">
-            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-white/5 flex items-center justify-center">
-                <FileText className="w-10 h-10 opacity-50" />
-            </div>
-            <p className="text-lg font-medium text-white mb-2">No Preview Available</p>
-            <p className="text-sm mb-6">Please download the file to view it.</p>
-            <a href={url} download target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white text-sm transition-colors">
-                <Download className="w-4 h-4" /> Download
-            </a>
-        </div>
-    );
-};
-
 // --- Board Cell Component ---
 const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, column: any, boardId: string | null, onUpdate: () => void, onPreview: (url: string, name: string, assetId?: string) => void }) => {
     const [isEditing, setIsEditing] = useState(false);
@@ -333,15 +254,6 @@ const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, 
         }
     }
 
-    // Fallback: Extract assetId from protected_static URL pattern if not already captured
-    // URL format: /protected_static/{account}/resources/{assetId}/filename
-    if (!assetId && linkUrl && linkUrl.includes('protected_static') && linkUrl.includes('/resources/')) {
-        const match = linkUrl.match(/\/resources\/(\d+)\//);
-        if (match && match[1]) {
-            assetId = match[1];
-        }
-    }
-
     // Special handling if displayValue (text) is actually a raw URL for files (User Screenshot Case)
     // OR if it's just a filename that we want to treat as a file (Universal Playback Request)
     const isFileLike = /\.(mp4|mov|webm|ogg|pdf|jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(displayValue);
@@ -364,6 +276,16 @@ const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, 
         }
     }
     if (fileName) displayValue = fileName; // Override ugly URL text with filename
+
+    // Fallback: Extract assetId from protected_static URL pattern if not already captured
+    // URL format: /protected_static/{account}/resources/{assetId}/filename
+    // IMPORTANT: This must run AFTER linkUrl is set from displayValue (above)
+    if (!assetId && linkUrl && linkUrl.includes('protected_static') && linkUrl.includes('/resources/')) {
+        const match = linkUrl.match(/\/resources\/(\d+)\//);
+        if (match && match[1]) {
+            assetId = match[1];
+        }
+    }
 
 
     // Parse column settings for Status/Dropdown

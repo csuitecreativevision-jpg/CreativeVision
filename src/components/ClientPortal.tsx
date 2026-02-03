@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BackgroundLayout } from './layout/BackgroundLayout';
 import { CinematicOverlay } from './ui/CinematicOverlay';
 import { SpotlightCard } from './ui/SpotlightCard';
+import { FilePreviewer } from './ui/FilePreviewModal';
 import {
     Loader2,
     Eye,
@@ -179,86 +180,6 @@ const FolderTreeItem = ({ folder, allFolders, allBoards, onSelectBoard, selected
                     </motion.div>
                 )}
             </AnimatePresence>
-        </div>
-    );
-};
-
-// --- File Preview Component ---
-const FilePreviewer = ({ url, name, isLoading }: { url: string, name: string, isLoading?: boolean }) => {
-    const [error, setError] = useState(false);
-
-    // Show loading state while fetching authorized URL
-    if (isLoading) {
-        return (
-            <div className="text-center text-gray-400">
-                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-white/5 flex items-center justify-center">
-                    <Loader2 className="w-10 h-10 text-emerald-400 animate-spin" />
-                </div>
-                <p className="text-lg font-medium text-white mb-2">Fetching Video...</p>
-                <p className="text-sm max-w-xs mx-auto opacity-70">
-                    Requesting authorized access from Monday.com
-                </p>
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div className="text-center text-gray-400">
-                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-white/5 flex items-center justify-center">
-                    <AlertCircle className="w-10 h-10 opacity-50 text-red-400" />
-                </div>
-                <p className="text-lg font-medium text-white mb-2">Preview Unavailable</p>
-                <p className="text-sm max-w-xs mx-auto mb-6 opacity-70">
-                    Unable to play this file in the browser ({(url.split('?')[0].split('.').pop() || 'file').toLowerCase()}).
-                </p>
-                <a
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-6 py-2 bg-emerald-500 hover:brightness-110 rounded-lg text-white text-sm font-bold transition-all shadow-lg shadow-emerald-500/20"
-                >
-                    <Download className="w-4 h-4" /> Open / Download
-                </a>
-            </div>
-        );
-    }
-
-    if (url.match(/\.(jpeg|jpg|gif|png|webp|svg)(\?|$)/i)) {
-        return <img src={url} onError={() => setError(true)} className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" alt={name || "Preview"} />;
-    }
-    if (url.match(/\.(mp4|webm|ogg|mov)(\?|$)/i)) {
-        // Note: crossOrigin removed to avoid CORS issues with S3 signed URLs
-        // preload="auto" loads the video before playing, removing autoPlay for smoother UX
-        return (
-            <video
-                src={url}
-                controls
-                preload="auto"
-                playsInline
-                onError={(e) => {
-                    console.error('[VideoPlayer] Video failed to load:', e.currentTarget.error, url);
-                    setError(true);
-                }}
-                className="max-w-full max-h-full rounded-lg shadow-2xl outline-none"
-            />
-        );
-    }
-    if (url.match(/\.pdf(\?|$)/i)) {
-        return <iframe src={url} className="w-full h-full rounded-lg shadow-2xl bg-white" title="PDF Preview" onError={() => setError(true)} />;
-    }
-
-    // Default Fallback
-    return (
-        <div className="text-center text-gray-400">
-            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-white/5 flex items-center justify-center">
-                <FileText className="w-10 h-10 opacity-50" />
-            </div>
-            <p className="text-lg font-medium text-white mb-2">No Preview Available</p>
-            <p className="text-sm mb-6">Please download the file to view it.</p>
-            <a href={url} download target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white text-sm transition-colors">
-                <Download className="w-4 h-4" /> Download
-            </a>
         </div>
     );
 };
@@ -770,16 +691,41 @@ export default function ClientPortal() {
     }, [boards, checkingPermissions, prefetchStarted]);
 
     // Effect to fetch public URL for preview if assetId is available
+    // Using a ref to track fetching state to prevent duplicate requests
+    const fetchingRef = useRef<string | null>(null);
+    const urlCacheRef = useRef<Map<string, string>>(new Map());
+
     useEffect(() => {
-        if (previewFile?.assetId && previewFile.url && !previewFile.url.includes('public_url_fetched')) {
+        if (previewFile?.assetId && previewFile.url) {
+            const assetId = previewFile.assetId;
+
+            // Check if we have a cached URL for this assetId
+            const cachedUrl = urlCacheRef.current.get(assetId);
+            if (cachedUrl) {
+                setPreviewFile(prev => prev ? { ...prev, url: cachedUrl, assetId: undefined } : null);
+                return;
+            }
+
+            // Check if we're already fetching this assetId
+            if (fetchingRef.current === assetId) {
+                return; // Already fetching, don't duplicate
+            }
+
+            fetchingRef.current = assetId;
+
             const fetchPublicUrl = async () => {
                 try {
-                    const publicUrl = await getAssetPublicUrl(previewFile.assetId!);
+                    // Get the authorized public URL from Monday.com API
+                    const publicUrl = await getAssetPublicUrl(assetId);
                     if (publicUrl) {
+                        // Cache and use the URL directly
+                        urlCacheRef.current.set(assetId, publicUrl);
                         setPreviewFile(prev => prev ? { ...prev, url: publicUrl, assetId: undefined } : null);
                     }
                 } catch (err) {
                     console.error("Failed to fetch public URL", err);
+                } finally {
+                    fetchingRef.current = null;
                 }
             };
             fetchPublicUrl();
