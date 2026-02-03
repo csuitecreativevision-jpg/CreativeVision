@@ -86,12 +86,34 @@ interface FilePreviewerProps {
     isLoading?: boolean;
 }
 
+// Helper to detect Monday.com WorkDocs
+const isMondayWorkDoc = (url: string): boolean => {
+    return url.includes('monday.com') && (url.includes('/docs/') || url.includes('object_id'));
+};
+
+// Helper to get file extension from URL or name
+const getFileExtension = (url: string, name: string): string => {
+    // First try to get from name
+    if (name) {
+        const nameParts = name.split('.');
+        if (nameParts.length > 1) {
+            return nameParts.pop()?.toLowerCase() || '';
+        }
+    }
+    // Fall back to URL (without query params)
+    const urlWithoutParams = url.split('?')[0];
+    const urlParts = urlWithoutParams.split('.');
+    return urlParts.length > 1 ? (urlParts.pop()?.toLowerCase() || '') : '';
+};
+
 export const FilePreviewer = ({ url, name, isLoading }: FilePreviewerProps) => {
     const [error, setError] = useState(false);
+    const [iframeLoading, setIframeLoading] = useState(true);
 
     // Reset error when URL changes
     useEffect(() => {
         setError(false);
+        setIframeLoading(true);
     }, [url]);
 
     // Show loading state while fetching authorized URL
@@ -117,7 +139,7 @@ export const FilePreviewer = ({ url, name, isLoading }: FilePreviewerProps) => {
                 </div>
                 <p className="text-lg font-medium text-white mb-2">Preview Unavailable</p>
                 <p className="text-sm max-w-xs mx-auto mb-6 opacity-70">
-                    Unable to play this file in the browser ({(url.split('?')[0].split('.').pop() || 'file').toLowerCase()}).
+                    Unable to preview this file in the browser ({getFileExtension(url, name) || 'file'}).
                 </p>
                 <a
                     href={url}
@@ -131,13 +153,40 @@ export const FilePreviewer = ({ url, name, isLoading }: FilePreviewerProps) => {
         );
     }
 
+    const ext = getFileExtension(url, name);
+
+    // Monday.com WorkDocs - open in iframe or new tab
+    if (isMondayWorkDoc(url)) {
+        return (
+            <div className="w-full h-full flex flex-col items-center justify-center gap-6">
+                <div className="w-24 h-24 mx-auto rounded-2xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center border border-white/10">
+                    <FileText className="w-12 h-12 text-purple-400" />
+                </div>
+                <div className="text-center">
+                    <p className="text-xl font-semibold text-white mb-2">{name || 'Monday WorkDoc'}</p>
+                    <p className="text-sm text-gray-400 mb-6">
+                        This is a Monday.com document that opens in a new tab.
+                    </p>
+                </div>
+                <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-purple-500 to-blue-500 hover:brightness-110 rounded-xl text-white font-bold transition-all shadow-lg shadow-purple-500/30"
+                >
+                    <FileText className="w-5 h-5" /> Open in Monday.com
+                </a>
+            </div>
+        );
+    }
+
     // Image preview
-    if (url.match(/\.(jpeg|jpg|gif|png|webp|svg)(\?|$)/i)) {
+    if (['jpeg', 'jpg', 'gif', 'png', 'webp', 'svg', 'bmp', 'ico'].includes(ext)) {
         return <img src={url} onError={() => setError(true)} className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" alt={name || "Preview"} />;
     }
 
     // Video preview
-    if (url.match(/\.(mp4|webm|ogg|mov)(\?|$)/i)) {
+    if (['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(ext)) {
         return (
             <video
                 src={url}
@@ -155,9 +204,77 @@ export const FilePreviewer = ({ url, name, isLoading }: FilePreviewerProps) => {
         );
     }
 
+    // Audio preview
+    if (['mp3', 'wav', 'ogg', 'aac', 'm4a', 'flac'].includes(ext)) {
+        return (
+            <div className="flex flex-col items-center gap-6 p-8">
+                <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center border border-white/10">
+                    <FileText className="w-16 h-16 text-emerald-400" />
+                </div>
+                <p className="text-lg font-medium text-white">{name || 'Audio File'}</p>
+                <audio
+                    src={url}
+                    controls
+                    autoPlay
+                    onError={() => setError(true)}
+                    className="w-full max-w-md"
+                />
+            </div>
+        );
+    }
+
     // PDF preview
-    if (url.match(/\.pdf(\?|$)/i)) {
-        return <iframe src={url} className="w-full h-full rounded-lg shadow-2xl bg-white" title="PDF Preview" onError={() => setError(true)} />;
+    if (ext === 'pdf') {
+        return (
+            <div className="w-full h-full relative">
+                {iframeLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                        <Loader2 className="w-10 h-10 text-emerald-400 animate-spin" />
+                    </div>
+                )}
+                <iframe
+                    src={url}
+                    className="w-full h-full rounded-lg shadow-2xl bg-white"
+                    title="PDF Preview"
+                    onLoad={() => setIframeLoading(false)}
+                    onError={() => setError(true)}
+                />
+            </div>
+        );
+    }
+
+    // Office documents (Word, Excel, PowerPoint) - use Microsoft Office viewer
+    if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) {
+        // Microsoft Office Online viewer requires a publicly accessible URL
+        const officeViewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`;
+        return (
+            <div className="w-full h-full relative">
+                {iframeLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                        <Loader2 className="w-10 h-10 text-emerald-400 animate-spin" />
+                    </div>
+                )}
+                <iframe
+                    src={officeViewerUrl}
+                    className="w-full h-full rounded-lg shadow-2xl bg-white"
+                    title="Document Preview"
+                    onLoad={() => setIframeLoading(false)}
+                    onError={() => setError(true)}
+                />
+            </div>
+        );
+    }
+
+    // Text files
+    if (['txt', 'md', 'json', 'xml', 'csv', 'log'].includes(ext)) {
+        return (
+            <iframe
+                src={url}
+                className="w-full h-full rounded-lg shadow-2xl bg-slate-800 text-white"
+                title="Text Preview"
+                onError={() => setError(true)}
+            />
+        );
     }
 
     // Default fallback
@@ -168,7 +285,7 @@ export const FilePreviewer = ({ url, name, isLoading }: FilePreviewerProps) => {
             </div>
             <p className="text-lg font-medium text-white mb-2">{name || "File Preview"}</p>
             <p className="text-sm max-w-xs mx-auto mb-6 opacity-70">
-                This file type cannot be previewed in the browser.
+                This file type ({ext || 'unknown'}) cannot be previewed in the browser.
             </p>
             <a
                 href={url}

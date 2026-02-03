@@ -1,28 +1,20 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BackgroundLayout } from './layout/BackgroundLayout';
 import { CinematicOverlay } from './ui/CinematicOverlay';
 import { SpotlightCard } from './ui/SpotlightCard';
 import { FilePreviewer } from './ui/FilePreviewModal';
 import {
-    LayoutDashboard,
-    Users,
-    Activity,
-    Search,
-    Menu,
-    TrendingUp,
-    Eye,
-    Briefcase,
-    LogOut,
-    AlignLeft,
-    Table,
     Loader2,
+    Eye,
     X,
+    LayoutDashboard,
+    TrendingUp,
+    Briefcase,
+    Table,
     ChevronDown,
-    MoreHorizontal,
     FileText,
     Download,
-    AlertCircle,
     LayoutGrid,
     Clock,
     PlayCircle
@@ -35,6 +27,7 @@ import {
     prefetchBoardItems
 } from '../services/mondayService';
 import { supabase } from '../services/boardsService';
+import { useVisibilityPolling } from '../hooks/useMondayData';
 // User management Removed
 
 // --- Helpers ---
@@ -165,17 +158,17 @@ const FolderTreeItem = ({ folder, allFolders, allBoards, onSelectBoard, selected
                                     onClick={() => onSelectBoard(board.id)}
                                     className={`flex items-center gap-2.5 px-3 py-1.5 mx-2 rounded-lg cursor-pointer transition-all mb-0.5 relative group/item
                                         ${isSelected
-                                            ? 'bg-blue-500/10 text-white font-semibold'
+                                            ? 'bg-emerald-500/10 text-white font-semibold'
                                             : 'text-gray-400 hover:text-gray-200 hover:bg-white/5 font-medium'}`}
                                     style={{ paddingLeft: `${(depth + 1) * 12 + 12}px` }}
                                     title={board.name} // Show full name on hover
                                 >
                                     {/* Active Indicator Bar */}
                                     {isSelected && (
-                                        <div className="absolute left-0 top-1.5 bottom-1.5 w-0.5 bg-blue-500 rounded-r-full shadow-[0_0_8px_rgba(59, 130, 246,0.5)]" />
+                                        <div className="absolute left-0 top-1.5 bottom-1.5 w-0.5 bg-emerald-500 rounded-r-full shadow-[0_0_8px_rgba(16, 185, 129,0.5)]" />
                                     )}
 
-                                    <Icon className={`w-3.5 h-3.5 flex-shrink-0 transition-colors ${isSelected ? 'text-blue-400' : 'text-gray-500 group-hover/item:text-gray-400'}`} />
+                                    <Icon className={`w-3.5 h-3.5 flex-shrink-0 transition-colors ${isSelected ? 'text-emerald-400' : 'text-gray-500 group-hover/item:text-gray-400'}`} />
                                     <span className="truncate tracking-wide">{displayName}</span>
                                 </div>
                             );
@@ -535,62 +528,47 @@ const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, 
 };
 
 // ... (Rest of sidebar items and structure)
-const SidebarItem = ({ icon, label, active = false, onClick }: { icon: any, label: string, active?: boolean, onClick?: () => void }) => (
+const SidebarItem = ({ icon, label, active = false, onClick, isClientItem = false }: { icon?: any, label: string, active?: boolean, onClick?: () => void, isClientItem?: boolean }) => (
     <button
         onClick={onClick}
-        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group relative overflow-hidden ${active ? 'bg-white/10 border border-white/20 text-white shadow-xl shadow-black/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+        className={`w-full flex items-center gap-3 px-4 py-2 text-sm transition-all duration-200 group relative ${active
+            ? 'bg-white/5 text-white border-l-2 border-emerald-500'
+            : 'text-gray-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent'
+            }`}
     >
-        {active && <div className="absolute inset-0 bg-gradient-to-r from-white/5 to-transparent opacity-50" />}
-        <div className={`p-1 rounded-lg relative z-10 ${active ? 'text-white' : 'text-gray-500 group-hover:text-white transition-colors'}`}>
-            {icon}
-        </div>
-        <span className="text-sm font-medium tracking-wide relative z-10">{label}</span>
-        {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)] relative z-10" />}
+        {icon && !isClientItem && <div className={`${active ? 'text-white' : 'text-gray-500 group-hover:text-white'}`}>{icon}</div>}
+        {isClientItem && (
+            <div className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-emerald-500' : 'bg-gray-600 group-hover:bg-gray-400'} mr-2`} />
+        )}
+        <span className="truncate font-medium">{label}</span>
     </button>
 );
 
-const StatCard = ({ title, value, change, icon, delay }: { title: string, value: string, change: string, icon: any, delay: number }) => (
-    <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay, duration: 0.5 }}
-    >
-        <SpotlightCard className="p-6 rounded-3xl bg-black/20 border border-white/5 backdrop-blur-xl h-full">
-            <div className="flex justify-between items-start mb-4">
-                <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
-                    {icon}
-                </div>
-                <div className="px-2 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-[10px] font-bold text-green-400 flex items-center gap-1">
-                    <TrendingUp className="w-3 h-3" /> {change}
-                </div>
-            </div>
-            <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">{title}</h3>
-            <div className="text-3xl font-black text-white tracking-tight">{value}</div>
-        </SpotlightCard>
-    </motion.div>
-);
+
 
 export default function EditorPortal() {
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState<'Overview' | 'Boards' | 'Projects' | 'Analytics'>('Overview');
+    const [activeTab, setActiveTab] = useState<'Boards' | 'Projects' | 'Analytics'>('Boards');
 
     // Current logged-in user info (from localStorage)
-    const currentUserRole = localStorage.getItem('portal_user_role') || 'editor';
+    const currentUserRole = localStorage.getItem('portal_user_role') || 'client';
     const currentUserName = localStorage.getItem('portal_user_name') || '';
 
     // Strict Role Check
     useEffect(() => {
         const role = localStorage.getItem('portal_user_role');
         if (role !== 'editor') {
+            // Allow admins to view client portal? Maybe not for strict separation.
+            // If I am admin I should be in admin portal.
             navigate('/portal');
         }
     }, []);
 
     // Data State
     const [boards, setBoards] = useState<any[]>([]);
-    const [folders, setFolders] = useState<any[]>([]);
-    const [workspaces, setWorkspaces] = useState<any[]>([]);
-    const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(localStorage.getItem('portal_user_workspace') || null); // null = Main Workspace
+    const [_folders, setFolders] = useState<any[]>([]);
+    const [_workspaces, setWorkspaces] = useState<any[]>([]);
+    const [_selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(localStorage.getItem('portal_user_workspace') || null); // null = Main Workspace
     const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
     const [boardData, setBoardData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -605,7 +583,7 @@ export default function EditorPortal() {
     // Create Modal State REMOVED
 
     // Overview Stats State
-    const [overviewStats, setOverviewStats] = useState({
+    const [_overviewStats, setOverviewStats] = useState({
         activeClientsCount: 0,
         activeProjectsCount: 0,
         activeEditorsCount: 0,
@@ -614,7 +592,7 @@ export default function EditorPortal() {
         clientProjectDistribution: [] as { name: string, count: number }[],
         editorPerformance: [] as { name: string, count: number }[]
     });
-    const [overviewLoading, setOverviewLoading] = useState(false);
+    const [_overviewLoading, setOverviewLoading] = useState(false);
 
     // Collapsed Groups State
     const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -641,7 +619,32 @@ export default function EditorPortal() {
 
     const [checkingPermissions, setCheckingPermissions] = useState(true);
 
-    // Stabilize reference to prevent infinite loops
+    useEffect(() => {
+        const fetchPermissions = async () => {
+            // Fetch User Permissions on Mount
+            const email = localStorage.getItem('portal_user_email');
+            if (email) {
+                try {
+                    const { data } = await supabase
+                        .from('users')
+                        .select('allowed_board_ids, workspace_id')
+                        .eq('email', email)
+                        .single();
+
+                    if (data) {
+                        setCurrentUserAllowedBoards(data.allowed_board_ids || []);
+                        setCurrentUserWorkspaceId(data.workspace_id || null);
+                    }
+                } catch {
+                    // Ignore errors
+                }
+            }
+            setCheckingPermissions(false);
+        };
+        fetchPermissions();
+    }, []);
+
+    // Memoized refresh function for visibility-based polling
     const stableAllowedBoards = useMemo(() => currentUserAllowedBoards, [JSON.stringify(currentUserAllowedBoards)]);
 
 
@@ -661,22 +664,29 @@ export default function EditorPortal() {
                     }
                     setCheckingPermissions(false);
                 })
-                .catch(() => setCheckingPermissions(false));
+                .catch((_error) => { // Fix unused param and promise chain
+                    setCheckingPermissions(false);
+                    return null;
+                });
         } else {
             setCheckingPermissions(false);
         }
     }, []);
 
+    // Memoized refresh function for visibility-based polling
+    const refreshCallback = useCallback(() => {
+        if (!checkingPermissions) {
+            refreshBoardsAndFolders(true);
+        }
+    }, [checkingPermissions, stableAllowedBoards, currentUserWorkspaceId]);
+
+    // Use visibility-based polling instead of setInterval
+    // This will pause polling when tab is hidden and resume when visible
+    useVisibilityPolling(refreshCallback, 60000); // Poll every 60s when visible
+
     useEffect(() => {
         if (checkingPermissions) return; // Wait for permissions
-
         refreshBoardsAndFolders();
-        // Hot Reloading: Refresh every 30 seconds
-        const interval = setInterval(() => {
-            refreshBoardsAndFolders(true);
-        }, 30000);
-        return () => clearInterval(interval);
-        return () => clearInterval(interval);
     }, [stableAllowedBoards, currentUserWorkspaceId, checkingPermissions]); // Re-run when permissions load
 
     // --- Background Prefetch ---
@@ -685,21 +695,46 @@ export default function EditorPortal() {
         if (!checkingPermissions && boards.length > 0 && !prefetchStarted) {
             setPrefetchStarted(true);
             const boardIds = boards.map((b: any) => b.id);
-            prefetchBoardItems(boardIds).catch(err => console.error("Prefetch failed", err));
+            prefetchBoardItems(boardIds).then(undefined, err => console.error("Prefetch failed", err));
         }
     }, [boards, checkingPermissions, prefetchStarted]);
 
     // Effect to fetch public URL for preview if assetId is available
+    // Using a ref to track fetching state to prevent duplicate requests
+    const fetchingRef = useRef<string | null>(null);
+    const urlCacheRef = useRef<Map<string, string>>(new Map());
+
     useEffect(() => {
-        if (previewFile?.assetId && previewFile.url && !previewFile.url.includes('public_url_fetched')) {
+        if (previewFile?.assetId && previewFile.url) {
+            const assetId = previewFile.assetId;
+
+            // Check if we have a cached URL for this assetId
+            const cachedUrl = urlCacheRef.current.get(assetId);
+            if (cachedUrl) {
+                setPreviewFile(prev => prev ? { ...prev, url: cachedUrl, assetId: undefined } : null);
+                return;
+            }
+
+            // Check if we're already fetching this assetId
+            if (fetchingRef.current === assetId) {
+                return; // Already fetching, don't duplicate
+            }
+
+            fetchingRef.current = assetId;
+
             const fetchPublicUrl = async () => {
                 try {
-                    const publicUrl = await getAssetPublicUrl(previewFile.assetId!);
+                    // Get the authorized public URL from Monday.com API
+                    const publicUrl = await getAssetPublicUrl(assetId);
                     if (publicUrl) {
-                        setPreviewFile(prev => prev ? { ...prev, url: publicUrl, assetId: undefined } : null); // assetId undefined to prevent loop
+                        // Cache and use the URL directly
+                        urlCacheRef.current.set(assetId, publicUrl);
+                        setPreviewFile(prev => prev ? { ...prev, url: publicUrl, assetId: undefined } : null);
                     }
                 } catch (err) {
                     console.error("Failed to fetch public URL", err);
+                } finally {
+                    fetchingRef.current = null;
                 }
             };
             fetchPublicUrl();
@@ -1008,470 +1043,78 @@ export default function EditorPortal() {
 
             <div className="relative min-h-screen w-full flex bg-transparent overflow-hidden">
                 {/* Main Sidebar */}
-                <aside className="hidden lg:flex w-64 h-screen flex-col border-r border-white/5 bg-black/20 backdrop-blur-xl p-4 relative z-30 flex-shrink-0">
-                    {/* Logo Area */}
-                    <div className="flex items-center gap-3 mb-8 px-2">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-white/10 to-white/5 border border-white/10 p-[1px]">
-                            <div className="w-full h-full rounded-lg bg-black flex items-center justify-center">
-                                <img src="/Untitled design (3).png" alt="Logo" className="w-5 h-5 object-contain opacity-80" />
-                            </div>
+                <aside className="hidden lg:flex w-64 h-screen flex-col border-r border-white/5 bg-[#0e0e1a] relative z-30 flex-shrink-0">
+                    {/* Workspace Header and Active Workspace Card REMOVED per client request */}
+                    {/*
+                    <div className="h-16 flex items-center justify-between px-4 border-b border-white/5">
+                        <div className="flex items-center gap-2">
+                            <span className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Workspaces</span>
                         </div>
-                        <div>
-                            <h2 className="text-white font-bold text-sm tracking-tight">CreativeVision</h2>
-                            <div className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">
-                                Editor Portal
-                            </div>
+                         ...
+                    </div>
+                    */}
+
+                    {/* Active Workspaces / Clients List */}
+                    <div className="flex-1 overflow-y-auto py-4">
+                        {/* 
+                        <div className="px-4 mb-6">
+                            ... (Creative Vision Card)
+                        </div>
+                        */}
+
+                        <div className="px-4 mb-4 flex items-center gap-2">
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Your Projects</span>
+                        </div>
+
+                        <div className="space-y-0.5">
+                            {/* Overview tab removed for cleaner client experience */}
+                            {/* Example Board Item matching screenshot style */}
+                            {boards.map((board: any) => (
+                                <SidebarItem
+                                    key={board.id}
+                                    label={board.name}
+                                    active={selectedBoardId === board.id}
+                                    onClick={() => {
+                                        setSelectedBoardId(board.id);
+                                        setActiveTab('Boards');
+                                    }}
+                                    isClientItem={true}
+                                />
+                            ))}
+                            {boards.length === 0 && (
+                                <div className="px-8 py-2 text-xs text-gray-600 italic">No active boards</div>
+                            )}
                         </div>
                     </div>
 
-                    <div className="flex-1 space-y-1">
-                        <SidebarItem icon={<LayoutDashboard className="w-5 h-5" />} label="Overview" active={activeTab === 'Overview'} onClick={() => setActiveTab('Overview')} />
-                        <SidebarItem icon={<AlignLeft className="w-5 h-5" />} label="Boards" active={activeTab === 'Boards'} onClick={() => setActiveTab('Boards')} />
-                        {currentUserRole === 'admin' && (
-                            <>
-                                <SidebarItem icon={<Briefcase className="w-5 h-5" />} label="Projects" active={activeTab === 'Projects'} onClick={() => setActiveTab('Projects')} />
-                                <SidebarItem icon={<Activity className="w-5 h-5" />} label="Analytics" active={activeTab === 'Analytics'} onClick={() => setActiveTab('Analytics')} />
-                            </>
-                        )}
-                    </div>
-
-                    <div className="pt-6 border-t border-white/5">
-                        {currentUserName && (
-                            <div className="px-4 py-2 mb-2">
-                                <div className="text-white text-sm font-medium truncate">{currentUserName}</div>
-                                <div className={`text-xs capitalize ${currentUserRole === 'admin' ? 'text-purple-400' : currentUserRole === 'editor' ? 'text-blue-400' : 'text-green-400'}`}>
-                                    {currentUserRole}
-                                </div>
+                    {/* Minimal User Profile at Bottom (Optional, kept minimal) */}
+                    <div className="p-4 border-t border-white/5 bg-black/20">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-500 font-bold text-xs">
+                                {currentUserName ? currentUserName.charAt(0) : 'U'}
                             </div>
-                        )}
-                        <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-500/10 hover:text-red-400 text-gray-400 transition-colors group">
-                            <LogOut className="w-5 h-5" />
-                            <span className="text-sm font-medium">Log Out</span>
-                        </button>
+                            <div className="flex-1 overflow-hidden">
+                                <div className="text-white text-xs font-bold truncate">{currentUserName || 'User'}</div>
+                                <button onClick={handleLogout} className="text-[10px] text-gray-500 hover:text-white transition-colors">Log Out</button>
+                            </div>
+                        </div>
                     </div>
                 </aside>
 
                 <main className="flex-1 h-screen flex flex-col relative z-20 overflow-hidden">
-                    {/* Header */}
-                    <header className="h-16 px-8 flex items-center justify-between border-b border-white/5 bg-black/20 backdrop-blur-xl flex-shrink-0">
-                        <div className="flex items-center gap-4 lg:hidden">
-                            <button className="text-white"><Menu className="w-6 h-6" /></button>
-                        </div>
-
-                        <div className="hidden lg:block">
-                            <h1 className="text-lg font-bold text-white tracking-tight">
-                                {activeTab === 'Boards' && selectedBoardId && boardData ? boardData.name : activeTab}
-                            </h1>
-                        </div>
-
-                        <div className="flex items-center gap-6">
-                            {/* Debug Info */}
-                            <div className="text-[10px] text-gray-500 font-mono hidden xl:block">
-                                Boards: {boards.length} | Folders: {folders.length}
-                            </div>
-
-                            <div className="relative hidden md:block group">
-                                <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-blue-400 transition-colors" />
-                                <input
-                                    type="text"
-                                    placeholder="Search..."
-                                    className="bg-white/5 border border-white/10 rounded-full pl-10 pr-4 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500/50 focus:bg-white/10 transition-all w-64"
-                                />
-                            </div>
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-custom-blue to-custom-purple p-[1px]">
-                                <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&auto=format&fit=crop" alt="Admin" className="w-full h-full rounded-full object-cover" />
-                            </div>
-                        </div>
-                    </header>
-
                     {/* Content Area */}
-                    <div className="flex-1 overflow-hidden flex">
+                    <div className="flex-1 overflow-hidden flex flex-col relative z-20">
 
                         {/* Tab Content */}
-                        {activeTab === 'Overview' && (
-                            <div className="p-8 overflow-y-auto w-full">
-                                {/* Debug Area */}
-                                <div className="mb-8 p-4 bg-red-900/20 border border-red-500/20 rounded-xl text-xs font-mono text-red-200">
-                                    <h4 className="font-bold mb-2">Debug Data Dump</h4>
-                                    <div>Boards Count: {boards.length}</div>
-                                    <div>Folders Count: {folders.length}</div>
-                                    <pre className="mt-2 text-[10px] opacity-50 overflow-hidden text-ellipsis whitespace-nowrap">
-                                        Last Error: {loading ? 'Loading...' : 'None'}
-                                    </pre>
-                                </div>
+                        {/* Overview tab content REMOVED - clients now go directly to Boards */}
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                                    <StatCard
-                                        title="Active Clients"
-                                        value={overviewLoading ? "..." : String(overviewStats.activeClientsCount)}
-                                        change="Boards"
-                                        icon={<Briefcase className="w-5 h-5 text-blue-400" />}
-                                        delay={0.1}
-                                    />
-                                    <StatCard
-                                        title="Active Projects"
-                                        value={overviewLoading ? "..." : String(overviewStats.activeProjectsCount)}
-                                        change="In Progress"
-                                        icon={<Activity className="w-5 h-5 text-purple-400" />}
-                                        delay={0.2}
-                                    />
-                                    <StatCard
-                                        title="Top Editor"
-                                        value={overviewLoading ? "..." : overviewStats.topEditor.name}
-                                        change={`${overviewStats.topEditor.count} Videos`}
-                                        icon={<TrendingUp className="w-5 h-5 text-green-400" />}
-                                        delay={0.3}
-                                    />
-                                    <StatCard
-                                        title="Active Editors"
-                                        value={overviewLoading ? "..." : String(overviewStats.activeEditorsCount)}
-                                        change="In Workspace"
-                                        icon={<Users className="w-5 h-5 text-blue-400" />}
-                                        delay={0.4}
-                                    />
-                                </div>
-
-                                {/* --- REAL GRAPH & LEADERBOARD --- */}
-                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
-
-                                    {/* Editor Productivity Graph */}
-                                    <div className="lg:col-span-2 p-6 rounded-3xl bg-black/20 border border-white/5 backdrop-blur-xl">
-                                        <div className="flex items-center justify-between mb-6">
-                                            <h3 className="text-white font-bold text-lg">Editor Productivity</h3>
-                                            <div className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Total Projects</div>
-                                        </div>
-
-                                        <div className="h-64 flex items-end gap-2 overflow-x-auto pb-2 custom-scrollbar">
-                                            {overviewLoading ? (
-                                                <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">Loading data...</div>
-                                            ) : overviewStats.editorPerformance.length === 0 ? (
-                                                <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs italic">No active editor data found</div>
-                                            ) : (
-                                                overviewStats.editorPerformance.map((editor, idx) => {
-                                                    const maxVal = Math.max(...overviewStats.editorPerformance.map(c => c.count), 5); // scale max
-                                                    const heightPct = (editor.count / maxVal) * 100;
-                                                    const isTop3 = idx < 3;
-
-                                                    return (
-                                                        <div key={idx} className="flex flex-col items-center gap-2 group min-w-[60px] flex-1">
-                                                            <div className="relative w-full flex justify-center">
-                                                                <div
-                                                                    className={`w-full max-w-[40px] rounded-t-lg bg-gradient-to-t ${isTop3 ? 'from-green-500/80 to-green-400' : 'from-green-900/40 to-green-800/60'} group-hover:to-green-300 transition-all duration-300 relative`}
-                                                                    style={{ height: `${Math.max(heightPct, 5)}px`, minHeight: '24px' }}
-                                                                >
-                                                                    {/* Persistent Label for Top items, Hover for others */}
-                                                                    <div className={`absolute -top-6 left-1/2 -translate-x-1/2 ${isTop3 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity text-[10px] font-bold text-white bg-black/80 px-2 py-0.5 rounded pointer-events-none whitespace-nowrap z-10 border border-white/10`}>
-                                                                        {editor.count}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div className={`text-[10px] text-center truncate w-full max-w-[80px] ${isTop3 ? 'text-white font-bold' : 'text-gray-500'}`} title={editor.name}>
-                                                                {editor.name}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Client Portfolio Graph */}
-                                    <div className="lg:col-span-2 p-6 rounded-3xl bg-black/20 border border-white/5 backdrop-blur-xl">
-                                        <div className="flex items-center justify-between mb-6">
-                                            <h3 className="text-white font-bold text-lg">Client Portfolio</h3>
-                                            <div className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Active Projects Distribution</div>
-                                        </div>
-
-                                        <div className="h-64 flex items-end gap-2 overflow-x-auto pb-2 custom-scrollbar">
-                                            {overviewLoading ? (
-                                                <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">Loading data...</div>
-                                            ) : overviewStats.clientProjectDistribution.length === 0 ? (
-                                                <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs italic">No active client data found</div>
-                                            ) : (
-                                                overviewStats.clientProjectDistribution.map((client, idx) => {
-                                                    const maxVal = Math.max(...overviewStats.clientProjectDistribution.map(c => c.count), 5); // scale max
-                                                    const heightPct = (client.count / maxVal) * 100;
-
-                                                    return (
-                                                        <div key={idx} className="flex flex-col items-center gap-2 group min-w-[60px] flex-1">
-                                                            <div className="relative w-full flex justify-center">
-                                                                <div
-                                                                    className="w-full max-w-[40px] rounded-t-lg bg-gradient-to-t from-blue-600/20 to-blue-500/80 group-hover:to-blue-400 transition-all duration-300 relative"
-                                                                    style={{ height: `${Math.max(heightPct, 5)}px`, minHeight: '4px' }}
-                                                                >
-                                                                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-bold text-white bg-black/80 px-2 py-0.5 rounded pointer-events-none whitespace-nowrap">
-                                                                        {client.count} Projects
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div className="text-[10px] text-gray-400 text-center truncate w-full max-w-[80px]" title={client.name}>
-                                                                {client.name}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Editor Performance Leaderboard */}
-                                    <div className="p-6 rounded-3xl bg-black/20 border border-white/5 backdrop-blur-xl flex flex-col">
-                                        <div className="flex items-center justify-between mb-6">
-                                            <h3 className="text-white font-bold text-lg">Top Editors</h3>
-                                            <div className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Videos Done</div>
-                                        </div>
-
-                                        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3">
-                                            {overviewLoading ? (
-                                                <div className="text-center text-gray-500 text-xs py-10">Loading...</div>
-                                            ) : overviewStats.editorPerformance.length === 0 ? (
-                                                <div className="text-center text-gray-500 text-xs italic py-10">No editor data available</div>
-                                            ) : (
-                                                overviewStats.editorPerformance.slice(0, 3).map((editor, idx) => (
-                                                    <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors group">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${idx === 0 ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'bg-gray-700/30 text-gray-400'}`}>
-                                                                {idx + 1}
-                                                            </div>
-                                                            <div className="flex flex-col">
-                                                                <span className={`text-xs font-bold ${idx === 0 ? 'text-white' : 'text-gray-300'}`}>{editor.name}</span>
-                                                                {idx === 0 && <span className="text-[9px] text-yellow-500 uppercase tracking-wider">Top Performer</span>}
-                                                            </div>
-                                                        </div>
-                                                        <div className="text-sm font-black text-white px-2 py-1 rounded bg-black/20">
-                                                            {editor.count}
-                                                        </div>
-                                                    </div>
-                                                ))
-                                            )}
-                                        </div>
-                                    </div>
-
-                                </div>
-                                {/* End Real Data Section */}
-                            </div>
-                        )}
 
 
 
 
                         {activeTab === 'Boards' && (
                             <>
-                                {/* Tree Sidebar */}
-                                <div className="w-72 border-r border-white/5 bg-[#080816] flex flex-col flex-shrink-0">
-                                    <div className="pt-4 pb-2 px-4">
-                                        <div className="flex items-center justify-between text-gray-400 mb-2">
-                                            <h3 className="text-[13px] font-bold text-gray-300">Workspaces</h3>
-                                            <div className="flex items-center gap-2">
-                                                <MoreHorizontal className="w-4 h-4 hover:text-white cursor-pointer" />
-                                                <Search className="w-4 h-4 hover:text-white cursor-pointer" />
-                                            </div>
-                                        </div>
-
-                                        {/* Workspace Dropdown */}
-                                        <div className="relative mb-3 group z-20">
-                                            <div
-                                                className="flex items-center justify-between px-3 py-2 bg-[#1F2B47]/50 border border-white/10 rounded-lg cursor-pointer hover:bg-white/10 transition-colors"
-                                                onClick={() => {
-                                                    // Simple toggle for logic or just use a state for UI dropdown?
-                                                    // For now, I'll validly cycle or just use a simple HTML select for robustness if complex UI isn't built
-                                                    // But user wants "exactly like this".
-                                                    // I'll implement a custom dropdown.
-                                                    const el = document.getElementById('ws-dropdown');
-                                                    if (el) el.classList.toggle('hidden');
-                                                }}
-                                            >
-                                                <div className="flex items-center gap-3 overflow-hidden">
-                                                    <div className="w-6 h-6 rounded flex items-center justify-center bg-gradient-to-br from-pink-500 to-rose-500 text-white shadow-md flex-shrink-0">
-                                                        <span className="font-bold text-xs">
-                                                            {selectedWorkspaceId
-                                                                ? workspaces.find(w => w.id === selectedWorkspaceId)?.name.charAt(0)
-                                                                : 'M'}
-                                                        </span>
-                                                    </div>
-                                                    <span className="text-sm text-white font-medium truncate group-hover:text-blue-400 transition-colors">
-                                                        {selectedWorkspaceId
-                                                            ? workspaces.find(w => w.id === selectedWorkspaceId)?.name
-                                                            : 'Main Workspace'}
-                                                    </span>
-                                                </div>
-                                                <ChevronDown className="w-3 h-3 text-gray-500" />
-                                            </div>
-
-                                            {/* Dropdown Menu */}
-                                            <div id="ws-dropdown" className="hidden absolute top-full left-0 w-full mt-1 bg-[#23263a] border border-white/10 rounded-lg shadow-xl overflow-hidden">
-                                                <div
-                                                    className="px-3 py-2 hover:bg-white/5 cursor-pointer flex items-center gap-2"
-                                                    onClick={() => {
-                                                        setSelectedWorkspaceId(null);
-                                                        document.getElementById('ws-dropdown')?.classList.add('hidden');
-                                                    }}
-                                                >
-                                                    <div className="w-5 h-5 rounded bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-[10px] text-white">M</div>
-                                                    <span className="text-sm text-gray-300">Main Workspace</span>
-                                                </div>
-                                                {workspaces.map(ws => (
-                                                    <div
-                                                        key={ws.id}
-                                                        className="px-3 py-2 hover:bg-white/5 cursor-pointer flex items-center gap-2"
-                                                        onClick={() => {
-                                                            setSelectedWorkspaceId(ws.id);
-                                                            document.getElementById('ws-dropdown')?.classList.add('hidden');
-                                                        }}
-                                                    >
-                                                        <div className="w-5 h-5 rounded bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center text-[10px] text-white">{ws.name.charAt(0)}</div>
-                                                        <span className="text-sm text-gray-300 truncate">{ws.name}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        {/* Blue Plus Button */}
-
-                                    </div>
-                                    <div className="flex-1 overflow-y-auto p-2 space-y-0.5 custom-scrollbar">
-                                        {(() => {
-                                            // Filter by Workspace
-                                            // Main Workspace = item.workspace is null/undefined
-                                            const visibleFolders = folders.filter(f => selectedWorkspaceId ? String(f.workspace?.id) === String(selectedWorkspaceId) : !f.workspace);
-                                            // Filter by Workspace AND exclude Subitem Boards
-                                            const visibleBoards = boards
-                                                .filter(b => selectedWorkspaceId ? String(b.workspace?.id) === String(selectedWorkspaceId) : !b.workspace)
-                                                .filter(b => b.type !== 'sub_items_board' && !b.name.startsWith("Subitems of"));
-
-                                            // Custom Sort Logic based on Screenshot
-                                            const FOLDER_ORDER = ["Hiring and Onboarding", "Management", "Editors", "Clients", "Old"];
-                                            const getSortWeight = (name: string) => {
-                                                const index = FOLDER_ORDER.findIndex(n => name.includes(n));
-                                                return index === -1 ? 999 : index;
-                                            };
-
-                                            // VIRTUAL GROUPING: "Editor Workspaces" should be in "Editors" folder
-
-                                            // 1. Find key folders
-                                            const editorsFolder = visibleFolders.find(f => f.name.trim() === 'Editors');
-                                            const workspacesFolder = visibleFolders.find(f => f.name.trim() === 'Workspaces');
-
-                                            // 2. Identify "Workspace" boards
-                                            const editorBoards = visibleBoards.filter(b => b.name.includes(' - Workspace'));
-
-                                            // 3. Ensure "Editors" folder exists (Virtual or Real)
-                                            let effectiveEditorsFolder = editorsFolder;
-                                            if (!effectiveEditorsFolder && (workspacesFolder || editorBoards.length > 0)) {
-                                                effectiveEditorsFolder = {
-                                                    id: 'virtual-editors',
-                                                    name: 'Editors',
-                                                    color: '#ffcc00',
-                                                    children: []
-                                                };
-                                            }
-
-                                            // 4. Populate "Editors" folder children
-                                            if (effectiveEditorsFolder) {
-                                                if (!effectiveEditorsFolder.children) effectiveEditorsFolder.children = [];
-
-                                                // Helper to check if child exists in our effective folder
-                                                const hasChild = (id: string) => effectiveEditorsFolder!.children.some((c: any) => String(c.id) === String(id));
-
-                                                // A) Nest "Workspaces" folder inside "Editors"
-                                                if (workspacesFolder && !hasChild(workspacesFolder.id)) {
-                                                    effectiveEditorsFolder.children.push({ id: workspacesFolder.id });
-                                                }
-
-                                                // B) Nest loose "Workspace" boards inside "Editors"
-                                                editorBoards.forEach(b => {
-                                                    if (!hasChild(b.id)) {
-                                                        const isInWorkspaces = workspacesFolder && workspacesFolder.children && workspacesFolder.children.some((c: any) => String(c.id) === String(b.id));
-                                                        if (!isInWorkspaces) {
-                                                            effectiveEditorsFolder!.children.push({ id: b.id });
-                                                        }
-                                                    }
-                                                });
-                                            }
-
-                                            // 5. Construct Final Folders List
-                                            // Start with all visible folders
-                                            let finalFolders = [...visibleFolders];
-
-                                            // Remove "Workspaces" from root list (as it is now nested)
-                                            if (workspacesFolder) {
-                                                finalFolders = finalFolders.filter(f => f.id !== workspacesFolder.id);
-                                            }
-
-                                            // Ensure "Editors" is in the list (if virtual)
-                                            if (effectiveEditorsFolder && !finalFolders.some(f => f.id === effectiveEditorsFolder!.id)) {
-                                                finalFolders.push(effectiveEditorsFolder);
-                                            }
-
-                                            // 6. Calculate Root Items (Hiding nested children)
-                                            const childIds = new Set();
-                                            finalFolders.forEach(f => {
-                                                if (f.children) {
-                                                    f.children.forEach((c: any) => childIds.add(String(c.id)));
-                                                }
-                                            });
-
-                                            // Also exclude items that are children of the hidden "Workspaces" folder from root
-                                            // (Recursion in FolderTreeItem handles display, we just need to hide from root here)
-                                            if (workspacesFolder && workspacesFolder.children) {
-                                                workspacesFolder.children.forEach((c: any) => childIds.add(String(c.id)));
-                                            }
-
-                                            const rootFolders = finalFolders
-                                                .filter(f => !childIds.has(String(f.id)))
-                                                .sort((a, b) => getSortWeight(a.name) - getSortWeight(b.name));
-
-                                            // Boards A-Z fallback
-                                            const rootBoards = visibleBoards
-                                                .filter(b => !childIds.has(String(b.id)))
-                                                // Functionally, this removes 'editorBoards' because we added their IDs to 'editorsFolder' children
-                                                .sort((a, b) => a.name.localeCompare(b.name));
-
-                                            return (
-                                                <>
-                                                    {/* Root Folders */}
-                                                    {rootFolders.map(folder => (
-                                                        <FolderTreeItem
-                                                            key={folder.id}
-                                                            folder={folder}
-                                                            allFolders={visibleFolders}
-                                                            allBoards={visibleBoards}
-                                                            onSelectBoard={setSelectedBoardId}
-                                                            selectedBoardId={selectedBoardId}
-                                                        />
-                                                    ))}
-                                                    {/* Root Boards */}
-                                                    {rootBoards.map(board => {
-                                                        const Icon = getBoardIcon(board.name);
-                                                        return (
-                                                            <div
-                                                                key={board.id}
-                                                                onClick={() => setSelectedBoardId(board.id)}
-                                                                className={`flex items-center gap-2 px-3 py-1.5 mx-2 rounded-md cursor-pointer transition-all mb-0.5 ${selectedBoardId === board.id
-                                                                    ? 'bg-[#0073ea] text-white shadow-lg shadow-blue-900/20 font-medium'
-                                                                    : 'text-gray-400 hover:text-gray-200 hover:bg-[#1C212E]'
-                                                                    }`}
-                                                            >
-                                                                <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${selectedBoardId === board.id ? 'text-white' : 'text-gray-500'}`} />
-                                                                <span className="text-[13px] truncate">{board.name}</span>
-                                                            </div>
-                                                        );
-                                                    })}
-
-                                                    {loading && (
-                                                        <div className="p-4 text-center text-gray-500 text-xs animate-pulse">Loading workspace...</div>
-                                                    )}
-                                                    {!loading && visibleBoards.length === 0 && visibleFolders.length === 0 && (
-                                                        <div className="p-4 text-center text-gray-500 text-xs opacity-50 flex flex-col gap-2">
-                                                            <span>Empty Workspace</span>
-                                                            <span className="text-[10px]">(or Main Workspace selected)</span>
-                                                        </div>
-                                                    )}
-                                                </>
-                                            );
-                                        })()}
-                                    </div>
-                                </div>
+                                {/* Tree Sidebar REMOVED per client request for cleaner full-width view */}
 
                                 {/* Board Content */}
                                 <div className="flex-1 overflow-y-auto bg-[#050511] p-6 relative">
@@ -1479,7 +1122,7 @@ export default function EditorPortal() {
                                         <>
                                             {loading && !boardData ? (
                                                 <div className="flex flex-col items-center justify-center h-full">
-                                                    <Loader2 className="w-10 h-10 text-blue-400 animate-spin mb-4" />
+                                                    <Loader2 className="w-10 h-10 text-emerald-400 animate-spin mb-4" />
                                                     <p className="text-gray-400 text-sm">Loading board...</p>
                                                 </div>
                                             ) : boardData ? (
@@ -1591,7 +1234,7 @@ export default function EditorPortal() {
                                                                                             setFulfillmentMonthFilter('All');
                                                                                             setIsMonthFilterOpen(false);
                                                                                         }}
-                                                                                        className={`px-4 py-3 text-xs font-bold cursor-pointer transition-colors ${fulfillmentMonthFilter === 'All' ? 'bg-blue-500/10 text-blue-400' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                                                                                        className={`px-4 py-3 text-xs font-bold cursor-pointer transition-colors ${fulfillmentMonthFilter === 'All' ? 'bg-emerald-500/10 text-emerald-400' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                                                                                     >
                                                                                         All Time
                                                                                     </div>
@@ -1602,7 +1245,7 @@ export default function EditorPortal() {
                                                                                                 setFulfillmentMonthFilter(month);
                                                                                                 setIsMonthFilterOpen(false);
                                                                                             }}
-                                                                                            className={`px-4 py-3 text-xs font-bold cursor-pointer transition-colors ${fulfillmentMonthFilter === month ? 'bg-blue-500/10 text-blue-400' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                                                                                            className={`px-4 py-3 text-xs font-bold cursor-pointer transition-colors ${fulfillmentMonthFilter === month ? 'bg-emerald-500/10 text-emerald-400' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                                                                                         >
                                                                                             {month}
                                                                                         </div>
@@ -1636,7 +1279,7 @@ export default function EditorPortal() {
                                                                                 <div className="flex flex-col items-center">
                                                                                     <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-0.5">Viewing Project</span>
                                                                                     <div className="text-sm font-mono text-white">
-                                                                                        <span className="text-blue-400 font-bold">{fulfillmentRecentIndex + 1}</span> <span className="text-gray-600">/</span> {sortedItems.length}
+                                                                                        <span className="text-emerald-400 font-bold">{fulfillmentRecentIndex + 1}</span> <span className="text-gray-600">/</span> {sortedItems.length}
                                                                                     </div>
                                                                                 </div>
 
@@ -1658,7 +1301,7 @@ export default function EditorPortal() {
                                                                                 className="relative p-8 rounded-3xl bg-[#0e0e1a] border border-white/5 shadow-2xl overflow-hidden"
                                                                             >
                                                                                 <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-                                                                                    <Briefcase className="w-32 h-32 text-blue-400" />
+                                                                                    <Briefcase className="w-32 h-32 text-emerald-400" />
                                                                                 </div>
 
                                                                                 <div className="relative z-10 w-full max-w-3xl mx-auto">
@@ -1674,7 +1317,7 @@ export default function EditorPortal() {
                                                                                         {boardData.columns?.filter((col: any) => col.type !== 'name').map((col: any) => (
                                                                                             <div key={col.id} className="group p-4 rounded-2xl bg-black/20 border border-white/5 hover:bg-white/5 transition-colors">
                                                                                                 <div className="flex items-center gap-2 mb-2">
-                                                                                                    <span className="text-[10px] uppercase tracking-wider text-blue-400 font-bold">{col.title}</span>
+                                                                                                    <span className="text-[10px] uppercase tracking-wider text-emerald-400 font-bold">{col.title}</span>
                                                                                                 </div>
                                                                                                 <div className="min-h-[32px] flex items-center">
                                                                                                     <BoardCell
@@ -1730,7 +1373,7 @@ export default function EditorPortal() {
                                                                         {/* Graph Section */}
                                                                         <div className="bg-[#0e0e1a] border border-white/5 p-6 rounded-3xl shadow-xl">
                                                                             <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                                                                                <div className="p-1.5 bg-blue-500/10 rounded-lg"><LayoutDashboard className="w-4 h-4 text-blue-400" /></div>
+                                                                                <div className="p-1.5 bg-emerald-500/10 rounded-lg"><LayoutDashboard className="w-4 h-4 text-emerald-400" /></div>
                                                                                 Project Status Overview
                                                                             </h3>
                                                                             <div className="space-y-4">
@@ -1765,7 +1408,7 @@ export default function EditorPortal() {
                                                                         {/* Whole Overview Grid */}
                                                                         <div>
                                                                             <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                                                                                <span className="w-1 h-6 bg-blue-500 rounded-full" />
+                                                                                <span className="w-1 h-6 bg-emerald-500 rounded-full" />
                                                                                 Project Gallery
                                                                             </h3>
                                                                             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -1891,9 +1534,9 @@ export default function EditorPortal() {
                                                                                                 <div key={cycleKey} className="space-y-4">
                                                                                                     {/* Cycle Header */}
                                                                                                     <div className="flex items-center gap-3">
-                                                                                                        <div className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-                                                                                                            <div className="w-2 h-2 rounded-full bg-blue-500" />
-                                                                                                            <h3 className="text-sm font-bold text-blue-400 uppercase tracking-wider">
+                                                                                                        <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                                                                                                            <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                                                                                            <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wider">
                                                                                                                 {cycleKey}
                                                                                                             </h3>
                                                                                                         </div>
@@ -1913,12 +1556,12 @@ export default function EditorPortal() {
                                                                                                                 transition={{ delay: idx * 0.05, duration: 0.3 }}
                                                                                                                 className="group relative"
                                                                                                             >
-                                                                                                                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                                                                                                                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                                                                                                                 <div className="relative p-6 rounded-2xl bg-[#0e0e1a] border border-white/5 shadow-xl hover:border-white/10 hover:bg-[#131322] transition-all h-full flex flex-col gap-5">
                                                                                                                     {/* Item Name Header */}
                                                                                                                     <div className="flex items-start justify-between gap-3">
                                                                                                                         <h4 className="text-lg font-bold text-white leading-snug flex-1">{item.name}</h4>
-                                                                                                                        <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse flex-shrink-0 mt-2" />
+                                                                                                                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0 mt-2" />
                                                                                                                     </div>
 
                                                                                                                     <div className="w-full h-[1px] bg-white/5" />
@@ -1959,7 +1602,7 @@ export default function EditorPortal() {
                                                                                             <tbody>
                                                                                                 {groupItems.map((item: any) => (
                                                                                                     <tr key={item.id} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
-                                                                                                        <td className="px-4 py-3 font-medium text-white group-hover:text-blue-400 transition-colors sticky left-0 bg-[#0e0e1a] group-hover:bg-[#151525] z-10 border-r border-white/5">{item.name}</td>
+                                                                                                        <td className="px-4 py-3 font-medium text-white group-hover:text-emerald-400 transition-colors sticky left-0 bg-[#0e0e1a] group-hover:bg-[#151525] z-10 border-r border-white/5">{item.name}</td>
                                                                                                         {boardData.columns?.filter((c: any) => c.type !== 'name').map((col: any) => (<td key={col.id} className="px-4 py-3 text-gray-400"><BoardCell item={item} column={col} boardId={selectedBoardId} onUpdate={() => refreshBoardDetails(selectedBoardId!, true)} onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })} /></td>))}
                                                                                                     </tr>
                                                                                                 ))}
@@ -1991,42 +1634,44 @@ export default function EditorPortal() {
                         )}
 
                     </div>
-                </main>
+                </main >
 
                 {/* Modals remain mostly the same */}
 
                 {/* File Preview Modal */}
-                {previewFile && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-200">
-                        <button onClick={() => setPreviewFile(null)} className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"><X className="w-8 h-8" /></button>
+                {
+                    previewFile && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-200">
+                            <button onClick={() => setPreviewFile(null)} className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"><X className="w-8 h-8" /></button>
 
-                        <div className="w-full max-w-5xl h-[85vh] flex flex-col bg-[#0A0A16] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
-                            {/* Modal Header */}
-                            <div className="h-16 px-6 flex items-center justify-between border-b border-white/10 bg-white/5">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-blue-500/10 rounded-lg">
-                                        <FileText className="w-5 h-5 text-blue-400" />
+                            <div className="w-full max-w-5xl h-[85vh] flex flex-col bg-[#0A0A16] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+                                {/* Modal Header */}
+                                <div className="h-16 px-6 flex items-center justify-between border-b border-white/10 bg-white/5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-emerald-500/10 rounded-lg">
+                                            <FileText className="w-5 h-5 text-emerald-400" />
+                                        </div>
+                                        <h3 className="text-white font-bold text-lg truncate max-w-md">{previewFile?.name}</h3>
                                     </div>
-                                    <h3 className="text-white font-bold text-lg truncate max-w-md">{previewFile?.name}</h3>
+                                    <a
+                                        href={previewFile?.url}
+                                        target="_blank"
+                                        download
+                                        className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:brightness-110 font-bold text-sm transition-all shadow-lg shadow-emerald-500/20"
+                                    >
+                                        <Download className="w-4 h-4" /> Download Original
+                                    </a>
                                 </div>
-                                <a
-                                    href={previewFile?.url}
-                                    target="_blank"
-                                    download
-                                    className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:brightness-110 font-bold text-sm transition-all shadow-lg shadow-blue-500/20"
-                                >
-                                    <Download className="w-4 h-4" /> Download Original
-                                </a>
-                            </div>
 
-                            {/* Modal Content */}
-                            <div className="flex-1 bg-black/50 relative flex items-center justify-center p-4 overflow-hidden">
-                                <FilePreviewer url={previewFile?.url || ''} name={previewFile?.name || ''} isLoading={!!previewFile?.assetId} />
+                                {/* Modal Content */}
+                                <div className="flex-1 bg-black/50 relative flex items-center justify-center p-4 overflow-hidden">
+                                    <FilePreviewer url={previewFile?.url || ''} name={previewFile?.name || ''} isLoading={!!previewFile?.assetId} />
+                                </div>
                             </div>
                         </div>
-                    </div>
-                )}
-            </div>
-        </BackgroundLayout>
+                    )
+                }
+            </div >
+        </BackgroundLayout >
     );
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BackgroundLayout } from './layout/BackgroundLayout';
 import { CinematicOverlay } from './ui/CinematicOverlay';
@@ -42,6 +42,7 @@ import {
     prefetchBoardItems
 } from '../services/mondayService';
 import { createUser, getAllUsers, updateUser, deleteUser, supabase } from '../services/boardsService';
+import { useVisibilityPolling } from '../hooks/useMondayData';
 
 // --- Helpers ---
 // (Updated)
@@ -833,16 +834,20 @@ export default function AdminPortal() {
         }
     }, []);
 
+    // Memoized refresh function for visibility-based polling
+    const refreshCallback = useCallback(() => {
+        if (!checkingPermissions) {
+            refreshBoardsAndFolders(true);
+        }
+    }, [checkingPermissions, stableAllowedBoards, currentUserWorkspaceId]);
+
+    // Use visibility-based polling instead of setInterval
+    // This will pause polling when tab is hidden and resume when visible
+    useVisibilityPolling(refreshCallback, 60000); // Poll every 60s when visible
+
     useEffect(() => {
         if (checkingPermissions) return; // Wait for permissions
-
         refreshBoardsAndFolders();
-        // Hot Reloading: Refresh every 30 seconds
-        const interval = setInterval(() => {
-            refreshBoardsAndFolders(true);
-        }, 30000);
-        return () => clearInterval(interval);
-        return () => clearInterval(interval);
     }, [stableAllowedBoards, currentUserWorkspaceId, checkingPermissions]); // Re-run when permissions load
 
     // --- Background Prefetch ---
