@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     LayoutGrid,
     Clock,
+    Activity,
     FileText,
     ChevronDown,
 } from 'lucide-react';
@@ -177,50 +178,139 @@ export const GlobalCycleView = ({ boardData, selectedBoardId, refreshBoardDetail
 
             {/* --- OVERVIEW MODE --- */}
             {cycleViewMode === 'overview' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in zoom-in duration-300">
-                    {filteredItems.map((item: any, idx: number) => (
-                        <motion.div
-                            key={item.id}
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: idx * 0.05, duration: 0.3 }}
-                            className="group relative"
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                            <div className="relative p-6 rounded-2xl bg-[#0e0e1a] border border-white/5 shadow-xl hover:border-white/10 hover:bg-[#131322] transition-all h-full flex flex-col gap-5">
-                                {/* Item Name Header */}
-                                <div className="flex items-start justify-between gap-3">
-                                    <h4 className="text-lg font-bold text-white leading-snug flex-1">{item.name}</h4>
-                                    <div className="w-2 h-2 rounded-full bg-violet-500 animate-pulse flex-shrink-0 mt-2" />
+                <div className="space-y-8">
+                    {/* Activity Graph Section */}
+                    {filteredItems.length > 0 && (
+                        <div className="p-6 rounded-3xl bg-[#0e0e1a] border border-white/5 relative overflow-hidden group">
+                            <div className="absolute inset-0 bg-gradient-to-r from-violet-500/5 to-transparent opacity-50" />
+
+                            <div className="flex items-center justify-between mb-6 relative z-10">
+                                <div>
+                                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                        <Activity className="w-5 h-5 text-violet-400" />
+                                        Project Activity
+                                    </h3>
+                                    <p className="text-xs text-gray-500 mt-1">Real-time status distribution</p>
                                 </div>
-
-                                <div className="w-full h-[1px] bg-white/5" />
-
-                                {/* Column Values */}
-                                <div className="space-y-4 flex-1">
-                                    {boardData.columns?.filter((col: any) => col.type !== 'name').map((col: any) => (
-                                        <div key={col.id} className="flex flex-col gap-1.5">
-                                            <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">{col.title}</span>
-                                            <div className="min-h-[28px] flex items-center">
-                                                <BoardCell
-                                                    item={item}
-                                                    column={col}
-                                                    boardId={selectedBoardId}
-                                                    onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
-                                                    onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
-                                                />
-                                            </div>
-                                        </div>
-                                    ))}
+                                <div className="text-right">
+                                    <div className="text-2xl font-bold text-white">{filteredItems.length}</div>
+                                    <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Total Projects</div>
                                 </div>
                             </div>
-                        </motion.div>
-                    ))}
-                    {filteredItems.length === 0 && (
-                        <div className="col-span-full text-center text-gray-500 italic py-12 bg-[#0e0e1a] rounded-3xl border border-white/5">
-                            No items found
+
+                            {/* Graph Bars */}
+                            <div className="space-y-4 relative z-10">
+                                {(() => {
+                                    // Calculate Stats
+                                    const statusCounts: Record<string, number> = {};
+                                    const statusColors: Record<string, string> = {};
+
+                                    // Find primary status column
+                                    const statusCol = boardData.columns?.find((c: any) => c.title.toLowerCase().includes('status'));
+
+                                    if (!statusCol) return <div className="text-xs text-gray-500 italic">No status data available</div>;
+
+                                    // Parse Settings for Colors
+                                    let labelColors: Record<string, string> = {};
+                                    try {
+                                        const settings = JSON.parse(statusCol.settings_str || '{}');
+                                        if (settings.labels && settings.labels_colors) {
+                                            Object.keys(settings.labels).forEach(key => {
+                                                const label = settings.labels[key];
+                                                const color = settings.labels_colors[key]?.color;
+                                                labelColors[label] = color;
+                                            });
+                                        }
+                                    } catch (e) { }
+
+                                    // Aggregate
+                                    filteredItems.forEach((item: any) => {
+                                        const val = item.column_values.find((v: any) => v.id === statusCol.id)?.text;
+                                        if (val) {
+                                            statusCounts[val] = (statusCounts[val] || 0) + 1;
+                                            if (labelColors[val]) statusColors[val] = labelColors[val];
+                                        }
+                                    });
+
+                                    // Sort by count desc
+                                    const sortedStatuses = Object.entries(statusCounts).sort((a, b) => b[1] - a[1]);
+
+                                    return sortedStatuses.length > 0 ? sortedStatuses.map(([status, count], idx) => {
+                                        const color = statusColors[status] || '#a855f7'; // fallback violet
+                                        const percentage = Math.round((count / filteredItems.length) * 100);
+
+                                        return (
+                                            <div key={status} className="relative">
+                                                <div className="flex justify-between text-xs mb-1.5">
+                                                    <span className="font-bold text-gray-300">{status}</span>
+                                                    <span className="font-mono text-gray-500">{count} ({percentage}%)</span>
+                                                </div>
+                                                <div className="h-2.5 w-full bg-white/5 rounded-full overflow-hidden">
+                                                    <motion.div
+                                                        initial={{ width: 0 }}
+                                                        animate={{ width: `${percentage}%` }}
+                                                        transition={{ duration: 1, delay: idx * 0.1, ease: "easeOut" }}
+                                                        className="h-full rounded-full relative"
+                                                        style={{ backgroundColor: color }}
+                                                    >
+                                                        <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                                                    </motion.div>
+                                                </div>
+                                            </div>
+                                        );
+                                    }) : (
+                                        <div className="text-center text-xs text-gray-500 py-4">No active statuses found</div>
+                                    );
+                                })()}
+                            </div>
                         </div>
                     )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in zoom-in duration-300">
+                        {filteredItems.map((item: any, idx: number) => (
+                            <motion.div
+                                key={item.id}
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ delay: idx * 0.05, duration: 0.3 }}
+                                className="group relative"
+                            >
+                                <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                                <div className="relative p-6 rounded-2xl bg-[#0e0e1a] border border-white/5 shadow-xl hover:border-white/10 hover:bg-[#131322] transition-all h-full flex flex-col gap-5">
+                                    {/* Item Name Header */}
+                                    <div className="flex items-start justify-between gap-3">
+                                        <h4 className="text-lg font-bold text-white leading-snug flex-1">{item.name}</h4>
+                                        <div className="w-2 h-2 rounded-full bg-violet-500 animate-pulse flex-shrink-0 mt-2" />
+                                    </div>
+
+                                    <div className="w-full h-[1px] bg-white/5" />
+
+                                    {/* Column Values */}
+                                    <div className="space-y-4 flex-1">
+                                        {boardData.columns?.filter((col: any) => col.type !== 'name').map((col: any) => (
+                                            <div key={col.id} className="flex flex-col gap-1.5">
+                                                <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">{col.title}</span>
+                                                <div className="min-h-[28px] flex items-center">
+                                                    <BoardCell
+                                                        item={item}
+                                                        column={col}
+                                                        boardId={selectedBoardId}
+                                                        onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
+                                                        onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </motion.div>
+                        ))}
+                        {filteredItems.length === 0 && (
+                            <div className="col-span-full text-center text-gray-500 italic py-12 bg-[#0e0e1a] rounded-3xl border border-white/5">
+                                No items found
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
 
