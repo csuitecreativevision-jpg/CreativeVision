@@ -164,17 +164,17 @@ const FolderTreeItem = ({ folder, allFolders, allBoards, onSelectBoard, selected
                                     onClick={() => onSelectBoard(board.id)}
                                     className={`flex items-center gap-2.5 px-3 py-1.5 mx-2 rounded-lg cursor-pointer transition-all mb-0.5 relative group/item
                                         ${isSelected
-                                            ? 'bg-custom-bright/10 text-white font-semibold'
+                                            ? 'bg-blue-500/10 text-white font-semibold'
                                             : 'text-gray-400 hover:text-gray-200 hover:bg-white/5 font-medium'}`}
                                     style={{ paddingLeft: `${(depth + 1) * 12 + 12}px` }}
                                     title={board.name} // Show full name on hover
                                 >
                                     {/* Active Indicator Bar */}
                                     {isSelected && (
-                                        <div className="absolute left-0 top-1.5 bottom-1.5 w-0.5 bg-custom-bright rounded-r-full shadow-[0_0_8px_rgba(124,58,237,0.5)]" />
+                                        <div className="absolute left-0 top-1.5 bottom-1.5 w-0.5 bg-blue-500 rounded-r-full shadow-[0_0_8px_rgba(59, 130, 246,0.5)]" />
                                     )}
 
-                                    <Icon className={`w-3.5 h-3.5 flex-shrink-0 transition-colors ${isSelected ? 'text-custom-bright' : 'text-gray-500 group-hover/item:text-gray-400'}`} />
+                                    <Icon className={`w-3.5 h-3.5 flex-shrink-0 transition-colors ${isSelected ? 'text-blue-400' : 'text-gray-500 group-hover/item:text-gray-400'}`} />
                                     <span className="truncate tracking-wide">{displayName}</span>
                                 </div>
                             );
@@ -187,8 +187,23 @@ const FolderTreeItem = ({ folder, allFolders, allBoards, onSelectBoard, selected
 };
 
 // --- File Preview Component ---
-const FilePreviewer = ({ url, name }: { url: string, name: string }) => {
+const FilePreviewer = ({ url, name, isLoading }: { url: string, name: string, isLoading?: boolean }) => {
     const [error, setError] = useState(false);
+
+    // Show loading state while fetching authorized URL
+    if (isLoading) {
+        return (
+            <div className="text-center text-gray-400">
+                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-white/5 flex items-center justify-center">
+                    <Loader2 className="w-10 h-10 text-blue-400 animate-spin" />
+                </div>
+                <p className="text-lg font-medium text-white mb-2">Fetching Video...</p>
+                <p className="text-sm max-w-xs mx-auto opacity-70">
+                    Requesting authorized access from Monday.com
+                </p>
+            </div>
+        );
+    }
 
     if (error) {
         return (
@@ -204,7 +219,7 @@ const FilePreviewer = ({ url, name }: { url: string, name: string }) => {
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-6 py-2 bg-custom-bright hover:brightness-110 rounded-lg text-white text-sm font-bold transition-all shadow-lg shadow-custom-bright/20"
+                    className="inline-flex items-center gap-2 px-6 py-2 bg-blue-500 hover:brightness-110 rounded-lg text-white text-sm font-bold transition-all shadow-lg shadow-blue-500/20"
                 >
                     <Download className="w-4 h-4" /> Open / Download
                 </a>
@@ -216,8 +231,21 @@ const FilePreviewer = ({ url, name }: { url: string, name: string }) => {
         return <img src={url} onError={() => setError(true)} className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" alt={name || "Preview"} />;
     }
     if (url.match(/\.(mp4|webm|ogg|mov)(\?|$)/i)) {
-        // Fix: encodeURI to handle spaces in filenames
-        return <video src={encodeURI(url)} controls autoPlay onError={() => setError(true)} className="max-w-full max-h-full rounded-lg shadow-2xl outline-none" />;
+        // Note: crossOrigin removed to avoid CORS issues with S3 signed URLs
+        // preload="auto" loads the video before playing for smoother UX
+        return (
+            <video
+                src={url}
+                controls
+                preload="auto"
+                playsInline
+                onError={(e) => {
+                    console.error('[VideoPlayer] Video failed to load:', e.currentTarget.error, url);
+                    setError(true);
+                }}
+                className="max-w-full max-h-full rounded-lg shadow-2xl outline-none"
+            />
+        );
     }
     if (url.match(/\.pdf(\?|$)/i)) {
         return <iframe src={url} className="w-full h-full rounded-lg shadow-2xl bg-white" title="PDF Preview" onError={() => setError(true)} />;
@@ -302,6 +330,15 @@ const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, 
             }
         } catch (e) {
             // value might not be JSON, ignore
+        }
+    }
+
+    // Fallback: Extract assetId from protected_static URL pattern if not already captured
+    // URL format: /protected_static/{account}/resources/{assetId}/filename
+    if (!assetId && linkUrl && linkUrl.includes('protected_static') && linkUrl.includes('/resources/')) {
+        const match = linkUrl.match(/\/resources\/(\d+)\//);
+        if (match && match[1]) {
+            assetId = match[1];
         }
     }
 
@@ -579,13 +616,14 @@ const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, 
 const SidebarItem = ({ icon, label, active = false, onClick }: { icon: any, label: string, active?: boolean, onClick?: () => void }) => (
     <button
         onClick={onClick}
-        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${active ? 'bg-custom-bright/10 border border-custom-bright/20 text-white' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group relative overflow-hidden ${active ? 'bg-white/10 border border-white/20 text-white shadow-xl shadow-black/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
     >
-        <div className={`p-1 rounded-lg ${active ? 'text-custom-bright' : 'text-gray-500 group-hover:text-white transition-colors'}`}>
+        {active && <div className="absolute inset-0 bg-gradient-to-r from-white/5 to-transparent opacity-50" />}
+        <div className={`p-1 rounded-lg relative z-10 ${active ? 'text-white' : 'text-gray-500 group-hover:text-white transition-colors'}`}>
             {icon}
         </div>
-        <span className="text-sm font-medium tracking-wide">{label}</span>
-        {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-custom-bright shadow-[0_0_8px_rgba(124,58,237,0.5)]" />}
+        <span className="text-sm font-medium tracking-wide relative z-10">{label}</span>
+        {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)] relative z-10" />}
     </button>
 );
 
@@ -1051,15 +1089,15 @@ export default function EditorPortal() {
                 <aside className="hidden lg:flex w-64 h-screen flex-col border-r border-white/5 bg-black/20 backdrop-blur-xl p-4 relative z-30 flex-shrink-0">
                     {/* Logo Area */}
                     <div className="flex items-center gap-3 mb-8 px-2">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-custom-border to-custom-violet p-[1px]">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-white/10 to-white/5 border border-white/10 p-[1px]">
                             <div className="w-full h-full rounded-lg bg-black flex items-center justify-center">
-                                <img src="/Untitled design (3).png" alt="Logo" className="w-5 h-5 object-contain" />
+                                <img src="/Untitled design (3).png" alt="Logo" className="w-5 h-5 object-contain opacity-80" />
                             </div>
                         </div>
                         <div>
                             <h2 className="text-white font-bold text-sm tracking-tight">CreativeVision</h2>
-                            <div className="text-[9px] text-custom-bright font-bold uppercase tracking-widest">
-                                {currentUserRole === 'admin' ? 'Admin Console' : currentUserRole === 'editor' ? 'Editor Portal' : 'Client Portal'}
+                            <div className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">
+                                Editor Portal
                             </div>
                         </div>
                     </div>
@@ -1111,11 +1149,11 @@ export default function EditorPortal() {
                             </div>
 
                             <div className="relative hidden md:block group">
-                                <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-custom-bright transition-colors" />
+                                <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-blue-400 transition-colors" />
                                 <input
                                     type="text"
                                     placeholder="Search..."
-                                    className="bg-white/5 border border-white/10 rounded-full pl-10 pr-4 py-1.5 text-sm text-white focus:outline-none focus:border-custom-bright/50 focus:bg-white/10 transition-all w-64"
+                                    className="bg-white/5 border border-white/10 rounded-full pl-10 pr-4 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500/50 focus:bg-white/10 transition-all w-64"
                                 />
                             </div>
                             <div className="w-8 h-8 rounded-full bg-gradient-to-r from-custom-blue to-custom-purple p-[1px]">
@@ -1166,7 +1204,7 @@ export default function EditorPortal() {
                                         title="Active Editors"
                                         value={overviewLoading ? "..." : String(overviewStats.activeEditorsCount)}
                                         change="In Workspace"
-                                        icon={<Users className="w-5 h-5 text-custom-bright" />}
+                                        icon={<Users className="w-5 h-5 text-blue-400" />}
                                         delay={0.4}
                                     />
                                 </div>
@@ -1329,7 +1367,7 @@ export default function EditorPortal() {
                                                                 : 'M'}
                                                         </span>
                                                     </div>
-                                                    <span className="text-sm text-white font-medium truncate group-hover:text-custom-bright transition-colors">
+                                                    <span className="text-sm text-white font-medium truncate group-hover:text-blue-400 transition-colors">
                                                         {selectedWorkspaceId
                                                             ? workspaces.find(w => w.id === selectedWorkspaceId)?.name
                                                             : 'Main Workspace'}
@@ -1519,7 +1557,7 @@ export default function EditorPortal() {
                                         <>
                                             {loading && !boardData ? (
                                                 <div className="flex flex-col items-center justify-center h-full">
-                                                    <Loader2 className="w-10 h-10 text-custom-bright animate-spin mb-4" />
+                                                    <Loader2 className="w-10 h-10 text-blue-400 animate-spin mb-4" />
                                                     <p className="text-gray-400 text-sm">Loading board...</p>
                                                 </div>
                                             ) : boardData ? (
@@ -1631,7 +1669,7 @@ export default function EditorPortal() {
                                                                                             setFulfillmentMonthFilter('All');
                                                                                             setIsMonthFilterOpen(false);
                                                                                         }}
-                                                                                        className={`px-4 py-3 text-xs font-bold cursor-pointer transition-colors ${fulfillmentMonthFilter === 'All' ? 'bg-custom-bright/10 text-custom-bright' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                                                                                        className={`px-4 py-3 text-xs font-bold cursor-pointer transition-colors ${fulfillmentMonthFilter === 'All' ? 'bg-blue-500/10 text-blue-400' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                                                                                     >
                                                                                         All Time
                                                                                     </div>
@@ -1642,7 +1680,7 @@ export default function EditorPortal() {
                                                                                                 setFulfillmentMonthFilter(month);
                                                                                                 setIsMonthFilterOpen(false);
                                                                                             }}
-                                                                                            className={`px-4 py-3 text-xs font-bold cursor-pointer transition-colors ${fulfillmentMonthFilter === month ? 'bg-custom-bright/10 text-custom-bright' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                                                                                            className={`px-4 py-3 text-xs font-bold cursor-pointer transition-colors ${fulfillmentMonthFilter === month ? 'bg-blue-500/10 text-blue-400' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                                                                                         >
                                                                                             {month}
                                                                                         </div>
@@ -1676,7 +1714,7 @@ export default function EditorPortal() {
                                                                                 <div className="flex flex-col items-center">
                                                                                     <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-0.5">Viewing Project</span>
                                                                                     <div className="text-sm font-mono text-white">
-                                                                                        <span className="text-custom-bright font-bold">{fulfillmentRecentIndex + 1}</span> <span className="text-gray-600">/</span> {sortedItems.length}
+                                                                                        <span className="text-blue-400 font-bold">{fulfillmentRecentIndex + 1}</span> <span className="text-gray-600">/</span> {sortedItems.length}
                                                                                     </div>
                                                                                 </div>
 
@@ -1698,7 +1736,7 @@ export default function EditorPortal() {
                                                                                 className="relative p-8 rounded-3xl bg-[#0e0e1a] border border-white/5 shadow-2xl overflow-hidden"
                                                                             >
                                                                                 <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-                                                                                    <Briefcase className="w-32 h-32 text-custom-bright" />
+                                                                                    <Briefcase className="w-32 h-32 text-blue-400" />
                                                                                 </div>
 
                                                                                 <div className="relative z-10 w-full max-w-3xl mx-auto">
@@ -1714,7 +1752,7 @@ export default function EditorPortal() {
                                                                                         {boardData.columns?.filter((col: any) => col.type !== 'name').map((col: any) => (
                                                                                             <div key={col.id} className="group p-4 rounded-2xl bg-black/20 border border-white/5 hover:bg-white/5 transition-colors">
                                                                                                 <div className="flex items-center gap-2 mb-2">
-                                                                                                    <span className="text-[10px] uppercase tracking-wider text-custom-bright font-bold">{col.title}</span>
+                                                                                                    <span className="text-[10px] uppercase tracking-wider text-blue-400 font-bold">{col.title}</span>
                                                                                                 </div>
                                                                                                 <div className="min-h-[32px] flex items-center">
                                                                                                     <BoardCell
@@ -1770,7 +1808,7 @@ export default function EditorPortal() {
                                                                         {/* Graph Section */}
                                                                         <div className="bg-[#0e0e1a] border border-white/5 p-6 rounded-3xl shadow-xl">
                                                                             <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                                                                                <div className="p-1.5 bg-custom-bright/10 rounded-lg"><LayoutDashboard className="w-4 h-4 text-custom-bright" /></div>
+                                                                                <div className="p-1.5 bg-blue-500/10 rounded-lg"><LayoutDashboard className="w-4 h-4 text-blue-400" /></div>
                                                                                 Project Status Overview
                                                                             </h3>
                                                                             <div className="space-y-4">
@@ -1805,7 +1843,7 @@ export default function EditorPortal() {
                                                                         {/* Whole Overview Grid */}
                                                                         <div>
                                                                             <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                                                                                <span className="w-1 h-6 bg-custom-bright rounded-full" />
+                                                                                <span className="w-1 h-6 bg-blue-500 rounded-full" />
                                                                                 Project Gallery
                                                                             </h3>
                                                                             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -1931,9 +1969,9 @@ export default function EditorPortal() {
                                                                                                 <div key={cycleKey} className="space-y-4">
                                                                                                     {/* Cycle Header */}
                                                                                                     <div className="flex items-center gap-3">
-                                                                                                        <div className="flex items-center gap-2 px-4 py-2 bg-custom-bright/10 border border-custom-bright/20 rounded-xl">
-                                                                                                            <div className="w-2 h-2 rounded-full bg-custom-bright" />
-                                                                                                            <h3 className="text-sm font-bold text-custom-bright uppercase tracking-wider">
+                                                                                                        <div className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                                                                                                            <div className="w-2 h-2 rounded-full bg-blue-500" />
+                                                                                                            <h3 className="text-sm font-bold text-blue-400 uppercase tracking-wider">
                                                                                                                 {cycleKey}
                                                                                                             </h3>
                                                                                                         </div>
@@ -1953,12 +1991,12 @@ export default function EditorPortal() {
                                                                                                                 transition={{ delay: idx * 0.05, duration: 0.3 }}
                                                                                                                 className="group relative"
                                                                                                             >
-                                                                                                                <div className="absolute inset-0 bg-gradient-to-br from-custom-bright/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                                                                                                                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                                                                                                                 <div className="relative p-6 rounded-2xl bg-[#0e0e1a] border border-white/5 shadow-xl hover:border-white/10 hover:bg-[#131322] transition-all h-full flex flex-col gap-5">
                                                                                                                     {/* Item Name Header */}
                                                                                                                     <div className="flex items-start justify-between gap-3">
                                                                                                                         <h4 className="text-lg font-bold text-white leading-snug flex-1">{item.name}</h4>
-                                                                                                                        <div className="w-2 h-2 rounded-full bg-custom-bright animate-pulse flex-shrink-0 mt-2" />
+                                                                                                                        <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse flex-shrink-0 mt-2" />
                                                                                                                     </div>
 
                                                                                                                     <div className="w-full h-[1px] bg-white/5" />
@@ -1999,7 +2037,7 @@ export default function EditorPortal() {
                                                                                             <tbody>
                                                                                                 {groupItems.map((item: any) => (
                                                                                                     <tr key={item.id} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
-                                                                                                        <td className="px-4 py-3 font-medium text-white group-hover:text-custom-bright transition-colors sticky left-0 bg-[#0e0e1a] group-hover:bg-[#151525] z-10 border-r border-white/5">{item.name}</td>
+                                                                                                        <td className="px-4 py-3 font-medium text-white group-hover:text-blue-400 transition-colors sticky left-0 bg-[#0e0e1a] group-hover:bg-[#151525] z-10 border-r border-white/5">{item.name}</td>
                                                                                                         {boardData.columns?.filter((c: any) => c.type !== 'name').map((col: any) => (<td key={col.id} className="px-4 py-3 text-gray-400"><BoardCell item={item} column={col} boardId={selectedBoardId} onUpdate={() => refreshBoardDetails(selectedBoardId!, true)} onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })} /></td>))}
                                                                                                     </tr>
                                                                                                 ))}
@@ -2044,8 +2082,8 @@ export default function EditorPortal() {
                             {/* Modal Header */}
                             <div className="h-16 px-6 flex items-center justify-between border-b border-white/10 bg-white/5">
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-custom-bright/10 rounded-lg">
-                                        <FileText className="w-5 h-5 text-custom-bright" />
+                                    <div className="p-2 bg-blue-500/10 rounded-lg">
+                                        <FileText className="w-5 h-5 text-blue-400" />
                                     </div>
                                     <h3 className="text-white font-bold text-lg truncate max-w-md">{previewFile?.name}</h3>
                                 </div>
@@ -2053,7 +2091,7 @@ export default function EditorPortal() {
                                     href={previewFile?.url}
                                     target="_blank"
                                     download
-                                    className="flex items-center gap-2 px-4 py-2 bg-custom-bright text-white rounded-lg hover:brightness-110 font-bold text-sm transition-all shadow-lg shadow-custom-bright/20"
+                                    className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:brightness-110 font-bold text-sm transition-all shadow-lg shadow-blue-500/20"
                                 >
                                     <Download className="w-4 h-4" /> Download Original
                                 </a>
@@ -2061,7 +2099,7 @@ export default function EditorPortal() {
 
                             {/* Modal Content */}
                             <div className="flex-1 bg-black/50 relative flex items-center justify-center p-4 overflow-hidden">
-                                <FilePreviewer url={previewFile?.url || ''} name={previewFile?.name || ''} />
+                                <FilePreviewer url={previewFile?.url || ''} name={previewFile?.name || ''} isLoading={!!previewFile?.assetId} />
                             </div>
                         </div>
                     </div>
