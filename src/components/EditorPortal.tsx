@@ -2,14 +2,14 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BackgroundLayout } from './layout/BackgroundLayout';
 import { CinematicOverlay } from './ui/CinematicOverlay';
-import { SpotlightCard } from './ui/SpotlightCard';
+
 import { FilePreviewer } from './ui/FilePreviewModal';
 import {
     Loader2,
     Eye,
     X,
     LayoutDashboard,
-    TrendingUp,
+
     Briefcase,
     Table,
     ChevronDown,
@@ -28,6 +28,7 @@ import {
 } from '../services/mondayService';
 import { supabase } from '../services/boardsService';
 import { useVisibilityPolling } from '../hooks/useMondayData';
+import { GlobalCycleView } from './views/GlobalCycleView';
 // User management Removed
 
 // --- Helpers ---
@@ -181,7 +182,7 @@ const FolderTreeItem = ({ folder, allFolders, allBoards, onSelectBoard, selected
 };
 
 // --- Board Cell Component ---
-const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, column: any, boardId: string | null, onUpdate: () => void, onPreview: (url: string, name: string, assetId?: string) => void }) => {
+export const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, column: any, boardId: string | null, onUpdate: () => void, onPreview: (url: string, name: string, assetId?: string) => void }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -193,6 +194,7 @@ const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, 
     let linkUrl = null;
     let fileName = null;
     let assetId = null;
+    let thumbnailUrl: string | null = null;
 
     // Fix for Mirror Columns: Use display_value if available (native or from our updated query)
     if ((column.type === 'mirror' || column.type === 'lookup') && colValueObj.display_value) {
@@ -226,12 +228,17 @@ const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, 
             // Universal File Extraction (Check for files in ANY column type)
             // This fixes cases where "Submission" or other columns act as files but aren't typed as 'file'
             if (val.files && val.files.length > 0) {
-                // If we haven't found a linkUrl yet, or if this is definitely a file structure
-                const fileUrl = val.files[0].public_url || val.files[0].url || val.files[0].urlThumbnail;
+                // Determine file URL and Thumbnail
+                const f = val.files[0];
+                // Try multiple properties for thumbnail
+                const thumb = f.urlThumbnail || f.thumbnail_url || f.micro_thumbnail_url;
+
+                const fileUrl = f.public_url || f.url || thumb;
                 if (fileUrl) {
                     linkUrl = fileUrl;
-                    fileName = val.files[0].name;
-                    assetId = val.files[0].assetId; // Capture assetId for on-demand public URL fetch
+                    fileName = f.name;
+                    assetId = f.assetId; // Capture assetId for on-demand public URL fetch
+                    thumbnailUrl = thumb;
                 }
             }
             if (val.files && val.files.length > 0) {
@@ -452,6 +459,61 @@ const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, 
     const shouldRenderAsFile = (column.type === 'file' && linkUrl) || (linkUrl && (isVideo || isImage || isPdf));
 
     if (shouldRenderAsFile) {
+        if (isVideo) {
+            const thumbUrl = thumbnailUrl;
+
+            // Heuristic to avoid sticking non-video links (like Drive viewers) into a <video> tag
+            // If it's a raw file (mp4/mov ending) OR we have a dedicated assetId (Monday file), attempt video tag.
+            // Otherwise, just use button or thumbnail.
+            const isRawVideo = /\.(mp4|mov|webm|ogg)$/i.test(linkUrl || '');
+            const showVideoTag = isRawVideo && !thumbUrl;
+
+            return (
+                <div
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onPreview(linkUrl!, displayValue, assetId || undefined);
+                    }}
+                    className="relative group/video w-full max-w-[240px] aspect-video bg-black/40 rounded-lg overflow-hidden border border-white/10 cursor-pointer shadow-sm hover:shadow-md transition-all hover:border-emerald-500/30"
+                >
+                    {/* Thumbnail or Video Tag */}
+                    {thumbUrl ? (
+                        <img src={thumbUrl} alt={displayValue} className="w-full h-full object-cover opacity-80 group-hover/video:opacity-100 transition-opacity" />
+                    ) : showVideoTag ? (
+                        <video
+                            src={linkUrl!}
+                            className="w-full h-full object-cover opacity-80 group-hover/video:opacity-100 transition-opacity"
+                            muted
+                            loop
+                            playsInline
+                            preload="metadata"
+                            onMouseOver={e => e.currentTarget.play().catch(() => { })}
+                            onMouseOut={e => e.currentTarget.pause()}
+                        />
+                    ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-[#0e0e1a]">
+                            <PlayCircle className="w-8 h-8 text-white/20" />
+                        </div>
+                    )}
+
+                    {/* Play Overlay */}
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover/video:bg-transparent transition-all">
+                        <div className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center border border-white/20 group-hover/video:scale-110 transition-transform">
+                            <PlayCircle className="w-5 h-5 text-white/90 fill-white/20" />
+                        </div>
+                    </div>
+
+                    {/* Label Overlay */}
+                    <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/90 via-black/50 to-transparent">
+                        <p className="text-[10px] text-white/90 font-medium truncate flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            {displayValue}
+                        </p>
+                    </div>
+                </div>
+            );
+        }
+
         return (
             <button
                 onClick={(e) => {
@@ -459,14 +521,12 @@ const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, 
                     onPreview(linkUrl!, displayValue, assetId || undefined);
                 }}
                 className={`flex items-center gap-2 py-1.5 px-3 rounded-lg border transition-all group max-w-full text-left relative overflow-hidden
-                    ${isVideo ? 'bg-red-500/10 border-red-500/20 hover:bg-red-500/20 text-red-400' :
-                        isPdf ? 'bg-orange-500/10 border-orange-500/20 hover:bg-orange-500/20 text-orange-400' :
-                            'bg-[#0073ea]/10 border-[#0073ea]/20 hover:bg-[#0073ea]/20 text-[#0073ea]'}`}
+                    ${isPdf ? 'bg-orange-500/10 border-orange-500/20 hover:bg-orange-500/20 text-orange-400' :
+                        'bg-[#0073ea]/10 border-[#0073ea]/20 hover:bg-[#0073ea]/20 text-[#0073ea]'}`}
                 title={displayValue}
             >
-                {isVideo ? <PlayCircle className="w-4 h-4 flex-shrink-0 animate-pulse" /> :
-                    isPdf ? <FileText className="w-4 h-4 flex-shrink-0" /> :
-                        <Eye className="w-4 h-4 flex-shrink-0" />}
+                {isPdf ? <FileText className="w-4 h-4 flex-shrink-0" /> :
+                    <Eye className="w-4 h-4 flex-shrink-0" />}
 
                 <span className="text-[11px] font-bold truncate group-hover:underline decoration-current">
                     {displayValue}
@@ -568,7 +628,7 @@ export default function EditorPortal() {
     const [boards, setBoards] = useState<any[]>([]);
     const [_folders, setFolders] = useState<any[]>([]);
     const [_workspaces, setWorkspaces] = useState<any[]>([]);
-    const [_selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(localStorage.getItem('portal_user_workspace') || null); // null = Main Workspace
+    const [_selectedWorkspaceId] = useState<string | null>(localStorage.getItem('portal_user_workspace') || null); // null = Main Workspace
     const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
     const [boardData, setBoardData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -577,8 +637,7 @@ export default function EditorPortal() {
     const [currentUserAllowedBoards, setCurrentUserAllowedBoards] = useState<string[]>([]);
     const [currentUserWorkspaceId, setCurrentUserWorkspaceId] = useState<string | null>(null);
 
-    // Carousel State for Form Groups
-    const [groupCarouselIndices, setGroupCarouselIndices] = useState<Record<string, number>>({});
+
 
     // Create Modal State REMOVED
 
@@ -593,17 +652,16 @@ export default function EditorPortal() {
         editorPerformance: [] as { name: string, count: number }[]
     });
     const [_overviewLoading, setOverviewLoading] = useState(false);
-
-    // Collapsed Groups State
-    const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
     // Fulfillment View Toggle State
     const [fulfillmentViewMode, setFulfillmentViewMode] = useState<'recent' | 'overview'>('recent');
+
+
     // Carousel Index for "Recent" view in Fulfillment (iterating sorted list)
     const [fulfillmentRecentIndex, setFulfillmentRecentIndex] = useState(0);
     const [fulfillmentMonthFilter, setFulfillmentMonthFilter] = useState<string>('All');
     const [isMonthFilterOpen, setIsMonthFilterOpen] = useState(false);
 
-
+    // Editor Cycle View Mode REMOVED (Moved to GlobalCycleView)
 
     // User Management Logic REMOVED for EditorPortal
 
@@ -648,30 +706,7 @@ export default function EditorPortal() {
     const stableAllowedBoards = useMemo(() => currentUserAllowedBoards, [JSON.stringify(currentUserAllowedBoards)]);
 
 
-    useEffect(() => {
-        // Fetch User Permissions on Mount
-        const email = localStorage.getItem('portal_user_email');
-        if (email) {
-            supabase
-                .from('users')
-                .select('allowed_board_ids, workspace_id')
-                .eq('email', email)
-                .single()
-                .then(({ data }) => {
-                    if (data) {
-                        setCurrentUserAllowedBoards(data.allowed_board_ids || []);
-                        setCurrentUserWorkspaceId(data.workspace_id || null);
-                    }
-                    setCheckingPermissions(false);
-                })
-                .catch((_error) => { // Fix unused param and promise chain
-                    setCheckingPermissions(false);
-                    return null;
-                });
-        } else {
-            setCheckingPermissions(false);
-        }
-    }, []);
+
 
     // Memoized refresh function for visibility-based polling
     const refreshCallback = useCallback(() => {
@@ -1027,15 +1062,7 @@ export default function EditorPortal() {
 
 
 
-    const toggleGroup = (groupId: string) => {
-        const newCollapsed = new Set(collapsedGroups);
-        if (newCollapsed.has(groupId)) {
-            newCollapsed.delete(groupId);
-        } else {
-            newCollapsed.add(groupId);
-        }
-        setCollapsedGroups(newCollapsed);
-    };
+
 
     return (
         <BackgroundLayout>
@@ -1457,165 +1484,12 @@ export default function EditorPortal() {
                                                             </div>
                                                         );
                                                     })() : (
-                                                        <div className="space-y-6">
-                                                            {boardData.groups?.map((group: any) => {
-                                                                const groupItems = boardData.items?.filter((item: any) => item.group?.id === group.id) || [];
-                                                                const isCollapsed = collapsedGroups.has(group.id);
-
-                                                                return (
-                                                                    <motion.div key={group.id} className="rounded-[2rem] bg-black/20 border border-white/5 backdrop-blur-xl overflow-hidden">
-                                                                        <div className="px-6 py-4 bg-white/5 border-b border-white/5 flex items-center gap-4 cursor-pointer hover:bg-white/10 transition-colors" onClick={() => toggleGroup(group.id)}>
-                                                                            <div className={`transition-transform duration-300 ${isCollapsed ? '-rotate-90' : 'rotate-0'}`}><div className={`w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px]`} style={{ borderTopColor: group.color || '#fff' }} /></div>
-                                                                            <h3 className="text-lg font-bold text-white tracking-wide" style={{ color: group.color || '#fff' }}>{group.title}</h3>
-                                                                        </div>
-                                                                        {!isCollapsed && (
-                                                                            <div className="p-6">
-                                                                                {boardData.name.toLowerCase().includes('form') || boardData.name.toLowerCase().includes('board') ? (() => {
-                                                                                    const currentIndex = groupCarouselIndices[group.id] || 0;
-                                                                                    const currentItem = groupItems[currentIndex];
-                                                                                    const hasNext = currentIndex < groupItems.length - 1;
-                                                                                    const hasPrev = currentIndex > 0;
-                                                                                    if (groupItems.length === 0) return <div className="text-center text-gray-500 italic py-8">No items in this group</div>;
-                                                                                    return (
-                                                                                        <div className="space-y-4">
-                                                                                            <div className="flex items-center justify-between mb-4 px-4">
-                                                                                                <button disabled={!hasPrev} onClick={() => setGroupCarouselIndices(prev => ({ ...prev, [group.id]: currentIndex - 1 }))} className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 flex items-center gap-2 transition-all"><ChevronDown className="w-4 h-4 rotate-90" /> Previous</button>
-                                                                                                <span className="text-sm font-mono text-gray-400 bg-black/40 px-3 py-1 rounded-full border border-white/5"><span className="text-white font-bold">{currentIndex + 1}</span> / {groupItems.length}</span>
-                                                                                                <button disabled={!hasNext} onClick={() => setGroupCarouselIndices(prev => ({ ...prev, [group.id]: currentIndex + 1 }))} className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 flex items-center gap-2 transition-all">Next <ChevronDown className="w-4 h-4 -rotate-90" /></button>
-                                                                                            </div>
-                                                                                            <div className="flex flex-col items-center mb-6"><h3 className="text-2xl font-black text-white mb-2 text-center">{currentItem.name}</h3><span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{boardData.name.toLowerCase().includes('form') ? 'Application Entry' : 'Project Details'}</span></div>
-                                                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-                                                                                                {boardData.columns?.filter((col: any) => col.type !== 'name').map((col: any) => (
-                                                                                                    <div key={col.id} className="p-4 rounded-2xl bg-[#0e0e1a] border border-white/5"><span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-2">{col.title}</span><BoardCell item={currentItem} column={col} boardId={selectedBoardId} onUpdate={() => refreshBoardDetails(selectedBoardId!, true)} onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })} /></div>
-                                                                                                ))}
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    );
-                                                                                })() : boardData.name.toLowerCase().includes('workspace') ? (() => {
-                                                                                    // Cycle Grouping Logic for Editor Workspaces
-                                                                                    const getCycleKey = (item: any) => {
-                                                                                        if (!item.created_at) return 'Unknown';
-                                                                                        const date = new Date(item.created_at);
-                                                                                        if (isNaN(date.getTime())) return 'Unknown';
-
-                                                                                        const year = date.getFullYear();
-                                                                                        const month = date.toLocaleString('default', { month: 'long' });
-                                                                                        const day = date.getDate();
-                                                                                        const cycle = day <= 15 ? 1 : 2;
-
-                                                                                        return `${month} ${year} - Cycle ${cycle}`;
-                                                                                    };
-
-                                                                                    const getCycleSortKey = (cycleKey: string) => {
-                                                                                        if (cycleKey === 'Unknown') return 0;
-                                                                                        const match = cycleKey.match(/(\w+) (\d+) - Cycle (\d)/);
-                                                                                        if (!match) return 0;
-                                                                                        const [, month, year, cycle] = match;
-                                                                                        const monthNum = new Date(`${month} 1, ${year}`).getMonth();
-                                                                                        return parseInt(year) * 100 + monthNum * 10 + parseInt(cycle);
-                                                                                    };
-
-                                                                                    // Group items by cycle
-                                                                                    const cycleGroups: Record<string, any[]> = {};
-                                                                                    groupItems.forEach((item: any) => {
-                                                                                        const cycleKey = getCycleKey(item);
-                                                                                        if (!cycleGroups[cycleKey]) cycleGroups[cycleKey] = [];
-                                                                                        cycleGroups[cycleKey].push(item);
-                                                                                    });
-
-                                                                                    // Sort cycles in descending order (newest first)
-                                                                                    const sortedCycles = Object.keys(cycleGroups).sort((a, b) =>
-                                                                                        getCycleSortKey(b) - getCycleSortKey(a)
-                                                                                    );
-
-                                                                                    return (
-                                                                                        <div className="space-y-8">
-                                                                                            {sortedCycles.map((cycleKey) => (
-                                                                                                <div key={cycleKey} className="space-y-4">
-                                                                                                    {/* Cycle Header */}
-                                                                                                    <div className="flex items-center gap-3">
-                                                                                                        <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
-                                                                                                            <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                                                                                                            <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wider">
-                                                                                                                {cycleKey}
-                                                                                                            </h3>
-                                                                                                        </div>
-                                                                                                        <div className="flex-1 h-[1px] bg-white/5" />
-                                                                                                        <span className="text-xs text-gray-500 font-mono">
-                                                                                                            {cycleGroups[cycleKey].length} {cycleGroups[cycleKey].length === 1 ? 'item' : 'items'}
-                                                                                                        </span>
-                                                                                                    </div>
-
-                                                                                                    {/* Card Grid for this Cycle */}
-                                                                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                                                                                        {cycleGroups[cycleKey].map((item: any, idx: number) => (
-                                                                                                            <motion.div
-                                                                                                                key={item.id}
-                                                                                                                initial={{ opacity: 0, y: 20 }}
-                                                                                                                animate={{ opacity: 1, y: 0 }}
-                                                                                                                transition={{ delay: idx * 0.05, duration: 0.3 }}
-                                                                                                                className="group relative"
-                                                                                                            >
-                                                                                                                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                                                                                                                <div className="relative p-6 rounded-2xl bg-[#0e0e1a] border border-white/5 shadow-xl hover:border-white/10 hover:bg-[#131322] transition-all h-full flex flex-col gap-5">
-                                                                                                                    {/* Item Name Header */}
-                                                                                                                    <div className="flex items-start justify-between gap-3">
-                                                                                                                        <h4 className="text-lg font-bold text-white leading-snug flex-1">{item.name}</h4>
-                                                                                                                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0 mt-2" />
-                                                                                                                    </div>
-
-                                                                                                                    <div className="w-full h-[1px] bg-white/5" />
-
-                                                                                                                    {/* Column Values */}
-                                                                                                                    <div className="space-y-4 flex-1">
-                                                                                                                        {boardData.columns?.filter((col: any) => col.type !== 'name').map((col: any) => (
-                                                                                                                            <div key={col.id} className="flex flex-col gap-1.5">
-                                                                                                                                <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">{col.title}</span>
-                                                                                                                                <div className="min-h-[28px] flex items-center">
-                                                                                                                                    <BoardCell
-                                                                                                                                        item={item}
-                                                                                                                                        column={col}
-                                                                                                                                        boardId={selectedBoardId}
-                                                                                                                                        onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
-                                                                                                                                        onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
-                                                                                                                                    />
-                                                                                                                                </div>
-                                                                                                                            </div>
-                                                                                                                        ))}
-                                                                                                                    </div>
-                                                                                                                </div>
-                                                                                                            </motion.div>
-                                                                                                        ))}
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                            ))}
-                                                                                            {groupItems.length === 0 && (
-                                                                                                <div className="text-center text-gray-500 italic py-8">No items in this group</div>
-                                                                                            )}
-                                                                                        </div>
-                                                                                    );
-                                                                                })() : (
-                                                                                    // Default Table View
-                                                                                    <div className="overflow-x-auto rounded-xl border border-white/5 bg-black/20">
-                                                                                        <table className="w-full text-left text-sm whitespace-nowrap">
-                                                                                            <thead><tr className="border-b border-white/10 bg-white/5"><th className="px-4 py-3 text-xs font-bold text-white uppercase tracking-wider w-[240px]">Name</th>{boardData.columns?.filter((c: any) => c.type !== 'name').map((col: any) => (<th key={col.id} className="px-4 py-3 text-xs font-bold text-gray-300 uppercase tracking-wider min-w-[150px]">{col.title}</th>))}</tr></thead>
-                                                                                            <tbody>
-                                                                                                {groupItems.map((item: any) => (
-                                                                                                    <tr key={item.id} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
-                                                                                                        <td className="px-4 py-3 font-medium text-white group-hover:text-emerald-400 transition-colors sticky left-0 bg-[#0e0e1a] group-hover:bg-[#151525] z-10 border-r border-white/5">{item.name}</td>
-                                                                                                        {boardData.columns?.filter((c: any) => c.type !== 'name').map((col: any) => (<td key={col.id} className="px-4 py-3 text-gray-400"><BoardCell item={item} column={col} boardId={selectedBoardId} onUpdate={() => refreshBoardDetails(selectedBoardId!, true)} onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })} /></td>))}
-                                                                                                    </tr>
-                                                                                                ))}
-                                                                                            </tbody>
-                                                                                        </table>
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
-                                                                        )}
-                                                                    </motion.div>
-                                                                );
-                                                            })}
-                                                        </div>
+                                                        <GlobalCycleView
+                                                            boardData={boardData}
+                                                            selectedBoardId={selectedBoardId}
+                                                            refreshBoardDetails={refreshBoardDetails}
+                                                            setPreviewFile={setPreviewFile}
+                                                        />
                                                     )}
                                                 </div>
                                             ) : null}
