@@ -1,4 +1,4 @@
-import CareersSection from './CareersSection';
+import CareersSection from '../components/CareersSection';
 
 interface JoinPageProps {
     onBack: () => void;

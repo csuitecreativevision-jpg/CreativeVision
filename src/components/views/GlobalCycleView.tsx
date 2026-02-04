@@ -7,7 +7,7 @@ import {
     FileText,
     ChevronDown,
 } from 'lucide-react';
-import { BoardCell } from '../EditorPortal';
+import { BoardCell } from '../shared/BoardCell';
 
 interface GlobalCycleViewProps {
     boardData: any;

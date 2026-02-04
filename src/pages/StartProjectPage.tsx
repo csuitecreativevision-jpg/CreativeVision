@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { packages } from '../data/pricingData';
-import PricingSection from './PricingSection';
-import PlanShowcase from './PlanShowcase';
-import PricingGrid from './PricingGrid';
-import Footer from './Footer';
+import PricingSection from '../components/PricingSection';
+import PlanShowcase from '../components/PlanShowcase';
+import PricingGrid from '../components/PricingGrid';
+import Footer from '../components/Footer';
 
 interface StartProjectPageProps {
     onBack: () => void;

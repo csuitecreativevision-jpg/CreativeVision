@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Play, Check, Calendar } from 'lucide-react';
-import MainNavigation from './MainNavigation';
-import CountingNumber from './CountingNumber';
-import Footer from './Footer';
-import { SpotlightCard } from './ui/SpotlightCard';
-import { MagneticButton } from './ui/MagneticButton';
+import MainNavigation from '../components/MainNavigation';
+import CountingNumber from '../components/CountingNumber';
+import Footer from '../components/Footer';
+import { SpotlightCard } from '../components/ui/SpotlightCard';
+import { MagneticButton } from '../components/ui/MagneticButton';
 
 interface HireUsPageProps {
   onBack: () => void;

@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import Hero from './Hero';
-import Services from './Services';
-import Portfolio from './Portfolio';
-import TrustSignals from './sections/TrustSignals';
-import ProblemSection from './sections/ProblemSection';
-import SummarySection from './sections/SummarySection';
-import { HorizontalScrollWrapper } from './layout/HorizontalScrollWrapper';
+import Hero from '../components/Hero';
+import Services from '../components/Services';
+import Portfolio from '../components/Portfolio';
+import TrustSignals from '../components/sections/TrustSignals';
+import ProblemSection from '../components/sections/ProblemSection';
+import SummarySection from '../components/sections/SummarySection';
+import { HorizontalScrollWrapper } from '../components/layout/HorizontalScrollWrapper';
 import { motion } from 'framer-motion';
 
 const Slide = ({ children, id, className = "", enableFlash = false }: { children: React.ReactNode, id?: string, className?: string, enableFlash?: boolean }) => {

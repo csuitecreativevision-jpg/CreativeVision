@@ -1,28 +1,23 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BackgroundLayout } from './layout/BackgroundLayout';
-import { CinematicOverlay } from './ui/CinematicOverlay';
-import { SpotlightCard } from './ui/SpotlightCard';
-import { FilePreviewer } from './ui/FilePreviewModal';
+import { PortalLayout } from '../components/shared/PortalLayout';
+import { BoardCell } from '../components/shared/BoardCell';
+import { SidebarItem } from '../components/shared/SidebarItem';
+import { FilePreviewer } from '../components/ui/FilePreviewModal';
 import {
     Loader2,
     Eye,
-    X,
     LayoutDashboard,
-    Users,
-    Activity,
-    Search,
-    TrendingUp,
-    Briefcase,
     Table,
     ChevronDown,
-    MoreHorizontal,
     FileText,
-    Download,
-    AlertCircle,
     LayoutGrid,
     Clock,
-    PlayCircle
+    PlayCircle,
+    LogOut,
+    Briefcase,
+    X,
+    Download
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -46,530 +41,7 @@ const getBoardIcon = (name: string) => {
 
 // --- Folder & Tree Components ---
 
-const FolderTreeItem = ({ folder, allFolders, allBoards, onSelectBoard, selectedBoardId, depth = 0 }: any) => {
-    const [isOpen, setIsOpen] = useState(false);
 
-    // Custom Sort Logic based on Screenshot
-    const FOLDER_ORDER = ["Hiring and Onboarding", "Management", "Editors", "Clients", "Old"];
-    const getSortWeight = (name: string) => {
-        const index = FOLDER_ORDER.findIndex(n => name.includes(n));
-        return index === -1 ? 999 : index;
-    };
-
-    // Find nested items using IDs (Robust string comparison)
-    const childFolders = folder.children
-        ? folder.children
-            .map((c: any) => allFolders.find((f: any) => String(f.id) === String(c.id)))
-            .filter(Boolean)
-            .sort((a: any, b: any) => getSortWeight(a.name) - getSortWeight(b.name))
-        : [];
-
-    const childBoards = folder.children
-        ? folder.children
-            .map((c: any) => allBoards.find((b: any) => String(b.id) === String(c.id)))
-            .filter(Boolean)
-            .sort((a: any, b: any) => a.name.localeCompare(b.name)) // Boards can stay A-Z or unsorted? Let's keep A-Z for boards inside folders for now unless user complains.
-        : [];
-
-
-
-    // Auto-expand if selected board is inside
-    useEffect(() => {
-        if (childBoards.some((b: any) => b.id === selectedBoardId)) {
-            setIsOpen(true);
-        }
-    }, [selectedBoardId, childBoards]);
-
-    // Recursive check for content visibility
-    const hasVisibleBoards = (fId: string): boolean => {
-        // Check direct boards in this folder
-        const hasDirectBoards = allBoards.some((b: any) => String(b.folder_id) === String(fId));
-        if (hasDirectBoards) return true;
-
-        // Check subfolders
-        const thisFolder = allFolders.find((f: any) => String(f.id) === String(fId));
-        if (!thisFolder || !thisFolder.children) return false;
-
-        return thisFolder.children.some((child: any) => {
-            // Is child a folder?
-            const isFolder = allFolders.find((f: any) => String(f.id) === String(child.id));
-            if (isFolder) return hasVisibleBoards(isFolder.id);
-            // Is child a board? (Already filtered list)
-            const isBoard = allBoards.find((b: any) => String(b.id) === String(child.id));
-            return !!isBoard;
-        });
-    };
-
-    const hasContent = hasVisibleBoards(folder.id);
-    if (!hasContent) return null;
-
-    const hasChildren = childFolders.length > 0 || childBoards.length > 0;
-    // Redundant but safe check? No, childFolders might be populated but empty inside.
-    // Actually hasVisibleBoards covers it. But childFolders array is used for rendering.
-    // If hasContent is true, then render.
-
-    // We can rely on hasContent.
-    if (!hasChildren && !hasContent) return null;
-
-    return (
-        <div className="select-none text-[13px] font-sans">
-            <div
-                className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg cursor-pointer transition-all mb-0.5 group ${isOpen ? 'text-white' : 'hover:bg-white/5 text-gray-400 hover:text-gray-200'}`}
-                style={{ paddingLeft: `${depth * 12 + 12}px` }}
-                onClick={() => setIsOpen(!isOpen)}
-            >
-                <div className="w-4 h-4 flex-shrink-0 flex items-center justify-center transition-colors">
-                    <div className={`transition-transform duration-200 ${isOpen ? 'rotate-90 text-white' : 'text-gray-500 group-hover:text-gray-300'}`}>
-                        <svg width="6" height="8" viewBox="0 0 6 8" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M0 0L6 4L0 8V0Z" />
-                        </svg>
-                    </div>
-                </div>
-                {/* Folder Name - Colored */}
-                <span className={`font-semibold truncate transition-colors ${isOpen ? 'opacity-100' : 'opacity-90'}`} style={{ color: folder.color || 'inherit' }}>
-                    {folder.name}
-                </span>
-            </div>
-
-            <AnimatePresence>
-                {isOpen && (
-                    <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="overflow-hidden"
-                    >
-                        {childFolders.map((subFolder: any) => (
-                            <FolderTreeItem
-                                key={subFolder.id}
-                                folder={subFolder}
-                                allFolders={allFolders}
-                                allBoards={allBoards}
-                                onSelectBoard={onSelectBoard}
-                                selectedBoardId={selectedBoardId}
-                                depth={depth + 1}
-                            />
-                        ))}
-                        {childBoards.map((board: any) => {
-                            const Icon = getBoardIcon(board.name);
-                            // Clean Name for Display
-                            let displayName = board.name.replace(/ - Workspace/g, '').replace(/\([^)]*\)/g, '').trim();
-                            if (!displayName) displayName = board.name.replace(/ - Workspace/g, '').trim();
-                            const isSelected = selectedBoardId === board.id;
-
-                            return (
-                                <div
-                                    key={board.id}
-                                    onClick={() => onSelectBoard(board.id)}
-                                    className={`flex items-center gap-2.5 px-3 py-1.5 mx-2 rounded-lg cursor-pointer transition-all mb-0.5 relative group/item
-                                        ${isSelected
-                                            ? 'bg-emerald-500/10 text-white font-semibold'
-                                            : 'text-gray-400 hover:text-gray-200 hover:bg-white/5 font-medium'}`}
-                                    style={{ paddingLeft: `${(depth + 1) * 12 + 12}px` }}
-                                    title={board.name} // Show full name on hover
-                                >
-                                    {/* Active Indicator Bar */}
-                                    {isSelected && (
-                                        <div className="absolute left-0 top-1.5 bottom-1.5 w-0.5 bg-emerald-500 rounded-r-full shadow-[0_0_8px_rgba(16, 185, 129,0.5)]" />
-                                    )}
-
-                                    <Icon className={`w-3.5 h-3.5 flex-shrink-0 transition-colors ${isSelected ? 'text-emerald-400' : 'text-gray-500 group-hover/item:text-gray-400'}`} />
-                                    <span className="truncate tracking-wide">{displayName}</span>
-                                </div>
-                            );
-                        })}
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </div>
-    );
-};
-
-// --- Board Cell Component ---
-const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, column: any, boardId: string | null, onUpdate: () => void, onPreview: (url: string, name: string, assetId?: string) => void }) => {
-    const [isEditing, setIsEditing] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-    const { mutateAsync: updateItem } = useUpdateItemValue();
-
-    // Find value for this column
-    const colValueObj = item.column_values.find((v: any) => v.id === column.id);
-    let displayValue = colValueObj ? (colValueObj.text || '') : '';
-
-    // Robust Parsing for Complex Types
-    let linkUrl = null;
-    let fileName = null;
-    let assetId = null;
-
-    // Fix for Mirror Columns: Use display_value if available (native or from our updated query)
-    if ((column.type === 'mirror' || column.type === 'lookup') && colValueObj.display_value) {
-        displayValue = colValueObj.display_value;
-    }
-
-    if (colValueObj && colValueObj.value) {
-        try {
-            const val = JSON.parse(colValueObj.value);
-            // Link
-            if (column.type === 'link') {
-                linkUrl = val.url;
-                // If we haven't already set displayValue from mirror logic, use the link text
-                if (!colValueObj.display_value) {
-                    displayValue = val.text || val.url || displayValue;
-                }
-            }
-            // Date
-            if (column.type === 'date') {
-                displayValue = val.date || displayValue;
-            }
-            // Email
-            if (column.type === 'email') {
-                displayValue = val.email || displayValue;
-            }
-            // Email
-            if (column.type === 'email') {
-                displayValue = val.email || displayValue;
-            }
-
-            // Universal File Extraction (Check for files in ANY column type)
-            // This fixes cases where "Submission" or other columns act as files but aren't typed as 'file'
-            if (val.files && val.files.length > 0) {
-                // If we haven't found a linkUrl yet, or if this is definitely a file structure
-                const fileUrl = val.files[0].public_url || val.files[0].url || val.files[0].urlThumbnail;
-                if (fileUrl) {
-                    linkUrl = fileUrl;
-                    fileName = val.files[0].name;
-                    assetId = val.files[0].assetId; // Capture assetId for on-demand public URL fetch
-                }
-            }
-            if (val.files && val.files.length > 0) {
-                // If we haven't found a linkUrl yet, or if this is definitely a file structure
-                const fileUrl = val.files[0].public_url || val.files[0].url || val.files[0].urlThumbnail;
-                if (fileUrl) {
-                    linkUrl = fileUrl;
-                    fileName = val.files[0].name;
-                }
-            }
-        } catch (e) {
-            // value might not be JSON, ignore
-        }
-    }
-
-    // Special handling if displayValue (text) is actually a raw URL for files (User Screenshot Case)
-    // OR if it's just a filename that we want to treat as a file (Universal Playback Request)
-    const isFileLike = /\.(mp4|mov|webm|ogg|pdf|jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(displayValue);
-
-    if (!linkUrl && (displayValue.startsWith('http') || isFileLike)) {
-        // If it looks like a URL, use it as the link
-        if (displayValue.startsWith('http') || displayValue.startsWith('blob:')) {
-            linkUrl = displayValue;
-        }
-        // If it's just a filename (e.g. "video.mp4") without HTTP, we might treat it as a relative path or just a file label.
-        // For the purpose of the user's request "make it playable", we assume the text MIGHT be a playable URL or at least we should try.
-        // If it's just a filename, we can't play it without a base URL.
-        // But let's at least capture the filename.
-
-        try {
-            // If it's a URL, extract filename. If it's already a filename, keep it.
-            fileName = displayValue.startsWith('http') ? decodeURIComponent(displayValue.split('/').pop() || 'File') : displayValue;
-        } catch (e) {
-            fileName = "Attachment";
-        }
-    }
-    if (fileName) displayValue = fileName; // Override ugly URL text with filename
-
-    // Fallback: Extract assetId from protected_static URL pattern if not already captured
-    // URL format: /protected_static/{account}/resources/{assetId}/filename
-    // IMPORTANT: This must run AFTER linkUrl is set from displayValue (above)
-    if (!assetId && linkUrl && linkUrl.includes('protected_static') && linkUrl.includes('/resources/')) {
-        const match = linkUrl.match(/\/resources\/(\d+)\//);
-        if (match && match[1]) {
-            assetId = match[1];
-        }
-    }
-
-
-    // Parse column settings for Status/Dropdown
-    let options: any[] = [];
-    if (column.type === 'color' || column.type === 'status') {
-        try {
-            const settings = JSON.parse(column.settings_str || '{}');
-            if (settings.labels) {
-                options = Object.entries(settings.labels).map(([key, label]: any) => ({
-                    id: key,
-                    label: label,
-                    color: settings.labels_colors ? settings.labels_colors[key]?.color : '#fff'
-                }));
-            }
-        } catch (e) {
-            console.error("Failed to parse column settings", e);
-        }
-    }
-
-    const handleSave = async (newValue: string) => {
-        if (newValue === displayValue) {
-            setIsEditing(false);
-            return;
-        }
-
-        if (!boardId) {
-            console.error("Cannot save: No board ID");
-            setIsEditing(false);
-            return;
-        }
-
-        setIsLoading(true);
-        try {
-            await updateItem({ boardId, itemId: item.id, columnId: column.id, value: newValue });
-            await onUpdate();
-        } catch (err) {
-            console.error(err);
-            alert("Failed to update value");
-        } finally {
-            setIsLoading(false);
-            setIsEditing(false);
-        }
-    };
-
-    if (isLoading) {
-        return <div className="text-gray-500 text-xs animate-pulse flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Saving...</div>;
-    }
-
-    // Heuristic: If it's a mirror column that looks like a status, treat it as one
-    const isMirrorStatus = (column.type === 'mirror' || column.type === 'lookup') && column.title.toLowerCase().includes('status');
-
-    // Status / Dropdown Rendering OR Mirror Status
-    if (column.type === 'color' || column.type === 'status' || isMirrorStatus) {
-        let currentOption = options.find(o => o.label === displayValue);
-
-        // Manual Color Override for Mirror Statuses if options are missing
-        if (!currentOption && isMirrorStatus) {
-            const val = displayValue;
-            // Detailed Mapping based on User Screenshot
-            if (val.includes('Unassigned')) currentOption = { label: val, color: '#595959', id: 'unassigned' }; // Dark Grey
-
-            // Yellows
-            else if (val.includes('Assigned (CV)')) currentOption = { label: val, color: '#fec12d', id: 'assigned_cv' };
-
-            // Oranges
-            else if (val.includes('Working on it (CV)')) currentOption = { label: val, color: '#fdab3d', id: 'working_cv' };
-            else if (val.includes('Exporting')) currentOption = { label: val, color: '#ffadad', id: 'exporting' }; // Light Peach/Orange
-
-            // Pinks/Reds
-            else if (val.includes('Taking a break (CV)')) currentOption = { label: val, color: '#ff158a', id: 'break_cv' };
-            else if (val.includes('Client Info')) currentOption = { label: val, color: '#e2445c', id: 'client_info' };
-            else if (val.includes('(Client) Approved')) currentOption = { label: val, color: '#cd3859', id: 'client_approved' }; // Dark Red
-
-            // Purples
-            else if (val.includes('For Approval (CV)')) currentOption = { label: val, color: '#5D24AA', id: 'for_approval_cv' }; // Deep Purple
-            else if (val.includes('(Client) Uploading')) currentOption = { label: val, color: '#904EE2', id: 'client_uploading' };
-
-            // Greens
-            else if (val.includes('1st Approval')) currentOption = { label: val, color: '#9cd326', id: '1st_approval' }; // Lime
-            else if (val.includes('Approved (CV)')) currentOption = { label: val, color: '#00c875', id: 'approved_cv' };
-            else if (val.includes('(Client) Sent for')) currentOption = { label: val, color: '#009d6c', id: 'client_sent' }; // Dark Green
-
-            // Blues
-            else if (val.includes('Waiting for Client')) currentOption = { label: val, color: '#579bfc', id: 'waiting_client' };
-            else if (val.includes('Downloading')) currentOption = { label: val, color: '#505f79', id: 'downloading' }; // Dark Blue Grey
-
-            // Fallback Heuristics
-            else if (val.includes('Approved')) currentOption = { label: val, color: '#00c875', id: 'approved_gen' };
-            else if (val.includes('Revision')) currentOption = { label: val, color: '#eebb4d', id: 'revision' }; // Goldish
-            else if (val.includes('Stuck') || val.includes('Error')) currentOption = { label: val, color: '#e2445c', id: 'error' };
-            else if (val) currentOption = { label: val, color: '#579bfc', id: 'default' };
-        }
-
-        // EDIT MODE (Only for native status, not mirrors)
-        if (isEditing && !isMirrorStatus) {
-            return (
-                <div className="relative z-50">
-                    <div className="fixed inset-0" onClick={() => setIsEditing(false)} />
-                    <div className="absolute top-0 left-0 min-w-[140px] bg-[#1a1a2e] border border-white/20 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 z-50 py-1">
-                        {options.map((opt: any) => (
-                            <button
-                                key={opt.id}
-                                onClick={() => handleSave(opt.label)}
-                                className="w-full text-left px-4 py-2 hover:bg-white/10 text-white text-xs transition-colors flex items-center gap-3"
-                            >
-                                <span className="w-2.5 h-2.5 rounded-full ring-2 ring-white/10" style={{ backgroundColor: opt.color || '#fff' }} />
-                                {opt.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            );
-        }
-
-        return (
-            <button
-                disabled={isMirrorStatus}
-                onClick={() => !isMirrorStatus && setIsEditing(true)}
-                className={`px-4 py-1.5 rounded-full text-white text-[11px] font-bold text-center min-w-[90px] transition-all shadow-lg shadow-black/20
-                    ${!isMirrorStatus ? 'hover:brightness-110 active:scale-95 cursor-pointer' : 'cursor-default opacity-90'}`}
-                style={currentOption && currentOption.label ? { backgroundColor: currentOption.color || '#7c3aed' } : { backgroundColor: '#2d2d3d', color: '#9ca3af' }}
-            >
-                {currentOption ? currentOption.label : (displayValue || 'Empty')}
-            </button>
-        );
-    }
-
-    // Link Rendering
-    if (column.type === 'link' && !isEditing && linkUrl) {
-        return (
-            <a
-                href={linkUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[#0073ea] hover:text-white hover:underline truncate text-sm flex items-center gap-1"
-            >
-                {displayValue}
-                <span className="text-[10px] opacity-50">↗</span>
-            </a>
-        );
-    }
-
-    // Auto-detect files in Text columns (Universal Playback)
-    const isFilePattern = (str: string) => /\.(mp4|mov|webm|ogg|pdf|jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(str);
-
-    // If it's a text column but contains a filename/URL, treat as file
-    if (!isEditing && isFilePattern(displayValue) && !linkUrl) {
-        // If it's just a filename without a URL, we might need a way to construct the URL 
-        // OR if it's a full URL in the text
-
-        // If we strictly have a text value that is a filename (e.g. "video.mp4") but NO URL, 
-        // we can't really play it unless we know the base path. 
-        // HOWEVER, based on the user request, it seems these MIGHT be "File" columns behaving as text, 
-        // or they just want the UI to LOOK like a file even if unplayable?
-        // BUT the user said "make it playable". 
-        // If the 'displayValue' IS the URL (common in some exports), then we use it.
-        // If it's just a filename, we might be limited, but let's assume the column might have hidden value or the text IS the link.
-
-        // Actually, looking at the code above (lines 250-258), we already try to extract linkUrl from text if it starts with http.
-        // If we found a linkUrl (even effectively from text), we should render it as a file.
-
-        // Let's broaden the "File Rendering" block above instead of adding a new one here.
-    }
-
-    // --- ENHANCED FILE RENDERING ---
-    // render if explicit file column OR if we detected a valid link/file pattern in a text column
-    const isVideo = /\.(mp4|mov|webm|ogg)(\?|$)/i.test(displayValue) || (linkUrl && /\.(mp4|mov|webm|ogg)(\?|$)/i.test(linkUrl));
-    const isImage = /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(displayValue) || (linkUrl && /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(linkUrl));
-    const isPdf = /\.pdf(\?|$)/i.test(displayValue) || (linkUrl && /\.pdf(\?|$)/i.test(linkUrl));
-
-    const shouldRenderAsFile = (column.type === 'file' && linkUrl) || (linkUrl && (isVideo || isImage || isPdf));
-
-    if (shouldRenderAsFile) {
-        return (
-            <button
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onPreview(linkUrl!, displayValue, assetId || undefined);
-                }}
-                className={`flex items-center gap-2 py-1.5 px-3 rounded-lg border transition-all group max-w-full text-left relative overflow-hidden
-                    ${isVideo ? 'bg-red-500/10 border-red-500/20 hover:bg-red-500/20 text-red-400' :
-                        isPdf ? 'bg-orange-500/10 border-orange-500/20 hover:bg-orange-500/20 text-orange-400' :
-                            'bg-[#0073ea]/10 border-[#0073ea]/20 hover:bg-[#0073ea]/20 text-[#0073ea]'}`}
-                title={displayValue}
-            >
-                {isVideo ? <PlayCircle className="w-4 h-4 flex-shrink-0 animate-pulse" /> :
-                    isPdf ? <FileText className="w-4 h-4 flex-shrink-0" /> :
-                        <Eye className="w-4 h-4 flex-shrink-0" />}
-
-                <span className="text-[11px] font-bold truncate group-hover:underline decoration-current">
-                    {displayValue}
-                </span>
-            </button>
-        );
-    }
-
-    // Fallback: If it LOOKS like a file (has extension) but we have NO URL (just text "video.mp4")
-    // Use a "Broken Link" or "Request" style? 
-    // Or just render it as a file button that does nothing but maybe open a search?
-    // User said: "Making finding client...mp4" (Text) playable. 
-    // If it's just text, we can't play it. 
-    // BUT maybe the "Submission" column IS a file column but the data structure wasn't parsed correctly? 
-    // Let's look at lines 238-243 again. 
-    // If column type is NOT 'file', we don't extract `val.files`. 
-    // We should try to check if `val.files` exists EVEN IF column type is not explicitly 'file' (in case of mislabeled column types from API).
-
-    // Generic Link in Text Column (Re-applied)
-    if (!isEditing && displayValue && (displayValue.startsWith('http://') || displayValue.startsWith('https://'))) {
-        return (
-            <a
-                href={displayValue}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="text-[#0073ea] hover:text-white hover:underline truncate text-sm flex items-center gap-1"
-            >
-                {displayValue}
-                <span className="text-[10px] opacity-50">↗</span>
-            </a>
-        );
-    }
-
-    // Text / Numbers / Default Rendering
-    if (isEditing) {
-        return (
-            <input
-                autoFocus
-                className="bg-[#050511] border border-custom-blue/50 rounded-lg px-3 py-1.5 text-white text-sm w-full outline-none shadow-[0_0_15px_rgba(0,115,234,0.1)] transition-all"
-                defaultValue={displayValue}
-                onBlur={(e) => handleSave(e.target.value)}
-                onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSave(e.currentTarget.value);
-                    if (e.key === 'Escape') setIsEditing(false);
-                }}
-            />
-        );
-    }
-
-    return (
-        <div
-            onClick={() => setIsEditing(true)}
-            className="cursor-text hover:bg-white/5 px-2 py-1 rounded-md transition-colors text-gray-200 text-sm min-h-[28px] w-full border border-transparent hover:border-white/5 flex items-center"
-        >
-            {displayValue || <span className="text-gray-600 text-xs italic">Empty</span>}
-        </div>
-    );
-};
-
-// ... (Rest of sidebar items and structure)
-const SidebarItem = ({ icon, label, active = false, onClick, isClientItem = false }: { icon?: any, label: string, active?: boolean, onClick?: () => void, isClientItem?: boolean }) => (
-    <button
-        onClick={onClick}
-        className={`w-full flex items-center gap-3 px-4 py-2 text-sm transition-all duration-200 group relative ${active
-            ? 'bg-white/5 text-white border-l-2 border-emerald-500'
-            : 'text-gray-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent'
-            }`}
-    >
-        {icon && !isClientItem && <div className={`${active ? 'text-white' : 'text-gray-500 group-hover:text-white'}`}>{icon}</div>}
-        {isClientItem && (
-            <div className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-emerald-500' : 'bg-gray-600 group-hover:bg-gray-400'} mr-2`} />
-        )}
-        <span className="truncate font-medium">{label}</span>
-    </button>
-);
-
-const StatCard = ({ title, value, change, icon, delay }: { title: string, value: string, change: string, icon: any, delay: number }) => (
-    <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay, duration: 0.5 }}
-    >
-        <SpotlightCard className="p-6 rounded-3xl bg-black/20 border border-white/5 backdrop-blur-xl h-full">
-            <div className="flex justify-between items-start mb-4">
-                <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
-                    {icon}
-                </div>
-                <div className="px-2 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-[10px] font-bold text-green-400 flex items-center gap-1">
-                    <TrendingUp className="w-3 h-3" /> {change}
-                </div>
-            </div>
-            <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">{title}</h3>
-            <div className="text-3xl font-black text-white tracking-tight">{value}</div>
-        </SpotlightCard>
-    </motion.div>
-);
 
 export default function ClientPortal() {
     const navigate = useNavigate();
@@ -591,9 +63,7 @@ export default function ClientPortal() {
 
     // Data State
     const [boards, setBoards] = useState<any[]>([]);
-    const [folders, setFolders] = useState<any[]>([]);
-    const [workspaces, setWorkspaces] = useState<any[]>([]);
-    const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(localStorage.getItem('portal_user_workspace') || null); // null = Main Workspace
+
     const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
     const [manualLoading, setManualLoading] = useState(true);
     const [previewFile, setPreviewFile] = useState<{ url: string, name: string, assetId?: string } | null>(null);
@@ -611,28 +81,26 @@ export default function ClientPortal() {
     // Carousel State for Form Groups
     const [groupCarouselIndices, setGroupCarouselIndices] = useState<Record<string, number>>({});
 
-    // Create Modal State REMOVED
-
-    // Overview Stats State
-    const [overviewStats, setOverviewStats] = useState({
-        activeClientsCount: 0,
-        activeProjectsCount: 0,
-        activeEditorsCount: 0,
-        topEditor: { name: 'N/A', count: 0 },
-        systemStatus: 'Stable',
-        clientProjectDistribution: [] as { name: string, count: number }[],
-        editorPerformance: [] as { name: string, count: number }[]
-    });
-    const [overviewLoading, setOverviewLoading] = useState(false);
-
     // Collapsed Groups State
     const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
     // Fulfillment View Toggle State
     const [fulfillmentViewMode, setFulfillmentViewMode] = useState<'recent' | 'overview'>('recent');
     // Carousel Index for "Recent" view in Fulfillment (iterating sorted list)
     const [fulfillmentRecentIndex, setFulfillmentRecentIndex] = useState(0);
     const [fulfillmentMonthFilter, setFulfillmentMonthFilter] = useState<string>('All');
     const [isMonthFilterOpen, setIsMonthFilterOpen] = useState(false);
+
+    const toggleGroup = (groupId: string) => {
+        const newCollapsed = new Set(collapsedGroups);
+        if (newCollapsed.has(groupId)) {
+            newCollapsed.delete(groupId);
+        } else {
+            newCollapsed.add(groupId);
+        }
+        setCollapsedGroups(newCollapsed);
+    };
+
 
 
 
@@ -669,8 +137,7 @@ export default function ClientPortal() {
                         setCurrentUserWorkspaceId(data.workspace_id || null);
                     }
                     setCheckingPermissions(false);
-                })
-                .catch(() => setCheckingPermissions(false));
+                }, () => setCheckingPermissions(false));
         } else {
             setCheckingPermissions(false);
         }
@@ -789,22 +256,9 @@ export default function ClientPortal() {
             setBoards(filteredBoards);
 
             // Filter Folders as well
-            let filteredFolders = foldersData || [];
-            if (currentUserAllowedBoards.length > 0) {
-                // If specific boards allowed, show folders containing them? 
-                // Or just show workspace folders?
-                // Usually if board access is specific, we might hide folders unless they contain the board.
-                // For now, let's filter folders by workspace if workspace_id is present on the board?
-                // Harder. Let's start with Workspace filtering which is the main request.
-                const allowedWorkspaces = new Set(filteredBoards.map((b: any) => b.workspace_id).filter(Boolean));
-                filteredFolders = filteredFolders.filter((f: any) => f.workspace?.id && allowedWorkspaces.has(String(f.workspace.id)));
-            } else if (currentUserWorkspaceId) {
-                filteredFolders = filteredFolders.filter((f: any) => f.workspace?.id && String(f.workspace.id) === currentUserWorkspaceId);
-            }
+            setBoards(filteredBoards);
+            // setFolders & setWorkspaces logic removed
 
-            setFolders(filteredFolders);
-            setWorkspaces(workspacesData || []);
-            setWorkspaces(workspacesData || []);
 
             // Auto-select first board if none selected and boards exist
             if (filteredBoards.length > 0 && !selectedBoardId) {
@@ -821,192 +275,10 @@ export default function ClientPortal() {
             }
             */
 
-            // --- REAL-TIME OVERVIEW STATS FETCH ---
-            setOverviewLoading(true);
-
-            // 1. Identify Target Folders
-            // "Clients" or "Active Clients"
-            // "Workspace" or "Editors" or "Team"
-            const allFetchedBoards = boardsData || [];
-
-
-
-            // 1. Identify Target Boards Strategy
-
-            // A) Client/Project Data Source: "Fulfillment Board"
-            const fulfillmentBoard = allFetchedBoards.find((b: any) =>
-                b.name.toLowerCase().includes('fulfillment') ||
-                b.name.toLowerCase().includes('fullfillment')
-            );
-
-            // B) Editor Data Source: Boards with "Workspace" in name
-            const editorBoards = allFetchedBoards.filter((b: any) => {
-                const name = b.name.toLowerCase();
-                return name.includes('workspace') &&
-                    !name.includes('subitem') &&
-                    !name.includes('template');
-            });
-            const editorBoardIds = editorBoards.map((b: any) => String(b.id));
-
-
-
-
-            // 3. Fetch Data
-            const idsToFetch = [];
-            if (fulfillmentBoard) idsToFetch.push(String(fulfillmentBoard.id));
-            editorBoardIds.forEach((id: string) => idsToFetch.push(id)); // Keep fetching items just in case
-
-
-
-            // Activity Logs Timeframe (Last 30 Days)
-            const oneMonthAgo = new Date();
-            oneMonthAgo.setDate(oneMonthAgo.getDate() - 30);
-
-            const [allFetchedItemsData] = await Promise.all([
-                getMultipleBoardItems(idsToFetch)
-            ]);
-
-            // Separate Data
-            // Note: getMultipleBoardItems usually returns array of boards with items.
-            // We need to map back to our board objects.
-
-            const fulfillmentBoardData = fulfillmentBoard ? allFetchedItemsData.find((b: any) => String(b.id) === String(fulfillmentBoard.id)) : null;
-            const editorBoardsData = allFetchedItemsData.filter((b: any) => editorBoardIds.includes(String(b.id)));
-
-            // 4. Calculate Metrics
-
-            // A) Active Clients & Projects (From Fulfillment Board)
-            let activeClientsCount = 0;
-            let totalActiveProjects = 0;
-            const clientProjectDistribution: { name: string, count: number }[] = [];
-
-            if (fulfillmentBoardData) {
-                // Active Clients = Groups (assuming each group is a client)
-                // Note: 'fulfillmentBoard' from 'allFetchedBoards' (getAllBoards) likely has 'groups' metadata. 
-                // 'fulfillmentBoardData' from 'getMultipleBoardItems' has 'items'.
-
-                const groups = fulfillmentBoard.groups || [];
-                const validGroups = groups.filter((g: any) => g.title.toLowerCase() !== 'hidden');
-
-                activeClientsCount = validGroups.length;
-
-                // Count Active Items (excluding Done?)
-                // User said "Active Projects"... typically means not Done.
-                const activeItems = fulfillmentBoardData.items.filter((i: any) => {
-                    const isDone = i.column_values.some((v: any) => (v.title === 'Status' || v.type === 'status' || v.type === 'color') && (v.text === 'Done' || v.text === 'Completed'));
-                    return !isDone;
-                });
-                totalActiveProjects = activeItems.length;
-
-                // Distribution: Items per Group
-                const groupMap = new Map();
-                groups.forEach((g: any) => groupMap.set(g.id, g.title));
-
-                // Count items per group
-                const groupCounts = new Map();
-                activeItems.forEach((item: any) => {
-                    const gId = item.group?.id; // items have group { id }
-                    if (gId) {
-                        const current = groupCounts.get(gId) || 0;
-                        groupCounts.set(gId, current + 1);
-                    }
-                });
-
-                groupCounts.forEach((count, gId) => {
-                    const name = groupMap.get(gId) || 'Unknown Group';
-                    if (name.toLowerCase() !== 'hidden' && count > 0) {
-                        clientProjectDistribution.push({ name, count });
-                    }
-                });
-            }
-
-            // Sort Distribution by Count
-            clientProjectDistribution.sort((a, b) => b.count - a.count);
-
-
-            // C) Active Editors & Performance (From Workspace Boards)
-            // C) Active Editors & Performance (From Activity Logs)
-            const activeEditorsCount = editorBoards.length;
-            const editorPerformance: { name: string, count: number }[] = [];
-
-            let maxDoneCount = 0;
-            let topEditorName = 'None';
-
-            // DEBUG: Verify Boards and Logs
-            console.log('Found Editor Boards:', editorBoards.map((b: any) => b.name));
-            if (fulfillmentBoard) console.log('Fulfillment Board:', fulfillmentBoard.name, fulfillmentBoard.id);
-            console.log('Total Boards with Logs:', editorBoardsData.length);
-
-            if (fulfillmentBoardData && fulfillmentBoardData.items.length > 0) {
-                const sampleItem = fulfillmentBoardData.items[0];
-                console.log('Fulfillment Item Columns:', sampleItem.column_values.map((c: any) => `${c.title} (${c.id})`));
-            }
-
-            // Iterate over boards to calculate performance based on ITEMS (Snapshot)
-            editorBoards.forEach((b: any) => {
-                const boardData = editorBoardsData.find((bd: any) => String(bd.id) === String(b.id));
-                const items = boardData ? boardData.items : [];
-
-                // DEBUG: Inspect Board Data
-                console.log(`Checking Board: ${b.name}`);
-                console.log(`Found ${items.length} items`);
-
-                // METRIC: Total Projects in Workspace (No Date/Status Filter)
-                const approvedCount = items.length;
-
-                // Clean Name
-                // 1. Remove text in parentheses and beyond (e.g. "Name (C-W-3)" -> "Name")
-                let cleanName = b.name.split('(')[0];
-
-                // 2. Remove "Workspace", "Editor", and dashes
-                cleanName = cleanName.replace(/workspace/gi, '')
-                    .replace(/editor/gi, '')
-                    .replace(/-/g, '')
-                    .trim();
-                if (!cleanName || cleanName.length < 2) cleanName = b.name;
-
-                if (approvedCount > 0) {
-                    editorPerformance.push({ name: cleanName, count: approvedCount });
-                } else {
-                    editorPerformance.push({ name: cleanName, count: 0 });
-                }
-
-                if (approvedCount > maxDoneCount) {
-                    maxDoneCount = approvedCount;
-                    topEditorName = cleanName;
-                }
-            });
-
-            // Fallback for Top Editor (if no done items found but boards exist)
-            if (maxDoneCount === 0 && editorBoardsData.length > 0) {
-                // Maybe pick one with most items overall?
-                const busiestBoard = editorBoardsData.sort((a: any, b: any) => b.items.length - a.items.length)[0];
-                if (busiestBoard) {
-                    let cleanName = busiestBoard.name.replace(/workspace/gi, '').replace(/editor/gi, '').replace(/-/g, '').trim();
-                    if (!cleanName) cleanName = busiestBoard.name;
-                    // Still 0 done, but we can set name
-                    // topEditorName = cleanName; 
-                }
-            }
-
-            // Sort Editors
-            editorPerformance.sort((a, b) => b.count - a.count);
-
-            setOverviewStats({
-                activeClientsCount,
-                activeProjectsCount: totalActiveProjects,
-                activeEditorsCount,
-                topEditor: { name: topEditorName, count: maxDoneCount },
-                systemStatus: 'Stable',
-                clientProjectDistribution,
-                editorPerformance
-            });
-
         } catch (error) {
             console.error("Failed to load initial data", error);
         } finally {
             setLoading(false);
-            setOverviewLoading(false);
         }
     };
 
@@ -1020,49 +292,25 @@ export default function ClientPortal() {
 
 
 
-    const toggleGroup = (groupId: string) => {
-        const newCollapsed = new Set(collapsedGroups);
-        if (newCollapsed.has(groupId)) {
-            newCollapsed.delete(groupId);
-        } else {
-            newCollapsed.add(groupId);
-        }
-        setCollapsedGroups(newCollapsed);
-    };
+
 
     return (
-        <BackgroundLayout>
-            <CinematicOverlay />
-
-            <div className="relative min-h-screen w-full flex bg-transparent overflow-hidden">
-                {/* Main Sidebar */}
-                <aside className="hidden lg:flex w-64 h-screen flex-col border-r border-white/5 bg-[#0e0e1a] relative z-30 flex-shrink-0">
-                    {/* Workspace Header and Active Workspace Card REMOVED per client request */}
-                    {/*
-                    <div className="h-16 flex items-center justify-between px-4 border-b border-white/5">
-                        <div className="flex items-center gap-2">
-                            <span className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Workspaces</span>
-                        </div>
-                         ...
+        <PortalLayout
+            userProfile={
+                <div className="text-[9px] text-custom-bright font-bold uppercase tracking-widest pl-11 -mt-6">
+                    Client Portal
+                </div>
+            }
+            sidebarContent={
+                <>
+                    <div className="px-4 mb-4 flex items-center gap-2">
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Your Projects</span>
                     </div>
-                    */}
 
-                    {/* Active Workspaces / Clients List */}
-                    <div className="flex-1 overflow-y-auto py-4">
-                        {/* 
-                        <div className="px-4 mb-6">
-                            ... (Creative Vision Card)
-                        </div>
-                        */}
-
-                        <div className="px-4 mb-4 flex items-center gap-2">
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Your Projects</span>
-                        </div>
-
-                        <div className="space-y-0.5">
-                            {/* Overview tab removed for cleaner client experience */}
-                            {/* Example Board Item matching screenshot style */}
-                            {boards.map((board: any) => (
+                    <div className="space-y-0.5">
+                        {boards.map((board: any) => {
+                            const Icon = getBoardIcon(board.name);
+                            return (
                                 <SidebarItem
                                     key={board.id}
                                     label={board.name}
@@ -1071,40 +319,43 @@ export default function ClientPortal() {
                                         setSelectedBoardId(board.id);
                                         setActiveTab('Boards');
                                     }}
-                                    isClientItem={true}
+                                    icon={<Icon className="w-4 h-4" />}
                                 />
-                            ))}
-                            {boards.length === 0 && (
-                                <div className="px-8 py-2 text-xs text-gray-600 italic">No active boards</div>
-                            )}
-                        </div>
+                            );
+                        })}
+                        {boards.length === 0 && (
+                            <div className="px-8 py-2 text-xs text-gray-600 italic">No active boards</div>
+                        )}
                     </div>
-
-                    {/* Minimal User Profile at Bottom (Optional, kept minimal) */}
-                    <div className="p-4 border-t border-white/5 bg-black/20">
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-500 font-bold text-xs">
-                                {currentUserName ? currentUserName.charAt(0) : 'U'}
-                            </div>
-                            <div className="flex-1 overflow-hidden">
-                                <div className="text-white text-xs font-bold truncate">{currentUserName || 'User'}</div>
-                                <button onClick={handleLogout} className="text-[10px] text-gray-500 hover:text-white transition-colors">Log Out</button>
+                </>
+            }
+            sidebarFooter={
+                <div className="pt-4 border-t border-white/5">
+                    {currentUserName && (
+                        <div className="px-2 py-2 mb-2">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-custom-bright/10 flex items-center justify-center text-custom-bright font-bold text-xs ring-1 ring-custom-bright/20">
+                                    {currentUserName.charAt(0)}
+                                </div>
+                                <div className="flex-1 overflow-hidden">
+                                    <div className="text-white text-xs font-bold truncate">{currentUserName}</div>
+                                    <div className="text-[10px] text-gray-500 capitalize">Client Account</div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </aside>
-
-                <main className="flex-1 h-screen flex flex-col relative z-20 overflow-hidden">
+                    )}
+                    <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-500/10 hover:text-red-400 text-gray-400 transition-colors group">
+                        <LogOut className="w-5 h-5" />
+                        <span className="text-sm font-medium">Log Out</span>
+                    </button>
+                </div>
+            }
+            mainContent={
+                <>
                     {/* Content Area */}
                     <div className="flex-1 overflow-hidden flex flex-col relative z-20">
 
                         {/* Tab Content */}
-                        {/* Overview tab content REMOVED - clients now go directly to Boards */}
-
-
-
-
-
                         {activeTab === 'Boards' && (
                             <>
                                 {/* Tree Sidebar REMOVED per client request for cleaner full-width view */}
@@ -1627,44 +878,45 @@ export default function ClientPortal() {
                         )}
 
                     </div>
-                </main >
 
-                {/* Modals remain mostly the same */}
 
-                {/* File Preview Modal */}
-                {
-                    previewFile && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-200">
-                            <button onClick={() => setPreviewFile(null)} className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"><X className="w-8 h-8" /></button>
+                    {/* Modals remain mostly the same */}
 
-                            <div className="w-full max-w-5xl h-[85vh] flex flex-col bg-[#0A0A16] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
-                                {/* Modal Header */}
-                                <div className="h-16 px-6 flex items-center justify-between border-b border-white/10 bg-white/5">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-emerald-500/10 rounded-lg">
-                                            <FileText className="w-5 h-5 text-emerald-400" />
+                    {/* File Preview Modal */}
+                    {
+                        previewFile && (
+                            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-200">
+                                <button onClick={() => setPreviewFile(null)} className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"><X className="w-8 h-8" /></button>
+
+                                <div className="w-full max-w-5xl h-[85vh] flex flex-col bg-[#0A0A16] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+                                    {/* Modal Header */}
+                                    <div className="h-16 px-6 flex items-center justify-between border-b border-white/10 bg-white/5">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-emerald-500/10 rounded-lg">
+                                                <FileText className="w-5 h-5 text-emerald-400" />
+                                            </div>
+                                            <h3 className="text-white font-bold text-lg truncate max-w-md">{previewFile?.name}</h3>
                                         </div>
-                                        <h3 className="text-white font-bold text-lg truncate max-w-md">{previewFile?.name}</h3>
+                                        <a
+                                            href={previewFile?.url}
+                                            target="_blank"
+                                            download
+                                            className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:brightness-110 font-bold text-sm transition-all shadow-lg shadow-emerald-500/20"
+                                        >
+                                            <Download className="w-4 h-4" /> Download Original
+                                        </a>
                                     </div>
-                                    <a
-                                        href={previewFile?.url}
-                                        target="_blank"
-                                        download
-                                        className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:brightness-110 font-bold text-sm transition-all shadow-lg shadow-emerald-500/20"
-                                    >
-                                        <Download className="w-4 h-4" /> Download Original
-                                    </a>
-                                </div>
 
-                                {/* Modal Content */}
-                                <div className="flex-1 bg-black/50 relative flex items-center justify-center p-4 overflow-hidden">
-                                    <FilePreviewer url={previewFile?.url || ''} name={previewFile?.name || ''} isLoading={!!previewFile?.assetId} />
+                                    {/* Modal Content */}
+                                    <div className="flex-1 bg-black/50 relative flex items-center justify-center p-4 overflow-hidden">
+                                        <FilePreviewer url={previewFile?.url || ''} name={previewFile?.name || ''} isLoading={!!previewFile?.assetId} />
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    )
-                }
-            </div >
-        </BackgroundLayout >
+                        )
+                    }
+                </>
+            }
+        />
     );
 }

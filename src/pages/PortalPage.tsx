@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { BackgroundLayout } from './layout/BackgroundLayout';
-import { CinematicOverlay } from './ui/CinematicOverlay';
-import { MagneticButton } from './ui/MagneticButton';
-import { SpotlightCard } from './ui/SpotlightCard';
+import { BackgroundLayout } from '../components/layout/BackgroundLayout';
+import { CinematicOverlay } from '../components/ui/CinematicOverlay';
+import { MagneticButton } from '../components/ui/MagneticButton';
+import { SpotlightCard } from '../components/ui/SpotlightCard';
 import { ArrowLeft, Lock, ShieldCheck, Wifi } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { loginUser } from '../services/boardsService';

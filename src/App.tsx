@@ -1,20 +1,20 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-
 import { BackgroundLayout } from './components/layout/BackgroundLayout';
 import { CinematicOverlay } from './components/ui/CinematicOverlay';
 import { Preloader } from './components/ui/Preloader';
-import HomePage from './components/HomePage';
-import HireUsPage from './components/HireUsPage';
-import JoinPage from './components/JoinPage';
-import ThankYouPage from './components/ThankYouPage';
-import PortalPage from './components/PortalPage';
 
-import AdminPortal from './components/AdminPortal';
-import EditorPortal from './components/EditorPortal';
-import ClientPortal from './components/ClientPortal';
-import PortalRouter from './components/PortalRouter';
-import StartProjectPage from './components/StartProjectPage';
+// Lazy Load Pages
+const HomePage = lazy(() => import('./pages/HomePage'));
+const HireUsPage = lazy(() => import('./pages/HireUsPage'));
+const JoinPage = lazy(() => import('./pages/JoinPage'));
+const StartProjectPage = lazy(() => import('./pages/StartProjectPage'));
+const ThankYouPage = lazy(() => import('./pages/ThankYouPage'));
+const PortalPage = lazy(() => import('./pages/PortalPage'));
+const PortalRouter = lazy(() => import('./pages/PortalRouter'));
+const AdminPortal = lazy(() => import('./pages/AdminPortal'));
+const EditorPortal = lazy(() => import('./pages/EditorPortal'));
+const ClientPortal = lazy(() => import('./pages/ClientPortal'));
 
 export default function App() {
   const navigate = useNavigate();
@@ -43,10 +43,6 @@ export default function App() {
     navigate(-1);
   };
 
-  const handleThankYou = () => {
-    navigate('/thank-you');
-  };
-
   return (
     <BackgroundLayout>
       {location.pathname !== '/portal' && location.pathname !== '/admin-dashboard' && <Preloader />}
@@ -65,22 +61,24 @@ export default function App() {
       )}
 
       {/* Main Routing */}
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/hire" element={<HireUsPage onBack={handleBack} />} />
-        <Route path="/join" element={<JoinPage onBack={() => {
-          navigate('/', { state: { target: 'services' } });
-        }} />} />
-        <Route path="/start" element={<StartProjectPage onBack={() => {
-          navigate('/', { state: { target: 'services' } });
-        }} />} />
-        <Route path="/thank-you" element={<ThankYouPage onBack={handleBack} />} />
-        <Route path="/portal" element={<PortalPage />} />
-        <Route path="/admin-dashboard" element={<PortalRouter />} />
-        <Route path="/admin-portal" element={<AdminPortal />} />
-        <Route path="/editor-portal" element={<EditorPortal />} />
-        <Route path="/client-portal" element={<ClientPortal />} />
-      </Routes>
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-black text-white"><Preloader /></div>}>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/hire" element={<HireUsPage onBack={handleBack} />} />
+          <Route path="/join" element={<JoinPage onBack={() => {
+            navigate('/', { state: { target: 'services' } });
+          }} />} />
+          <Route path="/start" element={<StartProjectPage onBack={() => {
+            navigate('/', { state: { target: 'services' } });
+          }} />} />
+          <Route path="/thank-you" element={<ThankYouPage onBack={handleBack} />} />
+          <Route path="/portal" element={<PortalPage />} />
+          <Route path="/admin-dashboard" element={<PortalRouter />} />
+          <Route path="/admin-portal" element={<AdminPortal />} />
+          <Route path="/editor-portal" element={<EditorPortal />} />
+          <Route path="/client-portal" element={<ClientPortal />} />
+        </Routes>
+      </Suspense>
     </BackgroundLayout>
   );
 }
