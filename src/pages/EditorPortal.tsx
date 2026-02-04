@@ -546,7 +546,7 @@ export default function EditorPortal() {
                                                                                     </div>
 
                                                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                                                        {boardData.columns?.filter((col: any) => col.type !== 'name').map((col: any) => (
+                                                                                        {boardData.columns?.filter((col: any) => col.type !== 'name' && !col.title.startsWith('C-F-')).map((col: any) => (
                                                                                             <div key={col.id} className="group p-4 rounded-2xl bg-black/20 border border-white/5 hover:bg-white/5 transition-colors">
                                                                                                 <div className="flex items-center gap-2 mb-2">
                                                                                                     <span className="text-[10px] uppercase tracking-wider text-emerald-400 font-bold">{col.title}</span>
@@ -662,7 +662,7 @@ export default function EditorPortal() {
                                                                                                 </div>
                                                                                                 <div className="w-full h-[1px] bg-white/5" />
                                                                                                 <div className="space-y-4">
-                                                                                                    {boardData.columns?.map((col: any) => (
+                                                                                                    {boardData.columns?.filter((col: any) => col.type !== 'name' && !col.title.startsWith('C-F-')).map((col: any) => (
                                                                                                         <div key={col.id} className="flex flex-col gap-1.5">
                                                                                                             <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">{col.title}</span>
                                                                                                             <div className="min-h-[28px] flex items-center">

@@ -635,7 +635,7 @@ export default function AdminPortal() {
         if (selectedBoardId) {
             setFulfillmentMonthFilter('All'); // Reset Filter
             refreshBoardItems(); // Fetch via hook
-            refreshBoardsAndFolders(true); // Background Refresh Global Data
+            // refreshBoardsAndFolders(true); // removed to prevent potential loop
         }
     }, [selectedBoardId]);
 
@@ -1736,7 +1736,7 @@ export default function AdminPortal() {
                                                                                     </div>
 
                                                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                                                        {boardData.columns?.filter((col: any) => col.type !== 'name').map((col: any) => (
+                                                                                        {boardData.columns?.filter((col: any) => col.type !== 'name' && !col.title.startsWith('C-F-')).map((col: any) => (
                                                                                             <div key={col.id} className="group p-4 rounded-2xl bg-black/20 border border-white/5 hover:bg-white/5 transition-colors">
                                                                                                 <div className="flex items-center gap-2 mb-2">
                                                                                                     <span className="text-[10px] uppercase tracking-wider text-custom-bright font-bold">{col.title}</span>
@@ -1907,7 +1907,7 @@ export default function AdminPortal() {
                                                                                             </div>
                                                                                             <div className="flex flex-col items-center mb-6"><h3 className="text-2xl font-black text-white mb-2 text-center">{currentItem.name}</h3><span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{boardData.name.toLowerCase().includes('form') ? 'Application Entry' : 'Project Details'}</span></div>
                                                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-                                                                                                {boardData.columns?.filter((col: any) => col.type !== 'name').map((col: any) => (
+                                                                                                {boardData.columns?.filter((col: any) => col.type !== 'name' && !col.title.startsWith('C-F-')).map((col: any) => (
                                                                                                     <div key={col.id} className="p-4 rounded-2xl bg-[#0e0e1a] border border-white/5"><span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-2">{col.title}</span><BoardCell item={currentItem} column={col} boardId={selectedBoardId} onUpdate={() => refreshBoardItems(true)} onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })} /></div>
                                                                                                 ))}
                                                                                             </div>
@@ -1990,7 +1990,7 @@ export default function AdminPortal() {
 
                                                                                                                     {/* Column Values */}
                                                                                                                     <div className="space-y-4 flex-1">
-                                                                                                                        {boardData.columns?.filter((col: any) => col.type !== 'name').map((col: any) => (
+                                                                                                                        {boardData.columns?.filter((col: any) => col.type !== 'name' && !col.title.startsWith('C-F-')).map((col: any) => (
                                                                                                                             <div key={col.id} className="flex flex-col gap-1.5">
                                                                                                                                 <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">{col.title}</span>
                                                                                                                                 <div className="min-h-[28px] flex items-center">
@@ -2020,12 +2020,12 @@ export default function AdminPortal() {
                                                                                     // Default Table View
                                                                                     <div className="overflow-x-auto rounded-xl border border-white/5 bg-black/20">
                                                                                         <table className="w-full text-left text-sm whitespace-nowrap">
-                                                                                            <thead><tr className="border-b border-white/10 bg-white/5"><th className="px-4 py-3 text-xs font-bold text-white uppercase tracking-wider w-[240px]">Name</th>{boardData.columns?.filter((c: any) => c.type !== 'name').map((col: any) => (<th key={col.id} className="px-4 py-3 text-xs font-bold text-gray-300 uppercase tracking-wider min-w-[150px]">{col.title}</th>))}</tr></thead>
+                                                                                            <thead><tr className="border-b border-white/10 bg-white/5"><th className="px-4 py-3 text-xs font-bold text-white uppercase tracking-wider w-[240px]">Name</th>{boardData.columns?.filter((c: any) => c.type !== 'name' && !c.title.startsWith('C-F-')).map((col: any) => (<th key={col.id} className="px-4 py-3 text-xs font-bold text-gray-300 uppercase tracking-wider min-w-[150px]">{col.title}</th>))}</tr></thead>
                                                                                             <tbody>
                                                                                                 {groupItems.map((item: any) => (
                                                                                                     <tr key={item.id} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
                                                                                                         <td className="px-4 py-3 font-medium text-white group-hover:text-custom-bright transition-colors sticky left-0 bg-[#0e0e1a] group-hover:bg-[#151525] z-10 border-r border-white/5">{item.name}</td>
-                                                                                                        {boardData.columns?.filter((c: any) => c.type !== 'name').map((col: any) => (<td key={col.id} className="px-4 py-3 text-gray-400"><BoardCell item={item} column={col} boardId={selectedBoardId} onUpdate={() => refreshBoardItems(true)} onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })} /></td>))}
+                                                                                                        {boardData.columns?.filter((c: any) => c.type !== 'name' && !c.title.startsWith('C-F-')).map((col: any) => (<td key={col.id} className="px-4 py-3 text-gray-400"><BoardCell item={item} column={col} boardId={selectedBoardId} onUpdate={() => refreshBoardItems(true)} onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })} /></td>))}
                                                                                                     </tr>
                                                                                                 ))}
                                                                                             </tbody>

@@ -1,12 +1,11 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import { PortalLayout } from '../components/shared/PortalLayout';
 import { BoardCell } from '../components/shared/BoardCell';
 import { SidebarItem } from '../components/shared/SidebarItem';
-import { FilePreviewer } from '../components/ui/FilePreviewModal';
+import { MondayMediaLoader } from '../components/shared/MondayMediaLoader';
 import {
     Loader2,
-    Eye,
     LayoutDashboard,
     Table,
     ChevronDown,
@@ -17,17 +16,17 @@ import {
     LogOut,
     Briefcase,
     X,
-    Download
+    Download,
+    Link as LinkIcon,
+    ArrowUpRight
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
     getAllBoards, getAllFolders, getAllWorkspaces,
-    getMultipleBoardItems,
-    getAssetPublicUrl,
     prefetchBoardItems
 } from '../services/mondayService';
 import { supabase } from '../services/boardsService';
-import { useVisibilityPolling, useBoardItems, useUpdateItemValue } from '../hooks/useMondayData';
+import { useVisibilityPolling, useBoardItems } from '../hooks/useMondayData';
 // User management Removed
 
 // --- Helpers ---
@@ -40,6 +39,259 @@ const getBoardIcon = (name: string) => {
 };
 
 // --- Folder & Tree Components ---
+
+function RecentProjectCard({
+    item,
+    boardData,
+    selectedBoardId,
+    refreshBoardItems,
+    setPreviewFile,
+    onNext,
+    onPrev,
+    hasNext,
+    hasPrev,
+    currentIndex,
+    totalCount
+}: {
+    item: any,
+    boardData: any,
+    selectedBoardId: string | null,
+    refreshBoardItems: (bg?: boolean) => void,
+    setPreviewFile: (f: any) => void,
+    onNext: () => void,
+    onPrev: () => void,
+    hasNext: boolean,
+    hasPrev: boolean,
+    currentIndex: number,
+    totalCount: number
+}) {
+    const assetData = useMemo(() => {
+        if (!item) return { coverAsset: null };
+
+        let coverAsset = null;
+
+        // 1. Try to find "Submission Preview" column first
+        const submissionCol = boardData.columns?.find((c: any) => c.title.toLowerCase().includes('submission') && c.title.toLowerCase().includes('preview'));
+        if (submissionCol) {
+            const valObj = item.column_values?.find((v: any) => v.id === submissionCol.id);
+            if (valObj) {
+                // A. Try JSON Content (Link or File columns)
+                if (valObj.value) {
+                    try {
+                        const val = JSON.parse(valObj.value);
+                        // Link Column Type
+                        if (val.url) {
+                            const url = val.url;
+                            const isVideo = /\.(mp4|mov|webm|ogg)(\?|$)/i.test(url);
+                            const isImage = /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(url);
+                            let finalType = 'external_link';
+                            if (isVideo) finalType = 'video';
+                            else if (isImage) finalType = 'image';
+                            coverAsset = { url, type: finalType, name: val.text };
+                        }
+                        // File Column Type
+                        else if (val.files && val.files.length > 0) {
+                            const f = val.files[0];
+                            const url = f.public_url || f.url || f.thumbnail_url;
+                            const isVideo = /\.(mp4|mov|webm|ogg)(\?|$)/i.test(f.name);
+                            // Determine Asset ID (files often use 'id' or 'assetId')
+                            const assetId = f.assetId || f.id;
+                            if (url) {
+                                coverAsset = { url, type: isVideo ? 'video' : 'image', name: f.name, assetId };
+                                console.log("Found Submission Preview File:", { name: f.name, assetId, url });
+                            }
+                        }
+                    } catch (e) { }
+                }
+                // B. Try Text Value (Raw Link) if JSON failed
+                if (!coverAsset && (valObj.text || valObj.display_value)) {
+                    const rawText = (valObj.text || valObj.display_value || '').trim();
+                    if (rawText.startsWith('http')) {
+                        const isVideo = /\.(mp4|mov|webm|ogg)(\?|$)/i.test(rawText);
+                        const isImage = /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(rawText);
+                        let finalType = 'external_link';
+                        if (isVideo) finalType = 'video';
+                        else if (isImage) finalType = 'image';
+                        coverAsset = { url: rawText, type: finalType, name: 'Submission' };
+                    }
+                }
+            }
+        }
+
+        // 2. Fallback to any file column
+        if (!coverAsset) {
+            const fileCols = boardData.columns?.filter((c: any) => c.type === 'file' && c.id !== submissionCol?.id) || [];
+            for (const col of fileCols) {
+                const valObj = item.column_values?.find((v: any) => v.id === col.id);
+                if (valObj && valObj.value) {
+                    try {
+                        const val = JSON.parse(valObj.value);
+                        if (val.files && val.files.length > 0) {
+                            const f = val.files[0];
+                            const url = f.public_url || f.url || f.thumbnail_url;
+                            const isVideo = /\.(mp4|mov|webm|ogg)(\?|$)/i.test(f.name);
+                            const assetId = f.assetId || f.id;
+                            if (url) {
+                                coverAsset = { url, type: isVideo ? 'video' : 'image', name: f.name, assetId };
+                                if (isVideo) break;
+                            }
+                        }
+                    } catch (e) { }
+                }
+            }
+        }
+
+        // 3. Fallback: URL Regex Extraction (if we have a URL but no assetId)
+        if (coverAsset && !coverAsset.assetId && coverAsset.url) {
+            // Typical Monday Patterns: 
+            // .../resources/12345/filename.mp4
+            // .../assets/12345
+            const resourceMatch = coverAsset.url.match(/\/resources\/(\d+)\//);
+            const assetMatch = coverAsset.url.match(/\/assets\/(\d+)/);
+            if (resourceMatch && resourceMatch[1]) {
+                coverAsset.assetId = resourceMatch[1];
+                console.log("Extracted ID from Resource URL:", coverAsset.assetId);
+            } else if (assetMatch && assetMatch[1]) {
+                coverAsset.assetId = assetMatch[1];
+                console.log("Extracted ID from Asset URL:", coverAsset.assetId);
+            }
+        }
+        return { coverAsset };
+    }, [item, boardData]);
+
+    const { coverAsset } = assetData || {};
+
+    return (
+        <div className="space-y-8">
+            {/* Navigation Bar */}
+            <div className="flex items-center justify-between bg-[#0e0e1a] p-4 rounded-2xl border border-white/5 shadow-lg">
+                <button
+                    disabled={!hasPrev}
+                    onClick={onPrev}
+                    className="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 hover:border-white/20 flex items-center gap-3 transition-all text-xs font-bold uppercase tracking-wider group"
+                >
+                    <ChevronDown className="w-4 h-4 rotate-90 group-hover:-translate-x-1 transition-transform" /> Newer Project
+                </button>
+
+                <div className="flex flex-col items-center">
+                    <span className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-bold mb-1">Project Timeline</span>
+                    <div className="text-sm font-mono text-white flex items-center gap-3 bg-black/20 px-4 py-1.5 rounded-full border border-white/5">
+                        <span className="text-gray-500">#</span>
+                        <span className="text-emerald-400 font-bold text-lg">{currentIndex + 1}</span>
+                        <span className="text-gray-600 text-xs">of</span>
+                        <span className="text-white font-bold">{totalCount}</span>
+                    </div>
+                </div>
+
+                <button
+                    disabled={!hasNext}
+                    onClick={onNext}
+                    className="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 hover:border-white/20 flex items-center gap-3 transition-all text-xs font-bold uppercase tracking-wider group"
+                >
+                    Older Project <ChevronDown className="w-4 h-4 -rotate-90 group-hover:translate-x-1 transition-transform" />
+                </button>
+            </div>
+
+            {/* Featured Project Card (Split View) */}
+            <motion.div
+                key={item.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
+                className="relative rounded-[2.5rem] bg-[#0e0e1a] border border-white/5 shadow-2xl overflow-hidden"
+            >
+                <div className="grid grid-cols-1 xl:grid-cols-12 min-h-[600px]">
+                    {/* Left: Media Preview Area (7 cols) */}
+                    <div className="xl:col-span-7 bg-black/40 relative group overflow-hidden border-r border-white/5">
+                        {coverAsset ? (
+                            coverAsset.type === 'external_link' ? (
+                                // External Link Card
+                                <div className="w-full h-full flex flex-col items-center justify-center p-12 text-center bg-[#070710]">
+                                    <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6 animate-pulse">
+                                        <LinkIcon className="w-10 h-10 text-emerald-400" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-white mb-2">External Submission Link</h3>
+                                    <p className="text-gray-400 text-sm mb-8 max-w-sm">This project has a submission link that opens in a new tab.</p>
+                                    <a
+                                        href={coverAsset.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-8 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-3 transform hover:scale-105"
+                                    >
+                                        Open Submission <ArrowUpRight className="w-4 h-4" />
+                                    </a>
+                                </div>
+                            ) : (
+                                // Video / Image Loader
+                                <div className="w-full h-full p-40">
+                                    <MondayMediaLoader
+                                        url={coverAsset.url}
+                                        name={coverAsset.name}
+                                        assetId={coverAsset.assetId}
+                                        type={coverAsset.type as any}
+                                        className=""
+                                    />
+                                </div>
+                            )
+                        ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center p-12 text-gray-600 space-y-4">
+                                <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center">
+                                    <Briefcase className="w-10 h-10 opacity-20" />
+                                </div>
+                                <p className="text-sm font-medium uppercase tracking-widest text-gray-700">No Preview Available</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Right: Details & Status (5 cols) */}
+                    <div className="xl:col-span-5 p-8 flex flex-col h-full bg-[#0e0e1a]">
+                        {/* Header */}
+                        <div className="mb-8">
+                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 mb-4">
+                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Active Project</span>
+                            </div>
+                            <h2 className="text-3xl font-black text-white leading-tight mb-2">{item.name}</h2>
+                            <p className="text-sm text-gray-500 font-medium">Project ID: #{item.id}</p>
+                        </div>
+
+                        {/* Status Grid */}
+                        <div className="flex-1 space-y-6">
+                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                <LayoutDashboard className="w-3 h-3" /> Project Details
+                            </h3>
+                            <div className="grid grid-cols-1 gap-4">
+                                {boardData.columns?.filter((col: any) => col.type !== 'name' && !col.title.toLowerCase().includes('submission preview') && !col.title.startsWith('C-F-')).map((col: any) => (
+                                    <div key={col.id} className="group p-4 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all">
+                                        <div className="flex flex-col gap-2">
+                                            <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold group-hover:text-emerald-400 transition-colors">{col.title}</span>
+                                            <div className="min-h-[28px] flex items-center">
+                                                <BoardCell
+                                                    item={item}
+                                                    column={col}
+                                                    boardId={selectedBoardId}
+                                                    onUpdate={() => refreshBoardItems(true)}
+                                                    onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Action Footer */}
+                        <div className="mt-8 pt-8 border-t border-white/5 flex items-center justify-between">
+                            <div className="text-xs text-gray-500">
+                                Last updated: <span className="text-gray-300">{new Date().toLocaleDateString()}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </motion.div>
+        </div>
+    );
+}
 
 
 
@@ -169,52 +421,12 @@ export default function ClientPortal() {
         }
     }, [boards, checkingPermissions, prefetchStarted]);
 
-    // Effect to fetch public URL for preview if assetId is available
-    // Using a ref to track fetching state to prevent duplicate requests
-    const fetchingRef = useRef<string | null>(null);
-    const urlCacheRef = useRef<Map<string, string>>(new Map());
 
-    useEffect(() => {
-        if (previewFile?.assetId && previewFile.url) {
-            const assetId = previewFile.assetId;
-
-            // Check if we have a cached URL for this assetId
-            const cachedUrl = urlCacheRef.current.get(assetId);
-            if (cachedUrl) {
-                setPreviewFile(prev => prev ? { ...prev, url: cachedUrl, assetId: undefined } : null);
-                return;
-            }
-
-            // Check if we're already fetching this assetId
-            if (fetchingRef.current === assetId) {
-                return; // Already fetching, don't duplicate
-            }
-
-            fetchingRef.current = assetId;
-
-            const fetchPublicUrl = async () => {
-                try {
-                    // Get the authorized public URL from Monday.com API
-                    const publicUrl = await getAssetPublicUrl(assetId);
-                    if (publicUrl) {
-                        // Cache and use the URL directly
-                        urlCacheRef.current.set(assetId, publicUrl);
-                        setPreviewFile(prev => prev ? { ...prev, url: publicUrl, assetId: undefined } : null);
-                    }
-                } catch (err) {
-                    console.error("Failed to fetch public URL", err);
-                } finally {
-                    fetchingRef.current = null;
-                }
-            };
-            fetchPublicUrl();
-        }
-    }, [previewFile]);
 
     async function refreshBoardsAndFolders(background = false) {
         if (!background) setLoading(true);
         try {
-            const [boardsData, foldersData, workspacesData] = await Promise.all([
+            const [boardsData] = await Promise.all([
                 getAllBoards(),
                 getAllFolders(),
                 getAllWorkspaces()
@@ -509,75 +721,19 @@ export default function ClientPortal() {
                                                                     if (!currentItem) return <div className="text-center text-gray-500 italic py-12">No projects found</div>;
 
                                                                     return (
-                                                                        <div className="space-y-6">
-                                                                            {/* Navigation */}
-                                                                            <div className="flex items-center justify-between bg-[#0e0e1a] p-3 rounded-2xl border border-white/5">
-                                                                                <button
-                                                                                    disabled={!hasPrev}
-                                                                                    onClick={() => setFulfillmentRecentIndex(prev => Math.max(0, prev - 1))}
-                                                                                    className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 flex items-center gap-2 transition-all text-xs font-bold"
-                                                                                >
-                                                                                    <ChevronDown className="w-4 h-4 rotate-90" /> Newer
-                                                                                </button>
-
-                                                                                <div className="flex flex-col items-center">
-                                                                                    <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-0.5">Viewing Project</span>
-                                                                                    <div className="text-sm font-mono text-white">
-                                                                                        <span className="text-emerald-400 font-bold">{fulfillmentRecentIndex + 1}</span> <span className="text-gray-600">/</span> {sortedItems.length}
-                                                                                    </div>
-                                                                                </div>
-
-                                                                                <button
-                                                                                    disabled={!hasNext}
-                                                                                    onClick={() => setFulfillmentRecentIndex(prev => Math.min(sortedItems.length - 1, prev + 1))}
-                                                                                    className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 flex items-center gap-2 transition-all text-xs font-bold"
-                                                                                >
-                                                                                    Older <ChevronDown className="w-4 h-4 -rotate-90" />
-                                                                                </button>
-                                                                            </div>
-
-                                                                            {/* Single Card Display */}
-                                                                            <motion.div
-                                                                                key={currentItem.id} // Key ensures animation on switch
-                                                                                initial={{ opacity: 0, x: 20 }}
-                                                                                animate={{ opacity: 1, x: 0 }}
-                                                                                exit={{ opacity: 0, x: -20 }}
-                                                                                className="relative p-8 rounded-3xl bg-[#0e0e1a] border border-white/5 shadow-2xl overflow-hidden"
-                                                                            >
-                                                                                <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-                                                                                    <Briefcase className="w-32 h-32 text-emerald-400" />
-                                                                                </div>
-
-                                                                                <div className="relative z-10 w-full max-w-3xl mx-auto">
-                                                                                    <div className="flex flex-col gap-6 mb-8 text-center">
-                                                                                        <div className="inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/5 mx-auto">
-                                                                                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                                                                                            <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">Active Project</span>
-                                                                                        </div>
-                                                                                        <h2 className="text-4xl font-black text-white leading-tight">{currentItem.name}</h2>
-                                                                                    </div>
-
-                                                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                                                        {boardData.columns?.filter((col: any) => col.type !== 'name').map((col: any) => (
-                                                                                            <div key={col.id} className="group p-4 rounded-2xl bg-black/20 border border-white/5 hover:bg-white/5 transition-colors">
-                                                                                                <div className="flex items-center gap-2 mb-2">
-                                                                                                    <span className="text-[10px] uppercase tracking-wider text-emerald-400 font-bold">{col.title}</span>
-                                                                                                </div>
-                                                                                                <div className="min-h-[32px] flex items-center">
-                                                                                                    <BoardCell
-                                                                                                        item={currentItem}
-                                                                                                        column={col}
-                                                                                                        boardId={selectedBoardId}
-                                                                                                        onUpdate={() => refreshBoardItems(true)}
-                                                                                                        onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
-                                                                                                    />
-                                                                                                </div>
-                                                                                            </div>
-                                                                                        ))}
-                                                                                    </div>
-                                                                                </div>
-                                                                            </motion.div>
-                                                                        </div>
+                                                                        <RecentProjectCard
+                                                                            item={currentItem}
+                                                                            boardData={boardData}
+                                                                            selectedBoardId={selectedBoardId}
+                                                                            refreshBoardItems={refreshBoardItems}
+                                                                            setPreviewFile={setPreviewFile}
+                                                                            onNext={() => setFulfillmentRecentIndex(prev => Math.min(sortedItems.length - 1, prev + 1))}
+                                                                            onPrev={() => setFulfillmentRecentIndex(prev => Math.max(0, prev - 1))}
+                                                                            hasNext={hasNext}
+                                                                            hasPrev={hasPrev}
+                                                                            currentIndex={fulfillmentRecentIndex}
+                                                                            totalCount={sortedItems.length}
+                                                                        />
                                                                     );
                                                                 })()}
 
@@ -655,44 +811,225 @@ export default function ClientPortal() {
                                                                                 <span className="w-1 h-6 bg-emerald-500 rounded-full" />
                                                                                 Project Gallery
                                                                             </h3>
-                                                                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                                                                                {boardData.groups?.map((group: any) => {
-                                                                                    const gItems = boardData.items?.filter((i: any) => i.group.id === group.id) || [];
-                                                                                    return gItems.map((item: any) => (
-                                                                                        <motion.div
-                                                                                            key={item.id}
-                                                                                            initial={{ opacity: 0, scale: 0.95 }}
-                                                                                            animate={{ opacity: 1, scale: 1 }}
-                                                                                            whileHover={{ y: -5 }}
-                                                                                            className="group relative"
-                                                                                        >
-                                                                                            <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                                                                                            <div className="relative p-5 rounded-2xl bg-[#0e0e1a] border border-white/5 shadow-xl hover:border-white/10 hover:bg-[#131322] transition-all h-full flex flex-col gap-4">
-                                                                                                <div className="flex items-start justify-between gap-4">
-                                                                                                    <h4 className="text-base font-bold text-white leading-snug line-clamp-2">{item.name}</h4>
-                                                                                                    <span className="px-2 py-0.5 rounded bg-white/5 text-[9px] text-gray-500 font-mono border border-white/5 whitespace-nowrap" style={{ color: group.color }}>{group.title}</span>
-                                                                                                </div>
-                                                                                                <div className="w-full h-[1px] bg-white/5" />
-                                                                                                <div className="space-y-4">
-                                                                                                    {boardData.columns?.map((col: any) => (
-                                                                                                        <div key={col.id} className="flex flex-col gap-1.5">
-                                                                                                            <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">{col.title}</span>
-                                                                                                            <div className="min-h-[28px] flex items-center">
-                                                                                                                <BoardCell
-                                                                                                                    item={item}
-                                                                                                                    column={col}
-                                                                                                                    boardId={selectedBoardId}
-                                                                                                                    onUpdate={() => refreshBoardItems(true)}
-                                                                                                                    onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
-                                                                                                                />
-                                                                                                            </div>
-                                                                                                        </div>
-                                                                                                    ))}
-                                                                                                </div>
+                                                                            <div className="space-y-12">
+                                                                                {(() => {
+                                                                                    // Group items by Month
+                                                                                    const monthGroups: Record<string, any[]> = {};
+                                                                                    const allItems = boardData.items || [];
+
+                                                                                    allItems.forEach((item: any) => {
+                                                                                        if (!item.created_at) return;
+                                                                                        const date = new Date(item.created_at);
+                                                                                        if (isNaN(date.getTime())) return;
+                                                                                        const monthKey = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+                                                                                        if (!monthGroups[monthKey]) monthGroups[monthKey] = [];
+                                                                                        monthGroups[monthKey].push(item);
+                                                                                    });
+
+                                                                                    // Sort months (newest first)
+                                                                                    const sortedMonths = Object.keys(monthGroups).sort((a, b) => {
+                                                                                        const dateA = new Date(a);
+                                                                                        const dateB = new Date(b);
+                                                                                        return dateB.getTime() - dateA.getTime();
+                                                                                    });
+
+                                                                                    if (sortedMonths.length === 0) return <div className="text-center text-gray-500 italic py-12">No projects found</div>;
+
+                                                                                    return sortedMonths.map((month) => (
+                                                                                        <div key={month} className="relative">
+                                                                                            <div className="flex items-center gap-4 mb-6 sticky top-0 bg-[#070710]/80 backdrop-blur-md py-4 z-20 border-b border-white/5">
+                                                                                                <div className="h-8 w-1 bg-gradient-to-b from-emerald-500 to-emerald-700 rounded-full" />
+                                                                                                <h3 className="text-2xl font-bold text-white tracking-tight">{month}</h3>
+                                                                                                <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-gray-400 font-mono">
+                                                                                                    {monthGroups[month].length} {monthGroups[month].length === 1 ? 'Project' : 'Projects'}
+                                                                                                </span>
                                                                                             </div>
-                                                                                        </motion.div>
+
+                                                                                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                                                                                {monthGroups[month].map((item: any) => {
+                                                                                                    const group = item.group; // Access group from item
+
+                                                                                                    // Find cover for card
+                                                                                                    let cardCover = null;
+
+                                                                                                    // 1. Try "Submission Preview" first
+                                                                                                    const submissionCol = boardData.columns?.find((c: any) => c.title.toLowerCase().includes('submission') && c.title.toLowerCase().includes('preview'));
+                                                                                                    if (submissionCol) {
+                                                                                                        const valObj = item.column_values?.find((v: any) => v.id === submissionCol.id);
+                                                                                                        if (valObj) {
+                                                                                                            if (valObj.value) {
+                                                                                                                try {
+                                                                                                                    const val = JSON.parse(valObj.value);
+                                                                                                                    // Link Column Type
+                                                                                                                    if (val.url) {
+                                                                                                                        const url = val.url;
+                                                                                                                        const isVideo = /\.(mp4|mov|webm|ogg)(\?|$)/i.test(url);
+                                                                                                                        const isImage = /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(url);
+                                                                                                                        let finalType = 'external_link';
+                                                                                                                        if (isVideo) finalType = 'video';
+                                                                                                                        else if (isImage) finalType = 'image';
+                                                                                                                        cardCover = { url, type: finalType, name: val.text || 'Submission', assetId: undefined };
+                                                                                                                    }
+                                                                                                                    // File Column Type
+                                                                                                                    else if (val.files && val.files.length > 0) {
+                                                                                                                        const f = val.files[0];
+                                                                                                                        const url = f.public_url || f.url || f.thumbnail_url;
+                                                                                                                        const isVideo = /\.(mp4|mov|webm|ogg)(\?|$)/i.test(f.name);
+                                                                                                                        const assetId = f.assetId || f.id;
+                                                                                                                        if (url) cardCover = { url, type: isVideo ? 'video' : 'image', name: f.name, assetId };
+                                                                                                                    }
+                                                                                                                } catch (e) { }
+                                                                                                            }
+                                                                                                            // Text / Raw URL Fallback
+                                                                                                            if (!cardCover && (valObj.text || valObj.display_value)) {
+                                                                                                                const rawText = (valObj.text || valObj.display_value || '').trim();
+                                                                                                                if (rawText.startsWith('http')) {
+                                                                                                                    const isVideo = /\.(mp4|mov|webm|ogg)(\?|$)/i.test(rawText);
+                                                                                                                    const isImage = /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(rawText);
+                                                                                                                    let finalType = 'external_link';
+                                                                                                                    if (isVideo) finalType = 'video';
+                                                                                                                    else if (isImage) finalType = 'image';
+                                                                                                                    cardCover = { url: rawText, type: finalType, name: 'Submission' };
+                                                                                                                }
+                                                                                                            }
+                                                                                                        }
+                                                                                                    }
+
+                                                                                                    // 2. Fallback to normal file columns
+                                                                                                    if (!cardCover) {
+                                                                                                        const fCols = boardData.columns?.filter((c: any) => c.type === 'file' && c.id !== submissionCol?.id) || [];
+                                                                                                        for (const col of fCols) {
+                                                                                                            const valObj = item.column_values?.find((v: any) => v.id === col.id);
+                                                                                                            if (valObj && valObj.value) {
+                                                                                                                try {
+                                                                                                                    const val = JSON.parse(valObj.value);
+                                                                                                                    if (val.files && val.files.length > 0) {
+                                                                                                                        const f = val.files[0];
+                                                                                                                        const url = f.public_url || f.url || f.thumbnail_url;
+                                                                                                                        const isVideo = /\.(mp4|mov|webm|ogg)(\?|$)/i.test(f.name);
+                                                                                                                        const assetId = f.assetId || f.id;
+                                                                                                                        if (url) {
+                                                                                                                            cardCover = { url, type: isVideo ? 'video' : 'image', name: f.name, assetId };
+                                                                                                                            break; // Take first file found
+                                                                                                                        }
+                                                                                                                    }
+                                                                                                                } catch (e) { }
+                                                                                                            }
+                                                                                                        }
+                                                                                                    }
+
+                                                                                                    // 3. Regex Fallback for Asset ID
+                                                                                                    if (cardCover && !cardCover.assetId && cardCover.url) {
+                                                                                                        const resourceMatch = cardCover.url.match(/\/resources\/(\d+)\//);
+                                                                                                        const assetMatch = cardCover.url.match(/\/assets\/(\d+)/);
+                                                                                                        if (resourceMatch && resourceMatch[1]) cardCover.assetId = resourceMatch[1];
+                                                                                                        else if (assetMatch && assetMatch[1]) cardCover.assetId = assetMatch[1];
+                                                                                                    }
+
+                                                                                                    return (
+                                                                                                        <motion.div
+                                                                                                            key={item.id}
+                                                                                                            initial={{ opacity: 0, scale: 0.95 }}
+                                                                                                            animate={{ opacity: 1, scale: 1 }}
+                                                                                                            whileHover={{ y: -8 }}
+                                                                                                            onClick={() => {
+                                                                                                                if (cardCover?.url) {
+                                                                                                                    setPreviewFile({
+                                                                                                                        url: cardCover.url,
+                                                                                                                        name: cardCover.name,
+                                                                                                                        assetId: cardCover.assetId
+                                                                                                                    });
+                                                                                                                }
+                                                                                                            }}
+                                                                                                            className={`group relative flex flex-col h-full ${cardCover ? 'cursor-pointer' : ''}`}
+                                                                                                        >
+                                                                                                            <div className="absolute inset-0 bg-white/5 rounded-[2rem] blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10" />
+
+                                                                                                            <div className="relative flex flex-col h-full bg-[#0e0e1a] border border-white/5 rounded-[2rem] overflow-hidden hover:border-white/10 transition-all shadow-xl hover:shadow-2xl">
+                                                                                                                {/* Card Preview Area */}
+                                                                                                                <div className="aspect-video w-full bg-black/40 relative border-b border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">
+                                                                                                                    {cardCover ? (
+                                                                                                                        cardCover.type === 'video' ? (
+                                                                                                                            <div className="w-full h-full relative group/media">
+                                                                                                                                <video
+                                                                                                                                    src={cardCover.url}
+                                                                                                                                    className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                                                                                                                                    muted
+                                                                                                                                    playsInline
+                                                                                                                                    onMouseOver={e => e.currentTarget.play().catch(() => { })}
+                                                                                                                                    onMouseOut={e => {
+                                                                                                                                        e.currentTarget.pause();
+                                                                                                                                        e.currentTarget.currentTime = 0;
+                                                                                                                                    }}
+                                                                                                                                />
+                                                                                                                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none group-hover/media:opacity-0 transition-opacity">
+                                                                                                                                    <div className="w-10 h-10 rounded-full bg-black/50 backdrop-blur flex items-center justify-center border border-white/20">
+                                                                                                                                        <PlayCircle className="w-5 h-5 text-white" />
+                                                                                                                                    </div>
+                                                                                                                                </div>
+                                                                                                                            </div>
+                                                                                                                        ) : cardCover.type === 'image' ? (
+                                                                                                                            <img src={cardCover.url} alt={item.name} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                                                                                                                        ) : (
+                                                                                                                            // Card External Link View
+                                                                                                                            <div className="w-full h-full flex flex-col items-center justify-center bg-[#070710] group-hover:bg-[#0a0a16] transition-colors relative">
+                                                                                                                                <LinkIcon className="w-8 h-8 text-emerald-400 mb-2" />
+                                                                                                                                <span className="text-[10px] uppercase text-emerald-400/80 font-bold tracking-widest">External Link</span>
+                                                                                                                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm bg-black/20">
+                                                                                                                                    <ArrowUpRight className="w-6 h-6 text-white" />
+                                                                                                                                </div>
+                                                                                                                            </div>
+                                                                                                                        )
+                                                                                                                    ) : (
+                                                                                                                        <div className="w-full h-full flex flex-col items-center justify-center bg-[#070710]">
+                                                                                                                            <Briefcase className="w-8 h-8 text-gray-700 mb-2" />
+                                                                                                                            <span className="text-[10px] uppercase text-gray-700 font-bold tracking-widest">No Preview</span>
+                                                                                                                        </div>
+                                                                                                                    )}
+
+                                                                                                                    {/* Status Badge Overlay */}
+                                                                                                                    {group && (
+                                                                                                                        <div className="absolute top-4 right-4 z-10">
+                                                                                                                            <span className="px-3 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-bold text-white shadow-lg" style={{ color: group.color }}>
+                                                                                                                                {group.title}
+                                                                                                                            </span>
+                                                                                                                        </div>
+                                                                                                                    )}
+                                                                                                                </div>
+
+                                                                                                                {/* Card Content */}
+                                                                                                                <div className="p-6 flex flex-col flex-1 gap-4">
+                                                                                                                    <div className="flex justify-between items-start gap-3">
+                                                                                                                        <h4 className="text-lg font-bold text-white leading-tight line-clamp-2 group-hover:text-emerald-400 transition-colors">{item.name}</h4>
+                                                                                                                    </div>
+
+                                                                                                                    <div className="w-full h-[1px] bg-white/5" />
+
+                                                                                                                    <div className="space-y-3 mt-auto">
+                                                                                                                        {boardData.columns?.filter((c: any) => (c.title.toLowerCase().includes('status') || c.type === 'file') && !c.title.toLowerCase().includes('submission preview')).map((col: any) => (
+                                                                                                                            <div key={col.id} className="grid grid-cols-[80px_1fr] items-center gap-2">
+                                                                                                                                <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold truncate">{col.title}</span>
+                                                                                                                                <div className="min-h-[24px]">
+                                                                                                                                    <BoardCell
+                                                                                                                                        item={item}
+                                                                                                                                        column={col}
+                                                                                                                                        boardId={selectedBoardId}
+                                                                                                                                        onUpdate={() => refreshBoardItems(true)}
+                                                                                                                                        onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
+                                                                                                                                    />
+                                                                                                                                </div>
+                                                                                                                            </div>
+                                                                                                                        ))}
+                                                                                                                    </div>
+                                                                                                                </div>
+                                                                                                            </div>
+                                                                                                        </motion.div>
+                                                                                                    );
+                                                                                                })}
+                                                                                            </div>
+                                                                                        </div>
                                                                                     ));
-                                                                                })}
+                                                                                })()}
                                                                             </div>
                                                                             {allItems.length === 0 && <div className="text-center text-gray-500 italic py-12 bg-[#0e0e1a] rounded-3xl border border-white/5 mt-4">No projects found to display</div>}
                                                                         </div>
@@ -909,7 +1246,11 @@ export default function ClientPortal() {
 
                                     {/* Modal Content */}
                                     <div className="flex-1 bg-black/50 relative flex items-center justify-center p-4 overflow-hidden">
-                                        <FilePreviewer url={previewFile?.url || ''} name={previewFile?.name || ''} isLoading={!!previewFile?.assetId} />
+                                        <MondayMediaLoader
+                                            url={previewFile?.url || ''}
+                                            name={previewFile?.name || ''}
+                                            assetId={previewFile?.assetId}
+                                        />
                                     </div>
                                 </div>
                             </div>

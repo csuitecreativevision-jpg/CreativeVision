@@ -84,6 +84,7 @@ interface FilePreviewerProps {
     url: string;
     name: string;
     isLoading?: boolean;
+    onReady?: () => void;
 }
 
 // Helper to detect Monday.com WorkDocs
@@ -106,7 +107,7 @@ const getFileExtension = (url: string, name: string): string => {
     return urlParts.length > 1 ? (urlParts.pop()?.toLowerCase() || '') : '';
 };
 
-export const FilePreviewer = ({ url, name, isLoading }: FilePreviewerProps) => {
+export const FilePreviewer = ({ url, name, isLoading, onReady }: FilePreviewerProps) => {
     const [error, setError] = useState(false);
     const [iframeLoading, setIframeLoading] = useState(true);
 
@@ -182,7 +183,7 @@ export const FilePreviewer = ({ url, name, isLoading }: FilePreviewerProps) => {
 
     // Image preview
     if (['jpeg', 'jpg', 'gif', 'png', 'webp', 'svg', 'bmp', 'ico'].includes(ext)) {
-        return <img src={url} onError={() => setError(true)} className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" alt={name || "Preview"} />;
+        return <img src={url} onError={() => setError(true)} onLoad={() => onReady?.()} className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" alt={name || "Preview"} />;
     }
 
     // Video preview
@@ -193,8 +194,13 @@ export const FilePreviewer = ({ url, name, isLoading }: FilePreviewerProps) => {
                 controls
                 autoPlay
                 muted
+                loop
                 preload="auto"
                 playsInline
+                onCanPlay={(e) => {
+                    e.currentTarget.play().catch(err => console.error("Autoplay failed:", err));
+                    onReady?.();
+                }}
                 onError={(e) => {
                     console.error('[VideoPlayer] Video failed to load:', e.currentTarget.error, url);
                     setError(true);
@@ -236,7 +242,10 @@ export const FilePreviewer = ({ url, name, isLoading }: FilePreviewerProps) => {
                     src={url}
                     className="w-full h-full rounded-lg shadow-2xl bg-white"
                     title="PDF Preview"
-                    onLoad={() => setIframeLoading(false)}
+                    onLoad={() => {
+                        setIframeLoading(false);
+                        onReady?.();
+                    }}
                     onError={() => setError(true)}
                 />
             </div>
@@ -258,7 +267,10 @@ export const FilePreviewer = ({ url, name, isLoading }: FilePreviewerProps) => {
                     src={officeViewerUrl}
                     className="w-full h-full rounded-lg shadow-2xl bg-white"
                     title="Document Preview"
-                    onLoad={() => setIframeLoading(false)}
+                    onLoad={() => {
+                        setIframeLoading(false);
+                        onReady?.();
+                    }}
                     onError={() => setError(true)}
                 />
             </div>
