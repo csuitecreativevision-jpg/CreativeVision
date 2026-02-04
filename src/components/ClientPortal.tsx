@@ -26,13 +26,13 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
-    getAllBoards, getAllFolders, getBoardItems, updateItemValue, getAllWorkspaces,
+    getAllBoards, getAllFolders, getAllWorkspaces,
     getMultipleBoardItems,
     getAssetPublicUrl,
     prefetchBoardItems
 } from '../services/mondayService';
 import { supabase } from '../services/boardsService';
-import { useVisibilityPolling } from '../hooks/useMondayData';
+import { useVisibilityPolling, useBoardItems, useUpdateItemValue } from '../hooks/useMondayData';
 // User management Removed
 
 // --- Helpers ---
@@ -189,6 +189,7 @@ const FolderTreeItem = ({ folder, allFolders, allBoards, onSelectBoard, selected
 const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, column: any, boardId: string | null, onUpdate: () => void, onPreview: (url: string, name: string, assetId?: string) => void }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const { mutateAsync: updateItem } = useUpdateItemValue();
 
     // Find value for this column
     const colValueObj = item.column_values.find((v: any) => v.id === column.id);
@@ -317,7 +318,7 @@ const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: { item: any, 
 
         setIsLoading(true);
         try {
-            await updateItemValue(boardId, item.id, column.id, newValue);
+            await updateItem({ boardId, itemId: item.id, columnId: column.id, value: newValue });
             await onUpdate();
         } catch (err) {
             console.error(err);
@@ -594,9 +595,15 @@ export default function ClientPortal() {
     const [workspaces, setWorkspaces] = useState<any[]>([]);
     const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(localStorage.getItem('portal_user_workspace') || null); // null = Main Workspace
     const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
-    const [boardData, setBoardData] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+    const [manualLoading, setManualLoading] = useState(true);
     const [previewFile, setPreviewFile] = useState<{ url: string, name: string, assetId?: string } | null>(null);
+
+    // Board Items Hook (React Query)
+    const { boardData, isLoading: isBoardItemsLoading, refreshBoardItems } = useBoardItems(selectedBoardId);
+
+    // Derived loading state (combines manual + hook loading)
+    const loading = manualLoading || isBoardItemsLoading;
+    const setLoading = setManualLoading;
     // User Permissions State
     const [currentUserAllowedBoards, setCurrentUserAllowedBoards] = useState<string[]>([]);
     const [currentUserWorkspaceId, setCurrentUserWorkspaceId] = useState<string | null>(null);
@@ -1003,21 +1010,11 @@ export default function ClientPortal() {
         }
     };
 
-    const refreshBoardDetails = (id: string, silent = false) => {
-        if (!silent) setLoading(true);
-        getBoardItems(id).then(data => {
-            setBoardData(data);
-            if (!silent) setLoading(false);
-        }).catch(err => { console.error(err); if (!silent) setLoading(false); });
-    };
-
     useEffect(() => {
         if (selectedBoardId) {
             setFulfillmentMonthFilter('All'); // Reset Filter
-            refreshBoardDetails(selectedBoardId);
+            refreshBoardItems();
             refreshBoardsAndFolders(true); // Background Refresh Global Data
-        } else {
-            setBoardData(null);
         }
     }, [selectedBoardId]);
 
@@ -1320,7 +1317,7 @@ export default function ClientPortal() {
                                                                                                         item={currentItem}
                                                                                                         column={col}
                                                                                                         boardId={selectedBoardId}
-                                                                                                        onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
+                                                                                                        onUpdate={() => refreshBoardItems(true)}
                                                                                                         onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
                                                                                                     />
                                                                                                 </div>
@@ -1434,7 +1431,7 @@ export default function ClientPortal() {
                                                                                                                     item={item}
                                                                                                                     column={col}
                                                                                                                     boardId={selectedBoardId}
-                                                                                                                    onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
+                                                                                                                    onUpdate={() => refreshBoardItems(true)}
                                                                                                                     onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
                                                                                                                 />
                                                                                                             </div>
@@ -1482,7 +1479,7 @@ export default function ClientPortal() {
                                                                                             <div className="flex flex-col items-center mb-6"><h3 className="text-2xl font-black text-white mb-2 text-center">{currentItem.name}</h3><span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{boardData.name.toLowerCase().includes('form') ? 'Application Entry' : 'Project Details'}</span></div>
                                                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
                                                                                                 {boardData.columns?.filter((col: any) => col.type !== 'name').map((col: any) => (
-                                                                                                    <div key={col.id} className="p-4 rounded-2xl bg-[#0e0e1a] border border-white/5"><span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-2">{col.title}</span><BoardCell item={currentItem} column={col} boardId={selectedBoardId} onUpdate={() => refreshBoardDetails(selectedBoardId!, true)} onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })} /></div>
+                                                                                                    <div key={col.id} className="p-4 rounded-2xl bg-[#0e0e1a] border border-white/5"><span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-2">{col.title}</span><BoardCell item={currentItem} column={col} boardId={selectedBoardId} onUpdate={() => refreshBoardItems(true)} onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })} /></div>
                                                                                                 ))}
                                                                                             </div>
                                                                                         </div>
@@ -1572,7 +1569,7 @@ export default function ClientPortal() {
                                                                                                                                         item={item}
                                                                                                                                         column={col}
                                                                                                                                         boardId={selectedBoardId}
-                                                                                                                                        onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
+                                                                                                                                        onUpdate={() => refreshBoardItems(true)}
                                                                                                                                         onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
                                                                                                                                     />
                                                                                                                                 </div>
@@ -1599,7 +1596,7 @@ export default function ClientPortal() {
                                                                                                 {groupItems.map((item: any) => (
                                                                                                     <tr key={item.id} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
                                                                                                         <td className="px-4 py-3 font-medium text-white group-hover:text-emerald-400 transition-colors sticky left-0 bg-[#0e0e1a] group-hover:bg-[#151525] z-10 border-r border-white/5">{item.name}</td>
-                                                                                                        {boardData.columns?.filter((c: any) => c.type !== 'name').map((col: any) => (<td key={col.id} className="px-4 py-3 text-gray-400"><BoardCell item={item} column={col} boardId={selectedBoardId} onUpdate={() => refreshBoardDetails(selectedBoardId!, true)} onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })} /></td>))}
+                                                                                                        {boardData.columns?.filter((c: any) => c.type !== 'name').map((col: any) => (<td key={col.id} className="px-4 py-3 text-gray-400"><BoardCell item={item} column={col} boardId={selectedBoardId} onUpdate={() => refreshBoardItems(true)} onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })} /></td>))}
                                                                                                     </tr>
                                                                                                 ))}
                                                                                             </tbody>
