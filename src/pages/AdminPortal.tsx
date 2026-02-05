@@ -45,7 +45,7 @@ export default function AdminPortal() {
         if (path.includes('boards')) return 'Boards';
         if (path.includes('users')) return 'Users';
         if (path.includes('settings')) return 'Settings';
-        if (path.includes('projects')) return 'Projects';
+        if (path.includes('clients')) return 'Clients';
         if (path.includes('analytics')) return 'Analytics';
         if (path.includes('team')) return 'Team';
         return 'Overview';
@@ -72,7 +72,7 @@ export default function AdminPortal() {
                     <SidebarItem icon={<AlignLeft className="w-5 h-5" />} label="Boards" active={activeTab === 'Boards'} onClick={() => navigate('/admin-portal/boards')} />
                     {currentUserRole === 'admin' && (
                         <>
-                            <SidebarItem icon={<Briefcase className="w-5 h-5" />} label="Projects" active={activeTab === 'Projects'} onClick={() => navigate('/admin-portal/overview')} />
+                            <SidebarItem icon={<Briefcase className="w-5 h-5" />} label="Clients" active={activeTab === 'Clients'} onClick={() => navigate('/admin-portal/clients')} />
                             <SidebarItem icon={<Activity className="w-5 h-5" />} label="Analytics" active={activeTab === 'Analytics'} onClick={() => navigate('/admin-portal/overview')} />
                             <SidebarItem icon={<Users className="w-5 h-5" />} label="Team" active={activeTab === 'Team'} onClick={() => navigate('/admin-portal/team')} />
                             <SidebarItem icon={<UserPlus className="w-5 h-5" />} label="Users" active={activeTab === 'Users'} onClick={() => navigate('/admin-portal/users')} />
