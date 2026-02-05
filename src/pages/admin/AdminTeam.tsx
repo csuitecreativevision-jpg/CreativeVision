@@ -127,34 +127,46 @@ export default function AdminTeam() {
                                     transition={{ delay: 0.3 }}
                                     className="flex items-center justify-center gap-4 pt-4"
                                 >
-                                    <div className="flex bg-white/5 border border-white/10 rounded-lg p-1">
-                                        <button
-                                            onClick={() => setSortOption('name')}
-                                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${sortOption === 'name' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'}`}
-                                        >
-                                            Name
-                                        </button>
-                                        <button
-                                            onClick={() => setSortOption('count')}
-                                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${sortOption === 'count' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'}`}
-                                        >
-                                            Projects
-                                        </button>
+                                    <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 relative">
+                                        <div className="relative flex gap-1">
+                                            {['name', 'count'].map((option) => (
+                                                <button
+                                                    key={option}
+                                                    onClick={() => setSortOption(option as 'name' | 'count')}
+                                                    className={`relative px-4 py-1.5 rounded-lg text-sm font-medium transition-all z-10 ${sortOption === option ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+                                                >
+                                                    {sortOption === option && (
+                                                        <motion.div
+                                                            layoutId="sortOptionHighlight"
+                                                            className="absolute inset-0 bg-white/10 rounded-lg"
+                                                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                                        />
+                                                    )}
+                                                    {option === 'name' ? 'Name' : 'Projects'}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
 
-                                    <div className="flex bg-white/5 border border-white/10 rounded-lg p-1">
-                                        <button
-                                            onClick={() => setSortDirection('asc')}
-                                            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${sortDirection === 'asc' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'}`}
-                                        >
-                                            ↑
-                                        </button>
-                                        <button
-                                            onClick={() => setSortDirection('desc')}
-                                            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${sortDirection === 'desc' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'}`}
-                                        >
-                                            ↓
-                                        </button>
+                                    <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 relative">
+                                        <div className="relative flex gap-1">
+                                            {['asc', 'desc'].map((dir) => (
+                                                <button
+                                                    key={dir}
+                                                    onClick={() => setSortDirection(dir as 'asc' | 'desc')}
+                                                    className={`relative px-3 py-1.5 rounded-lg text-sm font-medium transition-all z-10 ${sortDirection === dir ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+                                                >
+                                                    {sortDirection === dir && (
+                                                        <motion.div
+                                                            layoutId="sortDirHighlight"
+                                                            className="absolute inset-0 bg-white/10 rounded-lg"
+                                                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                                        />
+                                                    )}
+                                                    {dir === 'asc' ? '↑' : '↓'}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
                                 </motion.div>
                             </div>

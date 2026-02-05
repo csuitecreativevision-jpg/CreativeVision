@@ -22,7 +22,7 @@ export const WorkspaceCard = ({ name, itemCount = 0, onClick, color = '#8b5cf6',
             className="group relative h-[320px] w-full cursor-pointer perspective-1000"
         >
             {/* Card Container with Glassmorphism */}
-            <div className="absolute inset-0 bg-[#0e0e1a]/80 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden transition-all duration-500 group-hover:border-white/30 group-hover:shadow-[0_0_30px_rgba(139,92,246,0.3)] group-hover:translate-y-[-10px]">
+            <div className="absolute inset-0 bg-[#0e0e1a]/80 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden transition-all duration-500 group-hover:border-white/30 group-hover:shadow-[0_0_30px_rgba(139,92,246,0.3)] group-hover:translate-y-[-5px]">
 
                 {/* Background Gradient Effect */}
                 <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
