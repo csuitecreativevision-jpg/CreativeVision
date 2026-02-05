@@ -73,7 +73,7 @@ export default function AdminPortal() {
                     {currentUserRole === 'admin' && (
                         <>
                             <SidebarItem icon={<Briefcase className="w-5 h-5" />} label="Clients" active={activeTab === 'Clients'} onClick={() => navigate('/admin-portal/clients')} />
-                            <SidebarItem icon={<Activity className="w-5 h-5" />} label="Analytics" active={activeTab === 'Analytics'} onClick={() => navigate('/admin-portal/overview')} />
+                            <SidebarItem icon={<Activity className="w-5 h-5" />} label="Analytics" active={activeTab === 'Analytics'} onClick={() => navigate('/admin-portal/analytics')} />
                             <SidebarItem icon={<Users className="w-5 h-5" />} label="Team" active={activeTab === 'Team'} onClick={() => navigate('/admin-portal/team')} />
                             <SidebarItem icon={<UserPlus className="w-5 h-5" />} label="Users" active={activeTab === 'Users'} onClick={() => navigate('/admin-portal/users')} />
                             <SidebarItem icon={<Settings className="w-5 h-5" />} label="Settings" active={activeTab === 'Settings'} onClick={() => navigate('/admin-portal/overview')} />
