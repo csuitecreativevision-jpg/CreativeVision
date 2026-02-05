@@ -4,6 +4,7 @@ import { PortalLayout } from '../components/shared/PortalLayout';
 import { BoardCell } from '../components/shared/BoardCell';
 import { SidebarItem } from '../components/shared/SidebarItem';
 import { MondayMediaLoader } from '../components/shared/MondayMediaLoader';
+import { PortalOnboarding } from '../components/shared/PortalOnboarding';
 import {
     Loader2,
     LayoutDashboard,
@@ -18,7 +19,8 @@ import {
     X,
     Download,
     Link as LinkIcon,
-    ArrowUpRight
+    ArrowUpRight,
+    Sparkles
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -337,7 +339,7 @@ export default function ClientPortal() {
     const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
     // Fulfillment View Toggle State
-    const [fulfillmentViewMode, setFulfillmentViewMode] = useState<'recent' | 'overview'>('recent');
+    const [fulfillmentViewMode, setFulfillmentViewMode] = useState<'recent' | 'overview' | 'gallery'>('recent');
     // Carousel Index for "Recent" view in Fulfillment (iterating sorted list)
     const [fulfillmentRecentIndex, setFulfillmentRecentIndex] = useState(0);
     const [fulfillmentMonthFilter, setFulfillmentMonthFilter] = useState<string>('All');
@@ -352,6 +354,40 @@ export default function ClientPortal() {
         }
         setCollapsedGroups(newCollapsed);
     };
+
+    // Onboarding State
+    const [showOnboarding, setShowOnboarding] = useState(false);
+
+    useEffect(() => {
+        const hasSeen = localStorage.getItem('client_portal_onboarding_seen');
+        if (!hasSeen) {
+            setShowOnboarding(true);
+        }
+    }, []);
+
+    const onboardingSteps = [
+        {
+            title: "Welcome to Your Portal",
+            description: "Manage your projects, track progress, and view submissions all in one place.",
+            icon: <Sparkles className="w-10 h-10 text-emerald-400" />
+        },
+        {
+            title: "Project Overview",
+            description: "Get a high-level view of your project status, incomplete items, and recent activity.",
+            icon: <LayoutDashboard className="w-10 h-10 text-blue-400" />
+        },
+        {
+            title: "Project Gallery",
+            description: "Browse your project history visually, grouped by month for easy access to past work.",
+            icon: <LayoutGrid className="w-10 h-10 text-purple-400" />
+        },
+        {
+            title: "File Management",
+            description: "Preview videos, images, and documents directly within the portal without downloading.",
+            icon: <FileText className="w-10 h-10 text-orange-400" />
+        }
+    ];
+
 
 
 
@@ -564,6 +600,13 @@ export default function ClientPortal() {
             }
             mainContent={
                 <>
+                    <PortalOnboarding
+                        isOpen={showOnboarding}
+                        onClose={() => setShowOnboarding(false)}
+                        steps={onboardingSteps}
+                        storageKey="client_portal_onboarding_seen"
+                    />
+
                     {/* Content Area */}
                     <div className="flex-1 overflow-hidden flex flex-col relative z-20">
 
@@ -654,14 +697,21 @@ export default function ClientPortal() {
                                                                             onClick={() => setFulfillmentViewMode('overview')}
                                                                             className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${fulfillmentViewMode === 'overview' ? 'bg-[#0073ea] text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                                                                         >
-                                                                            <LayoutGrid className="w-3.5 h-3.5" /> Whole Overview
+                                                                            <LayoutGrid className="w-3.5 h-3.5" /> Overview
+                                                                        </button>
+                                                                        <div className="w-[1px] h-4 bg-white/10 mx-1" />
+                                                                        <button
+                                                                            onClick={() => setFulfillmentViewMode('gallery')}
+                                                                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${fulfillmentViewMode === 'gallery' ? 'bg-[#0073ea] text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                                                                        >
+                                                                            <FileText className="w-3.5 h-3.5" /> Gallery
                                                                         </button>
                                                                         <div className="w-[1px] h-4 bg-white/10 mx-1" />
                                                                         <button
                                                                             onClick={() => setFulfillmentViewMode('recent')}
                                                                             className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${fulfillmentViewMode === 'recent' ? 'bg-[#0073ea] text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                                                                         >
-                                                                            <Clock className="w-3.5 h-3.5" /> Most Recent Project
+                                                                            <Clock className="w-3.5 h-3.5" /> Recent
                                                                         </button>
                                                                     </div>
 
@@ -805,234 +855,232 @@ export default function ClientPortal() {
                                                                             </div>
                                                                         </div>
 
-                                                                        {/* Whole Overview Grid */}
-                                                                        <div>
-                                                                            <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                                                                                <span className="w-1 h-6 bg-emerald-500 rounded-full" />
-                                                                                Project Gallery
-                                                                            </h3>
-                                                                            <div className="space-y-12">
-                                                                                {(() => {
-                                                                                    // Group items by Month
-                                                                                    const monthGroups: Record<string, any[]> = {};
-                                                                                    const allItems = boardData.items || [];
+                                                                    </div>
+                                                                )
+                                                                }
 
-                                                                                    allItems.forEach((item: any) => {
-                                                                                        if (!item.created_at) return;
-                                                                                        const date = new Date(item.created_at);
-                                                                                        if (isNaN(date.getTime())) return;
-                                                                                        const monthKey = date.toLocaleString('default', { month: 'long', year: 'numeric' });
-                                                                                        if (!monthGroups[monthKey]) monthGroups[monthKey] = [];
-                                                                                        monthGroups[monthKey].push(item);
-                                                                                    });
+                                                                {/* --- GALLERY VIEW --- */}
+                                                                {fulfillmentViewMode === 'gallery' && (
+                                                                    <div className="space-y-12 animate-in fade-in zoom-in duration-300">
+                                                                        {(() => {
+                                                                            // Group items by Month
+                                                                            const monthGroups: Record<string, any[]> = {};
+                                                                            const allItems = boardData.items || [];
 
-                                                                                    // Sort months (newest first)
-                                                                                    const sortedMonths = Object.keys(monthGroups).sort((a, b) => {
-                                                                                        const dateA = new Date(a);
-                                                                                        const dateB = new Date(b);
-                                                                                        return dateB.getTime() - dateA.getTime();
-                                                                                    });
+                                                                            allItems.forEach((item: any) => {
+                                                                                if (!item.created_at) return;
+                                                                                const date = new Date(item.created_at);
+                                                                                if (isNaN(date.getTime())) return;
+                                                                                const monthKey = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+                                                                                if (!monthGroups[monthKey]) monthGroups[monthKey] = [];
+                                                                                monthGroups[monthKey].push(item);
+                                                                            });
 
-                                                                                    if (sortedMonths.length === 0) return <div className="text-center text-gray-500 italic py-12">No projects found</div>;
+                                                                            // Sort months (newest first)
+                                                                            const sortedMonths = Object.keys(monthGroups).sort((a, b) => {
+                                                                                const dateA = new Date(a);
+                                                                                const dateB = new Date(b);
+                                                                                return dateB.getTime() - dateA.getTime();
+                                                                            });
 
-                                                                                    return sortedMonths.map((month) => (
-                                                                                        <div key={month} className="relative">
-                                                                                            <div className="flex items-center gap-4 mb-6 sticky top-0 bg-[#070710]/80 backdrop-blur-md py-4 z-20 border-b border-white/5">
-                                                                                                <div className="h-8 w-1 bg-gradient-to-b from-emerald-500 to-emerald-700 rounded-full" />
-                                                                                                <h3 className="text-2xl font-bold text-white tracking-tight">{month}</h3>
-                                                                                                <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-gray-400 font-mono">
-                                                                                                    {monthGroups[month].length} {monthGroups[month].length === 1 ? 'Project' : 'Projects'}
-                                                                                                </span>
-                                                                                            </div>
+                                                                            if (sortedMonths.length === 0) return <div className="text-center text-gray-500 italic py-12">No projects found</div>;
 
-                                                                                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                                                                                                {monthGroups[month].map((item: any) => {
-                                                                                                    const group = item.group; // Access group from item
+                                                                            return sortedMonths.map((month) => (
+                                                                                <div key={month} className="relative">
+                                                                                    <div className="flex items-center gap-4 mb-6 sticky top-0 bg-[#070710]/80 backdrop-blur-md py-4 z-20 border-b border-white/5">
+                                                                                        <div className="h-8 w-1 bg-gradient-to-b from-emerald-500 to-emerald-700 rounded-full" />
+                                                                                        <h3 className="text-2xl font-bold text-white tracking-tight">{month}</h3>
+                                                                                        <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-gray-400 font-mono">
+                                                                                            {monthGroups[month].length} {monthGroups[month].length === 1 ? 'Project' : 'Projects'}
+                                                                                        </span>
+                                                                                    </div>
 
-                                                                                                    // Find cover for card
-                                                                                                    let cardCover = null;
+                                                                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                                                                        {monthGroups[month].map((item: any) => {
+                                                                                            const group = item.group; // Access group from item
 
-                                                                                                    // 1. Try "Submission Preview" first
-                                                                                                    const submissionCol = boardData.columns?.find((c: any) => c.title.toLowerCase().includes('submission') && c.title.toLowerCase().includes('preview'));
-                                                                                                    if (submissionCol) {
-                                                                                                        const valObj = item.column_values?.find((v: any) => v.id === submissionCol.id);
-                                                                                                        if (valObj) {
-                                                                                                            if (valObj.value) {
-                                                                                                                try {
-                                                                                                                    const val = JSON.parse(valObj.value);
-                                                                                                                    // Link Column Type
-                                                                                                                    if (val.url) {
-                                                                                                                        const url = val.url;
-                                                                                                                        const isVideo = /\.(mp4|mov|webm|ogg)(\?|$)/i.test(url);
-                                                                                                                        const isImage = /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(url);
-                                                                                                                        let finalType = 'external_link';
-                                                                                                                        if (isVideo) finalType = 'video';
-                                                                                                                        else if (isImage) finalType = 'image';
-                                                                                                                        cardCover = { url, type: finalType, name: val.text || 'Submission', assetId: undefined };
-                                                                                                                    }
-                                                                                                                    // File Column Type
-                                                                                                                    else if (val.files && val.files.length > 0) {
-                                                                                                                        const f = val.files[0];
-                                                                                                                        const url = f.public_url || f.url || f.thumbnail_url;
-                                                                                                                        const isVideo = /\.(mp4|mov|webm|ogg)(\?|$)/i.test(f.name);
-                                                                                                                        const assetId = f.assetId || f.id;
-                                                                                                                        if (url) cardCover = { url, type: isVideo ? 'video' : 'image', name: f.name, assetId };
-                                                                                                                    }
-                                                                                                                } catch (e) { }
+                                                                                            // Find cover for card
+                                                                                            let cardCover = null;
+
+                                                                                            // 1. Try "Submission Preview" first
+                                                                                            const submissionCol = boardData.columns?.find((c: any) => c.title.toLowerCase().includes('submission') && c.title.toLowerCase().includes('preview'));
+                                                                                            if (submissionCol) {
+                                                                                                const valObj = item.column_values?.find((v: any) => v.id === submissionCol.id);
+                                                                                                if (valObj) {
+                                                                                                    if (valObj.value) {
+                                                                                                        try {
+                                                                                                            const val = JSON.parse(valObj.value);
+                                                                                                            // Link Column Type
+                                                                                                            if (val.url) {
+                                                                                                                const url = val.url;
+                                                                                                                const isVideo = /\.(mp4|mov|webm|ogg)(\?|$)/i.test(url);
+                                                                                                                const isImage = /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(url);
+                                                                                                                let finalType = 'external_link';
+                                                                                                                if (isVideo) finalType = 'video';
+                                                                                                                else if (isImage) finalType = 'image';
+                                                                                                                cardCover = { url, type: finalType, name: val.text || 'Submission', assetId: undefined };
                                                                                                             }
-                                                                                                            // Text / Raw URL Fallback
-                                                                                                            if (!cardCover && (valObj.text || valObj.display_value)) {
-                                                                                                                const rawText = (valObj.text || valObj.display_value || '').trim();
-                                                                                                                if (rawText.startsWith('http')) {
-                                                                                                                    const isVideo = /\.(mp4|mov|webm|ogg)(\?|$)/i.test(rawText);
-                                                                                                                    const isImage = /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(rawText);
-                                                                                                                    let finalType = 'external_link';
-                                                                                                                    if (isVideo) finalType = 'video';
-                                                                                                                    else if (isImage) finalType = 'image';
-                                                                                                                    cardCover = { url: rawText, type: finalType, name: 'Submission' };
-                                                                                                                }
+                                                                                                            // File Column Type
+                                                                                                            else if (val.files && val.files.length > 0) {
+                                                                                                                const f = val.files[0];
+                                                                                                                const url = f.public_url || f.url || f.thumbnail_url;
+                                                                                                                const isVideo = /\.(mp4|mov|webm|ogg)(\?|$)/i.test(f.name);
+                                                                                                                const assetId = f.assetId || f.id;
+                                                                                                                if (url) cardCover = { url, type: isVideo ? 'video' : 'image', name: f.name, assetId };
                                                                                                             }
+                                                                                                        } catch (e) { }
+                                                                                                    }
+                                                                                                    // Text / Raw URL Fallback
+                                                                                                    if (!cardCover && (valObj.text || valObj.display_value)) {
+                                                                                                        const rawText = (valObj.text || valObj.display_value || '').trim();
+                                                                                                        if (rawText.startsWith('http')) {
+                                                                                                            const isVideo = /\.(mp4|mov|webm|ogg)(\?|$)/i.test(rawText);
+                                                                                                            const isImage = /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(rawText);
+                                                                                                            let finalType = 'external_link';
+                                                                                                            if (isVideo) finalType = 'video';
+                                                                                                            else if (isImage) finalType = 'image';
+                                                                                                            cardCover = { url: rawText, type: finalType, name: 'Submission' };
                                                                                                         }
                                                                                                     }
+                                                                                                }
+                                                                                            }
 
-                                                                                                    // 2. Fallback to normal file columns
-                                                                                                    if (!cardCover) {
-                                                                                                        const fCols = boardData.columns?.filter((c: any) => c.type === 'file' && c.id !== submissionCol?.id) || [];
-                                                                                                        for (const col of fCols) {
-                                                                                                            const valObj = item.column_values?.find((v: any) => v.id === col.id);
-                                                                                                            if (valObj && valObj.value) {
-                                                                                                                try {
-                                                                                                                    const val = JSON.parse(valObj.value);
-                                                                                                                    if (val.files && val.files.length > 0) {
-                                                                                                                        const f = val.files[0];
-                                                                                                                        const url = f.public_url || f.url || f.thumbnail_url;
-                                                                                                                        const isVideo = /\.(mp4|mov|webm|ogg)(\?|$)/i.test(f.name);
-                                                                                                                        const assetId = f.assetId || f.id;
-                                                                                                                        if (url) {
-                                                                                                                            cardCover = { url, type: isVideo ? 'video' : 'image', name: f.name, assetId };
-                                                                                                                            break; // Take first file found
-                                                                                                                        }
-                                                                                                                    }
-                                                                                                                } catch (e) { }
-                                                                                                            }
-                                                                                                        }
-                                                                                                    }
-
-                                                                                                    // 3. Regex Fallback for Asset ID
-                                                                                                    if (cardCover && !cardCover.assetId && cardCover.url) {
-                                                                                                        const resourceMatch = cardCover.url.match(/\/resources\/(\d+)\//);
-                                                                                                        const assetMatch = cardCover.url.match(/\/assets\/(\d+)/);
-                                                                                                        if (resourceMatch && resourceMatch[1]) cardCover.assetId = resourceMatch[1];
-                                                                                                        else if (assetMatch && assetMatch[1]) cardCover.assetId = assetMatch[1];
-                                                                                                    }
-
-                                                                                                    return (
-                                                                                                        <motion.div
-                                                                                                            key={item.id}
-                                                                                                            initial={{ opacity: 0, scale: 0.95 }}
-                                                                                                            animate={{ opacity: 1, scale: 1 }}
-                                                                                                            whileHover={{ y: -8 }}
-                                                                                                            onClick={() => {
-                                                                                                                if (cardCover?.url) {
-                                                                                                                    setPreviewFile({
-                                                                                                                        url: cardCover.url,
-                                                                                                                        name: cardCover.name,
-                                                                                                                        assetId: cardCover.assetId
-                                                                                                                    });
+                                                                                            // 2. Fallback to normal file columns
+                                                                                            if (!cardCover) {
+                                                                                                const fCols = boardData.columns?.filter((c: any) => c.type === 'file' && c.id !== submissionCol?.id) || [];
+                                                                                                for (const col of fCols) {
+                                                                                                    const valObj = item.column_values?.find((v: any) => v.id === col.id);
+                                                                                                    if (valObj && valObj.value) {
+                                                                                                        try {
+                                                                                                            const val = JSON.parse(valObj.value);
+                                                                                                            if (val.files && val.files.length > 0) {
+                                                                                                                const f = val.files[0];
+                                                                                                                const url = f.public_url || f.url || f.thumbnail_url;
+                                                                                                                const isVideo = /\.(mp4|mov|webm|ogg)(\?|$)/i.test(f.name);
+                                                                                                                const assetId = f.assetId || f.id;
+                                                                                                                if (url) {
+                                                                                                                    cardCover = { url, type: isVideo ? 'video' : 'image', name: f.name, assetId };
+                                                                                                                    break; // Take first file found
                                                                                                                 }
-                                                                                                            }}
-                                                                                                            className={`group relative flex flex-col h-full ${cardCover ? 'cursor-pointer' : ''}`}
-                                                                                                        >
-                                                                                                            <div className="absolute inset-0 bg-white/5 rounded-[2rem] blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10" />
+                                                                                                            }
+                                                                                                        } catch (e) { }
+                                                                                                    }
+                                                                                                }
+                                                                                            }
 
-                                                                                                            <div className="relative flex flex-col h-full bg-[#0e0e1a] border border-white/5 rounded-[2rem] overflow-hidden hover:border-white/10 transition-all shadow-xl hover:shadow-2xl">
-                                                                                                                {/* Card Preview Area */}
-                                                                                                                <div className="aspect-video w-full bg-black/40 relative border-b border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">
-                                                                                                                    {cardCover ? (
-                                                                                                                        cardCover.type === 'video' ? (
-                                                                                                                            <div className="w-full h-full relative group/media">
-                                                                                                                                <video
-                                                                                                                                    src={cardCover.url}
-                                                                                                                                    className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                                                                                                                                    muted
-                                                                                                                                    playsInline
-                                                                                                                                    onMouseOver={e => e.currentTarget.play().catch(() => { })}
-                                                                                                                                    onMouseOut={e => {
-                                                                                                                                        e.currentTarget.pause();
-                                                                                                                                        e.currentTarget.currentTime = 0;
-                                                                                                                                    }}
-                                                                                                                                />
-                                                                                                                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none group-hover/media:opacity-0 transition-opacity">
-                                                                                                                                    <div className="w-10 h-10 rounded-full bg-black/50 backdrop-blur flex items-center justify-center border border-white/20">
-                                                                                                                                        <PlayCircle className="w-5 h-5 text-white" />
-                                                                                                                                    </div>
-                                                                                                                                </div>
+                                                                                            // 3. Regex Fallback for Asset ID
+                                                                                            if (cardCover && !cardCover.assetId && cardCover.url) {
+                                                                                                const resourceMatch = cardCover.url.match(/\/resources\/(\d+)\//);
+                                                                                                const assetMatch = cardCover.url.match(/\/assets\/(\d+)/);
+                                                                                                if (resourceMatch && resourceMatch[1]) cardCover.assetId = resourceMatch[1];
+                                                                                                else if (assetMatch && assetMatch[1]) cardCover.assetId = assetMatch[1];
+                                                                                            }
+
+                                                                                            return (
+                                                                                                <motion.div
+                                                                                                    key={item.id}
+                                                                                                    initial={{ opacity: 0, scale: 0.95 }}
+                                                                                                    animate={{ opacity: 1, scale: 1 }}
+                                                                                                    whileHover={{ y: -8 }}
+                                                                                                    onClick={() => {
+                                                                                                        if (cardCover?.url) {
+                                                                                                            setPreviewFile({
+                                                                                                                url: cardCover.url,
+                                                                                                                name: cardCover.name,
+                                                                                                                assetId: cardCover.assetId
+                                                                                                            });
+                                                                                                        }
+                                                                                                    }}
+                                                                                                    className={`group relative flex flex-col h-full ${cardCover ? 'cursor-pointer' : ''}`}
+                                                                                                >
+                                                                                                    <div className="absolute inset-0 bg-white/5 rounded-[2rem] blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10" />
+
+                                                                                                    <div className="relative flex flex-col h-full bg-[#0e0e1a] border border-white/5 rounded-[2rem] overflow-hidden hover:border-white/10 transition-all shadow-xl hover:shadow-2xl">
+                                                                                                        {/* Card Preview Area */}
+                                                                                                        <div className="aspect-video w-full bg-black/40 relative border-b border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">
+                                                                                                            {cardCover ? (
+                                                                                                                cardCover.type === 'video' ? (
+                                                                                                                    <div className="w-full h-full relative group/media">
+                                                                                                                        <video
+                                                                                                                            src={cardCover.url}
+                                                                                                                            className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                                                                                                                            muted
+                                                                                                                            playsInline
+                                                                                                                            onMouseOver={e => e.currentTarget.play().catch(() => { })}
+                                                                                                                            onMouseOut={e => {
+                                                                                                                                e.currentTarget.pause();
+                                                                                                                                e.currentTarget.currentTime = 0;
+                                                                                                                            }}
+                                                                                                                        />
+                                                                                                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none group-hover/media:opacity-0 transition-opacity">
+                                                                                                                            <div className="w-10 h-10 rounded-full bg-black/50 backdrop-blur flex items-center justify-center border border-white/20">
+                                                                                                                                <PlayCircle className="w-5 h-5 text-white" />
                                                                                                                             </div>
-                                                                                                                        ) : cardCover.type === 'image' ? (
-                                                                                                                            <img src={cardCover.url} alt={item.name} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
-                                                                                                                        ) : (
-                                                                                                                            // Card External Link View
-                                                                                                                            <div className="w-full h-full flex flex-col items-center justify-center bg-[#070710] group-hover:bg-[#0a0a16] transition-colors relative">
-                                                                                                                                <LinkIcon className="w-8 h-8 text-emerald-400 mb-2" />
-                                                                                                                                <span className="text-[10px] uppercase text-emerald-400/80 font-bold tracking-widest">External Link</span>
-                                                                                                                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm bg-black/20">
-                                                                                                                                    <ArrowUpRight className="w-6 h-6 text-white" />
-                                                                                                                                </div>
-                                                                                                                            </div>
-                                                                                                                        )
-                                                                                                                    ) : (
-                                                                                                                        <div className="w-full h-full flex flex-col items-center justify-center bg-[#070710]">
-                                                                                                                            <Briefcase className="w-8 h-8 text-gray-700 mb-2" />
-                                                                                                                            <span className="text-[10px] uppercase text-gray-700 font-bold tracking-widest">No Preview</span>
                                                                                                                         </div>
-                                                                                                                    )}
-
-                                                                                                                    {/* Status Badge Overlay */}
-                                                                                                                    {group && (
-                                                                                                                        <div className="absolute top-4 right-4 z-10">
-                                                                                                                            <span className="px-3 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-bold text-white shadow-lg" style={{ color: group.color }}>
-                                                                                                                                {group.title}
-                                                                                                                            </span>
+                                                                                                                    </div>
+                                                                                                                ) : cardCover.type === 'image' ? (
+                                                                                                                    <img src={cardCover.url} alt={item.name} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                                                                                                                ) : (
+                                                                                                                    // Card External Link View
+                                                                                                                    <div className="w-full h-full flex flex-col items-center justify-center bg-[#070710] group-hover:bg-[#0a0a16] transition-colors relative">
+                                                                                                                        <LinkIcon className="w-8 h-8 text-emerald-400 mb-2" />
+                                                                                                                        <span className="text-[10px] uppercase text-emerald-400/80 font-bold tracking-widest">External Link</span>
+                                                                                                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm bg-black/20">
+                                                                                                                            <ArrowUpRight className="w-6 h-6 text-white" />
                                                                                                                         </div>
-                                                                                                                    )}
-                                                                                                                </div>
-
-                                                                                                                {/* Card Content */}
-                                                                                                                <div className="p-6 flex flex-col flex-1 gap-4">
-                                                                                                                    <div className="flex justify-between items-start gap-3">
-                                                                                                                        <h4 className="text-lg font-bold text-white leading-tight line-clamp-2 group-hover:text-emerald-400 transition-colors">{item.name}</h4>
                                                                                                                     </div>
-
-                                                                                                                    <div className="w-full h-[1px] bg-white/5" />
-
-                                                                                                                    <div className="space-y-3 mt-auto">
-                                                                                                                        {boardData.columns?.filter((c: any) => (c.title.toLowerCase().includes('status') || c.type === 'file') && !c.title.toLowerCase().includes('submission preview')).map((col: any) => (
-                                                                                                                            <div key={col.id} className="grid grid-cols-[80px_1fr] items-center gap-2">
-                                                                                                                                <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold truncate">{col.title}</span>
-                                                                                                                                <div className="min-h-[24px]">
-                                                                                                                                    <BoardCell
-                                                                                                                                        item={item}
-                                                                                                                                        column={col}
-                                                                                                                                        boardId={selectedBoardId}
-                                                                                                                                        onUpdate={() => refreshBoardItems(true)}
-                                                                                                                                        onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
-                                                                                                                                    />
-                                                                                                                                </div>
-                                                                                                                            </div>
-                                                                                                                        ))}
-                                                                                                                    </div>
+                                                                                                                )
+                                                                                                            ) : (
+                                                                                                                <div className="w-full h-full flex flex-col items-center justify-center bg-[#070710]">
+                                                                                                                    <Briefcase className="w-8 h-8 text-gray-700 mb-2" />
+                                                                                                                    <span className="text-[10px] uppercase text-gray-700 font-bold tracking-widest">No Preview</span>
                                                                                                                 </div>
+                                                                                                            )}
+
+                                                                                                            {/* Status Badge Overlay */}
+                                                                                                            {group && (
+                                                                                                                <div className="absolute top-4 right-4 z-10">
+                                                                                                                    <span className="px-3 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-bold text-white shadow-lg" style={{ color: group.color }}>
+                                                                                                                        {group.title}
+                                                                                                                    </span>
+                                                                                                                </div>
+                                                                                                            )}
+                                                                                                        </div>
+
+                                                                                                        {/* Card Content */}
+                                                                                                        <div className="p-6 flex flex-col flex-1 gap-4">
+                                                                                                            <div className="flex justify-between items-start gap-3">
+                                                                                                                <h4 className="text-lg font-bold text-white leading-tight line-clamp-2 group-hover:text-emerald-400 transition-colors">{item.name}</h4>
                                                                                                             </div>
-                                                                                                        </motion.div>
-                                                                                                    );
-                                                                                                })}
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    ));
-                                                                                })()}
-                                                                            </div>
-                                                                            {allItems.length === 0 && <div className="text-center text-gray-500 italic py-12 bg-[#0e0e1a] rounded-3xl border border-white/5 mt-4">No projects found to display</div>}
-                                                                        </div>
+
+                                                                                                            <div className="w-full h-[1px] bg-white/5" />
+
+                                                                                                            <div className="space-y-3 mt-auto">
+                                                                                                                {boardData.columns?.filter((c: any) => (c.title.toLowerCase().includes('status') || c.type === 'file') && !c.title.toLowerCase().includes('submission preview')).map((col: any) => (
+                                                                                                                    <div key={col.id} className="grid grid-cols-[80px_1fr] items-center gap-2">
+                                                                                                                        <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold truncate">{col.title}</span>
+                                                                                                                        <div className="min-h-[24px]">
+                                                                                                                            <BoardCell
+                                                                                                                                item={item}
+                                                                                                                                column={col}
+                                                                                                                                boardId={selectedBoardId}
+                                                                                                                                onUpdate={() => refreshBoardItems(true)}
+                                                                                                                                onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
+                                                                                                                            />
+                                                                                                                        </div>
+                                                                                                                    </div>
+                                                                                                                ))}
+                                                                                                            </div>
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                </motion.div>
+                                                                                            );
+                                                                                        })}
+                                                                                    </div>
+                                                                                </div>
+                                                                            ));
+                                                                        })()}
+                                                                        {((boardData.items || []).length === 0) && <div className="text-center text-gray-500 italic py-12 bg-[#0e0e1a] rounded-3xl border border-white/5 mt-4">No projects found to display</div>}
                                                                     </div>
                                                                 )}
                                                             </div>
