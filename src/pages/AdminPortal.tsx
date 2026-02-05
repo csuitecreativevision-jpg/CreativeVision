@@ -61,11 +61,7 @@ export default function AdminPortal() {
 
     return (
         <PortalLayout
-            userProfile={
-                <div className="text-[9px] text-custom-bright font-bold uppercase tracking-widest pl-11 -mt-6">
-                    {currentUserRole === 'admin' ? 'Admin Console' : currentUserRole === 'editor' ? 'Editor Portal' : 'Client Portal'}
-                </div>
-            }
+
             sidebarContent={
                 <>
                     <SidebarItem icon={<LayoutDashboard className="w-5 h-5" />} label="Overview" active={activeTab === 'Overview'} onClick={() => navigate('/admin-portal/overview')} />
@@ -82,18 +78,19 @@ export default function AdminPortal() {
                 </>
             }
             sidebarFooter={
-                <div className="pt-4 border-t border-white/5">
+                <div className="pt-6 mt-2 border-t border-white/5 pl-2">
                     {currentUserName && (
-                        <div className="px-2 py-2 mb-2">
-                            <div className="text-white text-sm font-medium truncate">{currentUserName}</div>
-                            <div className={`text-xs capitalize ${currentUserRole === 'admin' ? 'text-purple-400' : currentUserRole === 'editor' ? 'text-blue-400' : 'text-green-400'}`}>
+                        <div className="mb-6">
+                            <div className="text-white text-sm font-bold tracking-wide">{currentUserName}</div>
+                            <div className="text-xs font-medium text-violet-500/80 uppercase tracking-wider mt-0.5">
                                 {currentUserRole}
                             </div>
                         </div>
-                    )
-                    }
-                    <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-500/10 hover:text-red-400 text-gray-400 transition-colors group">
-                        <LogOut className="w-5 h-5" />
+                    )}
+                    <button onClick={handleLogout} className="flex items-center gap-3 text-gray-400 hover:text-white transition-colors group">
+                        <div className="p-2 rounded-lg bg-white/5 group-hover:bg-white/10 transition-colors">
+                            <LogOut className="w-4 h-4" />
+                        </div>
                         <span className="text-sm font-medium">Log Out</span>
                     </button>
                 </div>
