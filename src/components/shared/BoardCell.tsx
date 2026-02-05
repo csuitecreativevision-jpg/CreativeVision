@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Loader2, PlayCircle, FileText, Eye, Check } from 'lucide-react';
 import { useUpdateItemValue } from '../../hooks/useMondayData';
+import { normalizeMondayFileUrl } from '../../services/mondayService';
 import { MondayItem, MondayColumn } from '../../types/monday';
 
 interface BoardCellProps {
@@ -56,7 +57,7 @@ export const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: BoardC
                 const f = val.files[0];
                 const thumb = f.urlThumbnail || f.thumbnail_url || f.micro_thumbnail_url;
 
-                const fileUrl = f.public_url || f.url || thumb;
+                const fileUrl = normalizeMondayFileUrl(f.public_url || f.url || thumb);
                 if (fileUrl) {
                     linkUrl = fileUrl;
                     fileName = f.name;
@@ -237,7 +238,7 @@ export const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: BoardC
                     className="relative group/video w-full max-w-[240px] aspect-video bg-black/40 rounded-lg overflow-hidden border border-white/10 cursor-pointer shadow-sm hover:shadow-md transition-all hover:border-emerald-500/30"
                 >
                     {thumbUrl ? (
-                        <img src={thumbUrl} alt={displayValue} className="w-full h-full object-cover opacity-80 group-hover/video:opacity-100 transition-opacity" />
+                        <img src={thumbUrl} alt={displayValue} className="w-full h-full object-cover opacity-80 group-hover/video:opacity-100 transition-opacity" referrerPolicy="no-referrer" />
                     ) : showVideoTag ? (
                         <video
                             src={linkUrl!}
@@ -248,6 +249,8 @@ export const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: BoardC
                             preload="metadata"
                             onMouseOver={e => e.currentTarget.play().catch(() => { })}
                             onMouseOut={e => e.currentTarget.pause()}
+                            // @ts-ignore
+                            referrerPolicy="no-referrer"
                         />
                     ) : (
                         <div className="w-full h-full flex items-center justify-center bg-[#0e0e1a]">

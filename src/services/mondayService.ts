@@ -549,6 +549,16 @@ export async function getMultipleBoardActivityLogs(boardIds: string[], fromDate:
     return allBoardsWithLogs;
 }
 
+export function normalizeMondayFileUrl(url: string | null | undefined): string | null {
+    if (!url) return null;
+
+    // Simple string replacement is safer and sufficient here
+    if (url.startsWith("https://files-monday-com.s3.amazonaws.com")) {
+        return url.replace("https://files-monday-com.s3.amazonaws.com", "https://files.monday.com/use1");
+    }
+    return url;
+}
+
 export async function getAssetPublicUrl(assetId: string) {
     const query = `query {
         assets (ids: [${assetId}]) {
@@ -556,7 +566,7 @@ export async function getAssetPublicUrl(assetId: string) {
         }
     }`;
     const data = await mondayRequest(query);
-    return data.assets[0]?.public_url;
+    return normalizeMondayFileUrl(data.assets[0]?.public_url);
 }
 
 export async function prefetchBoardItems(boardIds: string[]) {

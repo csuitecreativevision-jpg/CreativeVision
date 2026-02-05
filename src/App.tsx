@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { BackgroundLayout } from './components/layout/BackgroundLayout';
 import { CinematicOverlay } from './components/ui/CinematicOverlay';
 import { Preloader } from './components/ui/Preloader';
@@ -13,6 +13,10 @@ const ThankYouPage = lazy(() => import('./pages/ThankYouPage'));
 const PortalPage = lazy(() => import('./pages/PortalPage'));
 const PortalRouter = lazy(() => import('./pages/PortalRouter'));
 const AdminPortal = lazy(() => import('./pages/AdminPortal'));
+const AdminOverview = lazy(() => import('./pages/admin/AdminOverview'));
+const AdminBoards = lazy(() => import('./pages/admin/AdminBoards'));
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
+const AdminTeam = lazy(() => import('./pages/admin/AdminTeam'));
 const EditorPortal = lazy(() => import('./pages/EditorPortal'));
 const ClientPortal = lazy(() => import('./pages/ClientPortal'));
 
@@ -74,7 +78,13 @@ export default function App() {
           <Route path="/thank-you" element={<ThankYouPage onBack={handleBack} />} />
           <Route path="/portal" element={<PortalPage />} />
           <Route path="/admin-dashboard" element={<PortalRouter />} />
-          <Route path="/admin-portal" element={<AdminPortal />} />
+          <Route path="/admin-portal" element={<AdminPortal />}>
+            <Route index element={<Navigate to="overview" replace />} />
+            <Route path="overview" element={<AdminOverview />} />
+            <Route path="boards" element={<AdminBoards />} />
+            <Route path="users" element={<AdminUsers />} />
+            <Route path="team" element={<AdminTeam />} />
+          </Route>
           <Route path="/editor-portal" element={<EditorPortal />} />
           <Route path="/client-portal" element={<ClientPortal />} />
         </Routes>

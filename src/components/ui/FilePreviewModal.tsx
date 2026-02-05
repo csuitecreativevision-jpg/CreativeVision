@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Download, FileText, Loader2, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getAssetPublicUrl } from '../../services/mondayService';
+import { getAssetPublicUrl, normalizeMondayFileUrl } from '../../services/mondayService';
 
 // --- Types ---
 export interface PreviewFile {
@@ -44,8 +44,11 @@ export function useProtectedPreview() {
                 try {
                     const publicUrl = await getAssetPublicUrl(assetId);
                     if (publicUrl) {
-                        urlCacheRef.current.set(assetId, publicUrl);
-                        setPreviewFile(prev => prev ? { ...prev, url: publicUrl, assetId: undefined } : null);
+                        const normalizedUrl = normalizeMondayFileUrl(publicUrl);
+                        if (normalizedUrl) {
+                            urlCacheRef.current.set(assetId, normalizedUrl);
+                            setPreviewFile(prev => prev ? { ...prev, url: normalizedUrl, assetId: undefined } : null);
+                        }
                     }
                 } catch (err) {
                     console.error("Failed to fetch public URL", err);
@@ -183,7 +186,7 @@ export const FilePreviewer = ({ url, name, isLoading, onReady }: FilePreviewerPr
 
     // Image preview
     if (['jpeg', 'jpg', 'gif', 'png', 'webp', 'svg', 'bmp', 'ico'].includes(ext)) {
-        return <img src={url} onError={() => setError(true)} onLoad={() => onReady?.()} className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" alt={name || "Preview"} />;
+        return <img src={url} onError={() => setError(true)} onLoad={() => onReady?.()} className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" alt={name || "Preview"} referrerPolicy="no-referrer" />;
     }
 
     // Video preview
@@ -206,6 +209,8 @@ export const FilePreviewer = ({ url, name, isLoading, onReady }: FilePreviewerPr
                     setError(true);
                 }}
                 className="max-w-full max-h-full rounded-lg shadow-2xl outline-none"
+                // @ts-ignore
+                referrerPolicy="no-referrer"
             />
         );
     }
