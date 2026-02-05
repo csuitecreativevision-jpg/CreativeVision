@@ -11,12 +11,49 @@ import {
     ChevronDown,
     Search,
     Table,
-    X
+    X,
+    Shield,
+    Briefcase,
+    Layout
 } from 'lucide-react';
 import {
     createUser, getAllUsers, updateUser, deleteUser
 } from '../../services/boardsService';
 import { getAllWorkspaces, getAllBoards } from '../../services/mondayService';
+import { AdminPageLayout } from '../../components/layout/AdminPageLayout';
+
+// --- Reusable UI Sub-Components (Internal) ---
+
+const GlassCard = ({ children, className = '' }: { children: React.ReactNode, className?: string }) => (
+    <div className={`bg-[#0E0E1A]/80 backdrop-blur-md border border-white/5 rounded-3xl p-6 md:p-8 shadow-xl ${className}`}>
+        {children}
+    </div>
+);
+
+const FormLabel = ({ children, required }: { children: React.ReactNode, required?: boolean }) => (
+    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+        {children} {required && <span className="text-red-400">*</span>}
+    </label>
+);
+
+const StyledInput = (props: React.InputHTMLAttributes<HTMLInputElement>) => (
+    <input
+        {...props}
+        className={`w-full bg-[#131322] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/50 transition-all ${props.className}`}
+    />
+);
+
+const StyledSelect = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
+    <div className="relative">
+        <select
+            {...props}
+            className={`w-full bg-[#131322] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/50 appearance-none cursor-pointer transition-all ${props.className}`}
+        />
+        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+    </div>
+);
+
+// ---------------------------------------------
 
 export default function AdminUsers() {
     // User Management State
@@ -61,25 +98,20 @@ export default function AdminUsers() {
         setBoards(b || []);
     };
 
-    // Auto-generate email based on role
+    // Auto-generate email
     useEffect(() => {
         if (!editingUserId) {
-            if (newUserRole === 'admin') {
-                setNewUserEmail(newUserName.toLowerCase().replace(/\s+/g, '') + '@admin.cv');
-            } else if (newUserRole === 'editor') {
-                setNewUserEmail(newUserName.toLowerCase().replace(/\s+/g, '') + '@editors.cv');
-            } else if (newUserRole === 'client') {
-                setNewUserEmail(newUserName.toLowerCase().replace(/\s+/g, '') + '@clients.cv');
-            }
+            const cleanName = newUserName.toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (newUserRole === 'admin') setNewUserEmail(cleanName + '@admin.cv');
+            else if (newUserRole === 'editor') setNewUserEmail(cleanName + '@editors.cv');
+            else if (newUserRole === 'client') setNewUserEmail(cleanName + '@clients.cv');
         }
     }, [newUserRole, newUserName, editingUserId]);
 
     const generatePassword = () => {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
         let pass = '';
-        for (let i = 0; i < 12; i++) {
-            pass += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
+        for (let i = 0; i < 12; i++) pass += chars.charAt(Math.floor(Math.random() * chars.length));
         setNewUserPassword(pass);
         setShowPassword(true);
     };
@@ -93,7 +125,6 @@ export default function AdminUsers() {
         setSelectedBoardIds(user.allowed_board_ids || []);
         setNewUserPassword('');
         setIsUserListOpen(false);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const handleCancelEdit = () => {
@@ -110,11 +141,8 @@ export default function AdminUsers() {
     const handleDeleteUser = async (id: string, name: string) => {
         if (window.confirm(`Are you sure you want to delete user "${name}"?`)) {
             const result = await deleteUser(id);
-            if (result.success) {
-                fetchUsers();
-            } else {
-                alert('Failed to delete user: ' + result.error);
-            }
+            if (result.success) fetchUsers();
+            else alert('Failed: ' + result.error);
         }
     };
 
@@ -125,11 +153,11 @@ export default function AdminUsers() {
 
         if (!editingUserId) {
             if (!newUserName.trim() || !newUserEmail.trim() || !newUserPassword.trim()) {
-                setUserError('Name, email, and password are required');
+                setUserError('All fields are required.');
                 return;
             }
             if (newUserPassword.length < 4) {
-                setUserError('Password must be at least 4 characters');
+                setUserError('Password too short (min 4).');
                 return;
             }
         } else {
@@ -151,7 +179,7 @@ export default function AdminUsers() {
             });
             setIsCreatingUser(false);
             if (result.success) {
-                setUserSuccess(`User "${newUserName}" updated successfully!`);
+                setUserSuccess(`User updated successfully!`);
                 handleCancelEdit();
                 fetchUsers();
             } else {
@@ -166,11 +194,9 @@ export default function AdminUsers() {
                 selectedUserWorkspace || undefined,
                 selectedBoardIds
             );
-
             setIsCreatingUser(false);
-
             if (result.success) {
-                setUserSuccess(`User "${result.user?.name}" created successfully!`);
+                setUserSuccess(`User created successfully!`);
                 setNewUserName('');
                 setNewUserPassword('');
                 setNewUserRole('editor');
@@ -184,347 +210,360 @@ export default function AdminUsers() {
     };
 
     return (
-        <div className="p-8 w-full max-w-7xl mx-auto animate-in fade-in duration-500 overflow-y-auto h-full">
-            <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-gray-400 mb-10 tracking-tight">User Management</h1>
+        <AdminPageLayout
+            title="User Management"
+            subtitle="Manage authorized personnel, assigning roles and access levels."
+            action={
+                <button
+                    onClick={() => setIsUserListOpen(true)}
+                    className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white font-bold transition-all group"
+                >
+                    <Users className="w-5 h-5 text-gray-400 group-hover:text-white" />
+                    Directory
+                    <span className="px-2 py-0.5 rounded bg-black/30 text-xs text-gray-400 border border-white/5">
+                        {userList.length}
+                    </span>
+                </button>
+            }
+        >
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Left Column Wrapper (Form + Roles) */}
-                <div className="space-y-6 lg:col-span-8">
-                    {/* Create User Form */}
-                    <div className="bg-[#0A0A16] border border-white/10 rounded-2xl p-6">
-                        <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                            {editingUserId ? <Pencil className="w-5 h-5 text-custom-bright" /> : <UserPlus className="w-5 h-5 text-custom-bright" />}
-                            {editingUserId ? 'Edit User' : 'Create New User'}
-                        </h2>
+                {/* --- Left Column: Create/Edit Form --- */}
+                <GlassCard className="space-y-6">
+                    <div className="flex items-center gap-3 pb-6 border-b border-white/5">
+                        <div className="p-3 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-400">
+                            {editingUserId ? <Pencil className="w-6 h-6" /> : <UserPlus className="w-6 h-6" />}
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold text-white">
+                                {editingUserId ? 'Edit Account' : 'New Account'}
+                            </h2>
+                            <p className="text-sm text-gray-400">
+                                {editingUserId ? 'Update user details and permissions.' : 'Create a new access profile.'}
+                            </p>
+                        </div>
+                    </div>
 
-                        <form onSubmit={handleCreateUser} className="space-y-4">
-                            {/* Role Selection */}
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Role</label>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {(['admin', 'editor', 'client'] as const).map(role => (
-                                        <button
-                                            key={role}
-                                            type="button"
-                                            onClick={() => setNewUserRole(role)}
-                                            className={`py-2 rounded-lg text-sm font-bold capitalize transition-all ${newUserRole === role
-                                                ? 'bg-custom-bright text-white shadow-lg shadow-custom-bright/20'
-                                                : 'bg-white/5 text-gray-400 hover:bg-white/10 py-2 border border-transparent'
-                                                }`}
-                                        >
-                                            {role}
-                                        </button>
-                                    ))}
-                                </div>
+                    <form onSubmit={handleCreateUser} className="space-y-6">
+
+                        {/* Role Selector */}
+                        <div>
+                            <FormLabel>Access Role</FormLabel>
+                            <div className="grid grid-cols-3 gap-3">
+                                {[
+                                    { id: 'admin', icon: Shield, label: 'Admin', color: 'purple' },
+                                    { id: 'editor', icon: Briefcase, label: 'Editor', color: 'blue' },
+                                    { id: 'client', icon: Layout, label: 'Client', color: 'emerald' },
+                                ].map((role) => (
+                                    <button
+                                        key={role.id}
+                                        type="button"
+                                        onClick={() => setNewUserRole(role.id as any)}
+                                        className={`relative group p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${newUserRole === role.id
+                                            ? `bg-${role.color}-500/20 border-${role.color}-500/50`
+                                            : 'bg-[#131322] border-white/5 hover:border-white/10'
+                                            }`}
+                                    >
+                                        <role.icon className={`w-5 h-5 ${newUserRole === role.id ? `text-${role.color}-400` : 'text-gray-500 group-hover:text-gray-300'}`} />
+                                        <span className={`text-xs font-bold ${newUserRole === role.id ? 'text-white' : 'text-gray-500'}`}>{role.label}</span>
+                                        {newUserRole === role.id && (
+                                            <motion.div layoutId="role-selected" className={`absolute inset-0 rounded-xl border-2 border-${role.color}-500`} />
+                                        )}
+                                    </button>
+                                ))}
                             </div>
+                        </div>
 
-                            {/* Name Input */}
+                        {/* Basic Info */}
+                        <div className="grid grid-cols-1 gap-4">
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Full Name</label>
-                                <input
-                                    type="text"
+                                <FormLabel required>Full Name</FormLabel>
+                                <StyledInput
+                                    placeholder="Jane Doe"
                                     value={newUserName}
-                                    onChange={(e) => setNewUserName(e.target.value)}
-                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-custom-bright transition-colors"
-                                    placeholder="e.g. John Doe"
+                                    onChange={e => setNewUserName(e.target.value)}
                                 />
                             </div>
 
-                            {/* Workspace Selection (For Editors/Clients) */}
-                            {(newUserRole === 'editor' || newUserRole === 'client') && (
-                                <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Assigned Workspace</label>
-                                    <div className="relative">
-                                        <select
-                                            value={selectedUserWorkspace}
-                                            onChange={(e) => setSelectedUserWorkspace(e.target.value)}
-                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-custom-bright appearance-none cursor-pointer"
-                                        >
-                                            <option value="" className="bg-[#0A0A16] text-gray-400">Select a Workspace...</option>
-                                            {workspaces.map(ws => (
-                                                <option key={ws.id} value={ws.id} className="bg-[#0A0A16]">{ws.name}</option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                                    </div>
-                                    <p className="text-[10px] text-gray-500 mt-1">
-                                        Associates this user with a specific Monday.com workspace
-                                    </p>
-                                </div>
-                            )}
+                            {/* Conditional Workspace/Boards */}
+                            <AnimatePresence>
+                                {(newUserRole === 'editor' || newUserRole === 'client') && (
+                                    <motion.div
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: 'auto' }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        className="space-y-4 overflow-hidden"
+                                    >
+                                        <div>
+                                            <FormLabel>Assigned Workspace</FormLabel>
+                                            <StyledSelect
+                                                value={selectedUserWorkspace}
+                                                onChange={e => setSelectedUserWorkspace(e.target.value)}
+                                            >
+                                                <option value="">Select Workspace...</option>
+                                                {workspaces.map(ws => (
+                                                    <option key={ws.id} value={ws.id}>{ws.name}</option>
+                                                ))}
+                                            </StyledSelect>
+                                        </div>
 
-                            {/* Board Selection */}
-                            {(selectedUserWorkspace && (newUserRole === 'editor' || newUserRole === 'client')) && (
-                                <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
-                                        Allowed Boards <span className="text-gray-600 normal-case ml-1">(Optional - Select none for all)</span>
-                                    </label>
+                                        {selectedUserWorkspace && (
+                                            <div>
+                                                <FormLabel>Allowed Boards (Optional)</FormLabel>
 
-                                    <div className="relative mb-2">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-500" />
-                                        <input
-                                            type="text"
-                                            placeholder="Filter boards..."
-                                            value={boardSearchQuery}
-                                            onChange={(e) => setBoardSearchQuery(e.target.value)}
-                                            className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-custom-bright transition-colors"
-                                        />
-                                    </div>
-
-                                    <div className="bg-white/5 border border-white/10 rounded-xl p-2 max-h-48 overflow-y-auto custom-scrollbar">
-                                        {boards
-                                            .filter(b =>
-                                                b.workspace_id === selectedUserWorkspace &&
-                                                b.name.toLowerCase().includes(boardSearchQuery.toLowerCase()) &&
-                                                (newUserRole === 'editor' ? b.name.toLowerCase().includes('workspace') : newUserRole === 'client' ? b.name.toLowerCase().includes('fulfillment') : true)
-                                            )
-                                            .map(board => (
-                                                <label key={board.id} className="flex items-center gap-3 p-2 hover:bg-white/5 rounded-lg cursor-pointer transition-colors group">
-                                                    <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${selectedBoardIds.includes(board.id)
-                                                        ? 'bg-custom-bright border-custom-bright'
-                                                        : 'border-gray-600 group-hover:border-gray-400'
-                                                        }`}>
-                                                        {selectedBoardIds.includes(board.id) && <div className="w-2 h-2 bg-white rounded-sm" />}
-                                                    </div>
+                                                {/* Added Search Input */}
+                                                <div className="relative mb-2">
+                                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-500" />
                                                     <input
-                                                        type="checkbox"
-                                                        className="hidden"
-                                                        checked={selectedBoardIds.includes(board.id)}
-                                                        onChange={(e) => {
-                                                            if (e.target.checked) {
-                                                                setSelectedBoardIds([...selectedBoardIds, board.id]);
-                                                            } else {
-                                                                setSelectedBoardIds(selectedBoardIds.filter(id => id !== board.id));
-                                                            }
-                                                        }}
+                                                        type="text"
+                                                        placeholder="Filter boards..."
+                                                        value={boardSearchQuery}
+                                                        onChange={(e) => setBoardSearchQuery(e.target.value)}
+                                                        className="w-full bg-[#131322] border border-white/10 rounded-lg pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500/50 transition-colors"
                                                     />
-                                                    <span className={`text-sm ${selectedBoardIds.includes(board.id) ? 'text-white' : 'text-gray-400'}`}>
-                                                        {board.name}
-                                                    </span>
-                                                </label>
-                                            ))}
-                                        {boards.filter(b => b.workspace_id === selectedUserWorkspace).length === 0 && <p className="text-sm text-gray-500 p-2">No boards found in workspace.</p>}
+                                                </div>
+
+                                                <div className="bg-[#131322] border border-white/10 rounded-xl max-h-48 overflow-y-auto custom-scrollbar p-2">
+                                                    {boards
+                                                        .filter(b => {
+                                                            const boardWsId = b.workspace?.id?.toString();
+                                                            return boardWsId === selectedUserWorkspace;
+                                                        })
+                                                        .filter(b => {
+                                                            const name = b.name.toLowerCase();
+                                                            const matchesSearch = name.includes(boardSearchQuery.toLowerCase());
+
+                                                            // Always exclude subitem boards
+                                                            if (name.includes('subitems')) return false;
+
+                                                            if (!matchesSearch) return false;
+
+                                                            if (newUserRole === 'editor') {
+                                                                return name.includes('- workspace');
+                                                            }
+                                                            if (newUserRole === 'client') {
+                                                                // Correcting user typo "fullfillment" to "fulfillment"
+                                                                return name.includes('fulfillment board');
+                                                            }
+                                                            return true;
+                                                        })
+                                                        .map(board => (
+                                                            <label key={board.id} className="flex items-center gap-3 p-2.5 hover:bg-white/5 rounded-lg cursor-pointer transition-colors group">
+                                                                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${selectedBoardIds.includes(board.id) ? 'bg-violet-500 border-violet-500' : 'border-gray-600 group-hover:border-gray-400'
+                                                                    }`}>
+                                                                    {selectedBoardIds.includes(board.id) && <div className="w-1.5 h-1.5 bg-white rounded-sm" />}
+                                                                </div>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    className="hidden"
+                                                                    checked={selectedBoardIds.includes(board.id)}
+                                                                    onChange={e => {
+                                                                        if (e.target.checked) setSelectedBoardIds([...selectedBoardIds, board.id]);
+                                                                        else setSelectedBoardIds(selectedBoardIds.filter(id => id !== board.id));
+                                                                    }}
+                                                                />
+                                                                <span className={`text-sm ${selectedBoardIds.includes(board.id) ? 'text-white' : 'text-gray-400'}`}>{board.name}</span>
+                                                            </label>
+                                                        ))
+                                                    }
+                                                </div>
+                                            </div>
+                                        )}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
+                            {/* Credentials */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <FormLabel>Email (Auto)</FormLabel>
+                                    <div className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-gray-500 font-mono text-sm">
+                                        {newUserEmail || '...'}
                                     </div>
                                 </div>
-                            )}
-
-                            {/* Auto-Generated Email */}
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Email (Auto-Generated)</label>
-                                <div className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-gray-400 font-mono text-sm flex items-center gap-2">
-                                    <span className="truncate">{newUserEmail || 'Start typing name...'}</span>
-                                </div>
-                            </div>
-
-                            {/* Password */}
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Password {editingUserId && <span className="text-custom-bright normal-case ml-1">(Optional)</span>}</label>
-                                <div className="relative flex gap-2">
-                                    <div className="relative flex-1">
-                                        <input
-                                            type={showPassword ? "text" : "password"}
-                                            value={newUserPassword}
-                                            onChange={(e) => setNewUserPassword(e.target.value)}
-                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-custom-bright transition-colors pr-10"
-                                            placeholder="Enter password"
-                                        />
+                                <div>
+                                    <FormLabel required={!editingUserId}>
+                                        Password {editingUserId && '(Optional)'}
+                                    </FormLabel>
+                                    <div className="relative flex gap-2">
+                                        <div className="relative flex-1">
+                                            <StyledInput
+                                                type={showPassword ? "text" : "password"}
+                                                value={newUserPassword}
+                                                onChange={e => setNewUserPassword(e.target.value)}
+                                                placeholder="••••••••"
+                                                className="pr-10"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+                                            >
+                                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                            </button>
+                                        </div>
                                         <button
                                             type="button"
-                                            onClick={() => setShowPassword(!showPassword)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                                            onClick={generatePassword}
+                                            className="px-3 bg-violet-500/10 border border-violet-500/20 rounded-xl text-violet-400 hover:bg-violet-500/20 transition-all flex items-center justify-center group"
+                                            title="Auto-generate secure password"
                                         >
-                                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                            <Wand2 className="w-5 h-5 group-hover:rotate-12 transition-transform" />
                                         </button>
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={generatePassword}
-                                        className="px-4 py-2 bg-custom-bright/10 border border-custom-bright/20 rounded-xl text-custom-bright hover:bg-custom-bright/20 transition-all flex items-center gap-2"
-                                        title="Auto-generate secure password"
-                                    >
-                                        <Wand2 className="w-4 h-4" />
-                                        <span className="text-xs font-bold hidden sm:inline">Generate</span>
-                                    </button>
                                 </div>
-                                <p className="text-[10px] text-gray-500 mt-1">Min. 4 characters</p>
                             </div>
+                        </div>
 
-                            {/* Status Messages */}
+                        {/* Actions */}
+                        <div className="pt-4 border-t border-white/5 flex gap-3">
+                            {editingUserId && (
+                                <button
+                                    type="button"
+                                    onClick={handleCancelEdit}
+                                    className="px-6 py-3 rounded-xl border border-white/10 text-gray-400 font-bold hover:bg-white/5 hover:text-white transition-all"
+                                >
+                                    Cancel
+                                </button>
+                            )}
+                            <button
+                                type="submit"
+                                disabled={isCreatingUser}
+                                className="flex-1 py-3 rounded-xl bg-violet-600 text-white font-bold hover:bg-violet-500 hover:shadow-lg hover:shadow-violet-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isCreatingUser ? 'Processing...' : (editingUserId ? 'Save Changes' : 'Create User')}
+                            </button>
+                        </div>
+
+                        {/* Feedback Messages */}
+                        <AnimatePresence>
                             {userError && (
-                                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{userError}</div>
+                                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-sm font-medium">
+                                    {userError}
+                                </motion.div>
                             )}
                             {userSuccess && (
-                                <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm">{userSuccess}</div>
+                                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="p-3 bg-green-500/10 border border-green-500/20 text-green-400 rounded-xl text-sm font-medium">
+                                    {userSuccess}
+                                </motion.div>
                             )}
+                        </AnimatePresence>
+                    </form>
+                </GlassCard>
 
-                            <div className="flex gap-3">
-                                {editingUserId && (
-                                    <button
-                                        type="button"
-                                        onClick={handleCancelEdit}
-                                        className="flex-1 py-3 rounded-xl bg-white/5 text-white font-bold hover:bg-white/10 transition-all border border-white/10"
-                                    >
-                                        Cancel
-                                    </button>
-                                )}
-                                <button
-                                    type="submit"
-                                    disabled={isCreatingUser}
-                                    className="flex-1 py-3 rounded-xl bg-custom-bright text-white font-bold hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-custom-bright/20"
-                                >
-                                    {isCreatingUser
-                                        ? (editingUserId ? 'Updating...' : 'Creating...')
-                                        : (editingUserId ? 'Update User' : 'Create User')}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
+                {/* --- Right Column: Info/Help --- */}
+                <div className="space-y-6">
+                    <div className="p-6 md:p-8 rounded-3xl bg-gradient-to-br from-violet-600/20 to-blue-600/5 border border-white/10 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-violet-600/20 blur-[80px] rounded-full pointer-events-none -mr-32 -mt-32" />
 
-                    {/* Roles Info */}
-                    <div className="bg-[#0A0A16]/50 border border-white/5 rounded-2xl p-6 backdrop-blur-sm">
-                        <h3 className="font-bold text-white mb-4 text-sm uppercase tracking-wider opacity-80">Role Permissions</h3>
-                        <div className="grid grid-cols-1 gap-3">
-                            {/* ... Role descriptions ... */}
-                            <div className="bg-white/5 rounded-xl p-3 border border-white/5 flex flex-col gap-1">
-                                <span className="self-start px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 text-[10px] font-bold uppercase">Admin</span>
-                                <span className="text-xs text-gray-400">Full access to all boards, settings, and user management.</span>
-                            </div>
-                            <div className="bg-white/5 rounded-xl p-3 border border-white/5 flex flex-col gap-1">
-                                <span className="self-start px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 text-[10px] font-bold uppercase">Editor</span>
-                                <span className="text-xs text-gray-400">Access to "Editor Portal". Sees only assigned workspace boards.</span>
-                            </div>
-                            <div className="bg-white/5 rounded-xl p-3 border border-white/5 flex flex-col gap-1">
-                                <span className="self-start px-2 py-0.5 rounded bg-green-500/20 text-green-400 text-[10px] font-bold uppercase">Client</span>
-                                <span className="text-xs text-gray-400">Access to "Client Portal". Sees only fulfillment deliverable boards.</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Right Column - User List Launcher */}
-                <div className="flex flex-col gap-6 lg:col-span-4">
-                    <div className="relative overflow-hidden bg-gradient-to-b from-[#0A0A16] to-[#0F0F1A] border border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center text-center hover:border-custom-bright/30 transition-all group cursor-pointer shadow-2xl shadow-black/50"
-                        onClick={() => setIsUserListOpen(true)}>
-
-                        <div className="relative z-10 w-16 h-16 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                            <Users className="w-8 h-8 text-gray-400 group-hover:text-white transition-colors" />
-                        </div>
-                        <h2 className="relative z-10 text-2xl font-bold text-white mb-2">User Directory</h2>
-                        <p className="relative z-10 text-gray-400 mb-8 max-w-[200px] text-xs leading-relaxed">
-                            Manage all registered users in a centralized table view.
-                        </p>
-                        <button className="relative z-10 w-full py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 border border-white/10">
-                            <Table className="w-4 h-4" />
-                            Open Directory
-                        </button>
-                        <div className="relative z-10 mt-6 flex items-center gap-2 text-[10px] font-mono text-gray-500 bg-black/20 px-3 py-1 rounded-full border border-white/5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                            {userList.length} Active Users
+                        <h3 className="text-lg font-bold text-white mb-4 relative z-10">Role Guidelines</h3>
+                        <div className="space-y-4 relative z-10">
+                            {[
+                                { role: 'Admin', desc: 'Full system access. Can manage users, view all boards, and modify global settings.', color: 'purple' },
+                                { role: 'Editor', desc: 'Restricted to specific Workspaces. Can view/edit boards assigned to them.', color: 'blue' },
+                                { role: 'Client', desc: 'Restricted view. Can only access "Fulfillment" boards in their workspace.', color: 'emerald' },
+                            ].map((item, i) => (
+                                <div key={i} className="flex gap-4 p-4 rounded-2xl bg-[#0E0E1A]/60 border border-white/5 backdrop-blur-sm">
+                                    <div className={`w-1 h-full rounded-full bg-${item.color}-500 shrink-0`} />
+                                    <div>
+                                        <span className={`text-xs font-bold uppercase tracking-wider text-${item.color}-400 mb-1 block`}>{item.role}</span>
+                                        <p className="text-xs text-gray-400 leading-relaxed">{item.desc}</p>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* User List Modal */}
+            {/* --- User Directory Modal --- */}
             <AnimatePresence>
                 {isUserListOpen && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={() => setIsUserListOpen(false)}
-                            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                            className="absolute inset-0 bg-black/80 backdrop-blur-sm cursor-pointer"
                         />
                         <motion.div
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="bg-[#0A0A16] border border-white/10 rounded-2xl shadow-2xl w-full max-w-6xl max-h-full flex flex-col relative z-10 overflow-hidden"
+                            className="bg-[#0E0E1A] border border-white/10 rounded-3xl w-full max-w-5xl max-h-[85vh] flex flex-col relative z-10 overflow-hidden shadow-2xl"
                         >
-                            <div className="p-6 border-b border-white/10 flex items-center justify-between bg-[#0A0A16]">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 rounded-lg bg-custom-bright/20">
-                                        <Users className="w-6 h-6 text-custom-bright" />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-xl font-bold text-white">User Directory</h2>
-                                        <p className="text-sm text-gray-400">{userList.length} active users</p>
-                                    </div>
+                            {/* Modal Header */}
+                            <div className="p-6 border-b border-white/10 flex items-center justify-between bg-[#131322]/50">
+                                <div>
+                                    <h2 className="text-xl font-bold text-white">User Directory</h2>
+                                    <p className="text-sm text-gray-400">{userList.length} registered accounts</p>
                                 </div>
                                 <button
                                     onClick={() => setIsUserListOpen(false)}
-                                    className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors"
+                                    className="p-2 hover:bg-white/10 rounded-xl text-gray-400 hover:text-white transition-colors"
                                 >
-                                    <X className="w-6 h-6" />
+                                    <X className="w-5 h-5" />
                                 </button>
                             </div>
 
-                            <div className="flex-1 overflow-auto p-6 bg-[#080816]">
-                                <div className="bg-[#0A0A16] border border-white/5 rounded-xl overflow-hidden">
-                                    <table className="w-full text-left border-collapse relative">
-                                        <thead className="sticky top-0 bg-[#0A0A16] z-10 shadow-sm shadow-black/50">
-                                            <tr className="border-b border-white/5 bg-white/5">
-                                                <th className="p-4 text-xs font-bold text-gray-400 uppercase whitespace-nowrap">Name</th>
-                                                <th className="p-4 text-xs font-bold text-gray-400 uppercase whitespace-nowrap">Role</th>
-                                                <th className="p-4 text-xs font-bold text-gray-400 uppercase whitespace-nowrap">Workspace</th>
-                                                <th className="p-4 text-xs font-bold text-gray-400 uppercase text-right">Actions</th>
+                            {/* Modal Content */}
+                            <div className="flex-1 overflow-auto p-0">
+                                <table className="w-full text-left border-collapse">
+                                    <thead className="bg-[#131322] sticky top-0 z-10">
+                                        <tr>
+                                            {['Name', 'Role', 'Workspace', 'Actions'].map(h => (
+                                                <th key={h} className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-white/5">{h}</th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5">
+                                        {userList.map((user) => (
+                                            <tr key={user.id} className="group hover:bg-white/5 transition-colors">
+                                                <td className="p-4">
+                                                    <div className="font-bold text-white text-sm">{user.name}</div>
+                                                    <div className="text-xs text-gray-500 font-mono">{user.email}</div>
+                                                </td>
+                                                <td className="p-4">
+                                                    <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${user.role === 'admin' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
+                                                        user.role === 'editor' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                                                            'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                        }`}>
+                                                        {user.role}
+                                                    </span>
+                                                </td>
+                                                <td className="p-4">
+                                                    {user.workspace_id ? (
+                                                        <span className="text-xs text-gray-300">
+                                                            {workspaces.find(w => w.id.toString() === user.workspace_id)?.name || 'Unknown'}
+                                                        </span>
+                                                    ) : <span className="text-gray-600">-</span>}
+                                                </td>
+                                                <td className="p-4">
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={() => handleEditUser(user)}
+                                                            className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-blue-400 transition-colors"
+                                                        >
+                                                            <Pencil className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteUser(user.id, user.name)}
+                                                            className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-400 hover:text-red-400 transition-colors"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </td>
                                             </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-white/5">
-                                            {userListLoading ? (
-                                                <tr><td colSpan={4} className="p-8 text-center text-gray-500">Loading users...</td></tr>
-                                            ) : userList.length === 0 ? (
-                                                <tr><td colSpan={4} className="p-8 text-center text-gray-500">No users found</td></tr>
-                                            ) : (
-                                                userList.map(user => (
-                                                    <tr key={user.id} className="hover:bg-white/5 transition-colors group">
-                                                        <td className="p-4">
-                                                            <div className="text-sm text-white font-medium">{user.name}</div>
-                                                            <div className="text-xs text-gray-500 font-mono mt-0.5">{user.email}</div>
-                                                        </td>
-                                                        <td className="p-4">
-                                                            <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${user.role === 'admin' ? 'bg-purple-500/20 text-purple-400' :
-                                                                user.role === 'editor' ? 'bg-blue-500/20 text-blue-400' :
-                                                                    'bg-green-500/20 text-green-400'
-                                                                }`}>
-                                                                {user.role}
-                                                            </span>
-                                                        </td>
-                                                        <td className="p-4 text-xs text-gray-400">
-                                                            {user.workspace_id ? (
-                                                                workspaces.find(w => w.id.toString() === user.workspace_id)?.name || 'Unknown WS'
-                                                            ) : (
-                                                                <span className="text-gray-600">-</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="p-4 text-right">
-                                                            <div className="flex items-center justify-end gap-1">
-                                                                <button
-                                                                    onClick={() => handleEditUser(user)}
-                                                                    className="p-1.5 hover:bg-blue-500/20 rounded-lg text-gray-500 hover:text-blue-400 transition-colors"
-                                                                >
-                                                                    <Pencil className="w-3.5 h-3.5" />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleDeleteUser(user.id, user.name)}
-                                                                    className="p-1.5 hover:bg-red-500/20 rounded-lg text-gray-500 hover:text-red-400 transition-colors"
-                                                                >
-                                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
                         </motion.div>
                     </div>
                 )}
             </AnimatePresence>
-        </div>
+        </AdminPageLayout>
     );
 }
