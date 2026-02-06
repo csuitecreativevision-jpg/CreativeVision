@@ -4,20 +4,10 @@ import { BackgroundLayout } from '../components/layout/BackgroundLayout';
 import { CinematicOverlay } from '../components/ui/CinematicOverlay';
 import { MagneticButton } from '../components/ui/MagneticButton';
 import { SpotlightCard } from '../components/ui/SpotlightCard';
-import { ArrowLeft, Lock, ShieldCheck, Wifi } from 'lucide-react';
+import { ArrowLeft, Lock, Mail } from 'lucide-react';
+import { FishTank } from '../components/ui/FishTank';
 import { useNavigate } from 'react-router-dom';
 import { loginUser } from '../services/boardsService';
-
-const FloatingWidget = ({ className, children, delay = 0 }: { className?: string, children: React.ReactNode, delay?: number }) => (
-    <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: delay + 0.5, duration: 0.8 }}
-        className={`absolute p-4 rounded-2xl bg-black/40 border border-white/10 backdrop-blur-xl shadow-2xl ${className}`}
-    >
-        {children}
-    </motion.div>
-);
 
 export default function PortalPage() {
     const navigate = useNavigate();
@@ -34,12 +24,12 @@ export default function PortalPage() {
         const result = await loginUser(email.toLowerCase(), password);
 
         if (!result.success || !result.user) {
-            setError(result.error || 'Invalid email or password');
+            setError(result.error || 'Invalid credentials');
             setIsLoading(false);
             return;
         }
 
-        // Store user info for role-based filtering
+        // Store user info
         localStorage.setItem('portal_user_email', result.user.email);
         localStorage.setItem('portal_user_role', result.user.role);
         localStorage.setItem('portal_user_name', result.user.name);
@@ -67,93 +57,105 @@ export default function PortalPage() {
 
             <div className="relative min-h-screen w-full flex items-center justify-center p-4 md:p-8 overflow-hidden bg-[#050511]">
 
-                {/* Back Link - Absolute Top Left */}
+                {/* Back Link */}
                 <button
                     onClick={() => navigate('/')}
-                    className="absolute top-8 left-8 z-50 flex items-center gap-2 text-white/40 hover:text-white transition-colors group"
+                    className="absolute top-8 left-8 z-50 flex items-center gap-3 text-white/40 hover:text-white transition-all duration-300 group"
                 >
-                    <div className="p-2 rounded-full bg-white/5 border border-white/10 group-hover:bg-white/10 transition-colors">
+                    <div className="p-2.5 rounded-full bg-white/5 border border-white/10 group-hover:bg-white/10 group-hover:border-white/20 transition-all">
                         <ArrowLeft className="w-4 h-4" />
                     </div>
-                    <span className="text-xs font-bold tracking-[0.2em] uppercase hidden md:inline-block">Return</span>
+                    <span className="text-xs font-bold tracking-[0.25em] uppercase hidden md:inline-block">Return</span>
                 </button>
 
-                {/* Main Card Container */}
+                {/* Main Card */}
                 <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
+                    initial={{ opacity: 0, scale: 0.98 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.8 }}
-                    className="w-full max-w-[1200px] h-[700px] md:h-[800px] relative z-20"
+                    transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                    className="w-full max-w-[1100px] h-[650px] md:h-[750px] relative z-20"
                 >
-                    <SpotlightCard className="w-full h-full rounded-[3rem] bg-[#0A0A16]/80 border border-white/10 backdrop-blur-3xl flex flex-col md:flex-row shadow-2xl p-2 md:p-3 overflow-hidden">
+                    <SpotlightCard className="w-full h-full rounded-[2.5rem] bg-[#0A0A16]/90 border border-white/10 backdrop-blur-3xl flex flex-col md:flex-row shadow-2xl p-2 md:p-3 overflow-hidden">
 
                         {/* LEFT SIDE: Login Form */}
-                        <div className="w-full md:w-[45%] lg:w-[40%] h-full flex flex-col justify-between p-8 md:p-12 relative">
+                        <div className="w-full md:w-[45%] lg:w-[40%] h-full flex flex-col justify-between p-8 md:p-12 relative overflow-hidden">
 
-                            {/* Logo Pill */}
-                            <div className="self-start">
-                                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10">
-                                    <div className="w-2 h-2 rounded-full bg-custom-bright animate-pulse" />
-                                    <span className="text-xs font-bold tracking-widest text-white">PORTAL v2.0</span>
+                            {/* Ambient Glow */}
+                            <div className="absolute top-0 left-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-[100px]" />
+
+                            {/* Brand Pill */}
+                            <div className="self-start relative z-10 text-white/90">
+                                <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.5)] animate-pulse" />
+                                    <span className="text-[10px] font-bold tracking-[0.2em] uppercase">CreativeVision Portal</span>
                                 </div>
                             </div>
 
                             {/* Form Content */}
-                            <div className="max-w-xs w-full mx-auto">
-                                <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">Authenticate</h1>
-                                <p className="text-gray-400 text-sm mb-8">Access restricted internal systems.</p>
+                            <div className="max-w-xs w-full mx-auto relative z-10">
+                                <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">Welcome Back</h1>
+                                <p className="text-gray-400 text-sm mb-8 font-medium">Please enter your credentials.</p>
 
                                 {error && (
-                                    <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
-                                        {error}
-                                    </div>
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center justify-center"
+                                    >
+                                        <span className="text-xs text-red-400 font-medium">{error}</span>
+                                    </motion.div>
                                 )}
 
                                 <form onSubmit={handleLogin} className="space-y-4">
-                                    <div className="space-y-1">
-                                        <div className="group relative">
-                                            <input
-                                                type="email"
-                                                value={email}
-                                                onChange={(e) => setEmail(e.target.value)}
-                                                placeholder="Employee ID"
-                                                className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white placeholder-gray-500 focus:outline-none focus:border-custom-bright/50 focus:bg-white/10 transition-all font-medium text-sm"
-                                                disabled={isLoading}
-                                            />
+                                    {/* Email */}
+                                    <div className="group relative">
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-white transition-colors duration-300 z-10">
+                                            <Mail className="w-4 h-4" />
                                         </div>
+                                        <input
+                                            type="email"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            placeholder="Identity"
+                                            className="w-full bg-black/40 border border-white/10 rounded-xl pl-12 pr-6 py-4 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500/50 focus:bg-white/5 focus:ring-1 focus:ring-indigo-500/50 transition-all duration-300 text-sm font-medium"
+                                            disabled={isLoading}
+                                        />
                                     </div>
 
-                                    <div className="space-y-1">
-                                        <div className="group relative">
-                                            <input
-                                                type="password"
-                                                value={password}
-                                                onChange={(e) => setPassword(e.target.value)}
-                                                placeholder="Secure Passkey"
-                                                className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white placeholder-gray-500 focus:outline-none focus:border-custom-bright/50 focus:bg-white/10 transition-all font-medium text-sm"
-                                                disabled={isLoading}
-                                            />
+                                    {/* Password */}
+                                    <div className="group relative">
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-white transition-colors duration-300 z-10">
+                                            <Lock className="w-4 h-4" />
                                         </div>
+                                        <input
+                                            type="password"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            placeholder="Passkey"
+                                            className="w-full bg-black/40 border border-white/10 rounded-xl pl-12 pr-6 py-4 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500/50 focus:bg-white/5 focus:ring-1 focus:ring-indigo-500/50 transition-all duration-300 text-sm font-medium"
+                                            disabled={isLoading}
+                                        />
                                     </div>
 
-                                    <div className="pt-4">
+                                    <div className="pt-6">
                                         <MagneticButton className="w-full">
                                             <button
                                                 type="submit"
                                                 disabled={isLoading}
-                                                className="w-full py-4 bg-gradient-to-r from-custom-blue via-custom-purple to-custom-violet text-white text-sm font-bold tracking-widest uppercase rounded-2xl hover:brightness-110 transition-all shadow-lg shadow-custom-violet/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="w-full py-4 bg-white text-black text-xs font-bold tracking-[0.2em] uppercase rounded-xl hover:bg-indigo-50 transition-all duration-300 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.25)] disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
-                                                {isLoading ? 'Authenticating...' : 'Enter Portal'}
+                                                {isLoading ? 'Verifying...' : 'Authenticate'}
                                             </button>
                                         </MagneticButton>
                                     </div>
 
-                                    <div className="flex justify-between items-center mt-6 text-[10px] text-gray-500 font-medium tracking-wider uppercase">
-                                        <button type="button" className="hover:text-white transition-colors">Recover ID</button>
-                                        <button type="button" className="hover:text-white transition-colors">SSO Login</button>
+                                    <div className="flex justify-center gap-6 mt-8 text-[10px] text-gray-600 font-bold tracking-widest uppercase">
+                                        <button type="button" className="hover:text-white transition-colors duration-200">Help</button>
+                                        <button type="button" className="hover:text-white transition-colors duration-200">Privacy</button>
                                     </div>
                                 </form>
                             </div>
+
 
                             {/* Footer */}
                             <div className="text-[10px] text-gray-600 font-medium tracking-wider">
@@ -161,67 +163,14 @@ export default function PortalPage() {
                             </div>
                         </div>
 
-                        {/* RIGHT SIDE: Visual Card */}
+                        {/* RIGHT SIDE: Visual Card via FishTank */}
                         <div className="hidden md:block flex-1 h-full rounded-[2.5rem] relative overflow-hidden bg-gray-900 group">
 
-                            {/* Background Image */}
-                            <div className="absolute inset-0">
-                                <img
-                                    src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop"
-                                    alt="Portal Background"
-                                    className="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-1000"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                                <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent" />
-                            </div>
+                            {/* Interactive Fish Tank */}
+                            <FishTank />
 
-                            {/* Floating Widgets (Style Match) */}
-
-                            {/* Top Right - Network Status */}
-                            <FloatingWidget className="top-8 right-8 flex items-center gap-3 backdrop-blur-2xl bg-black/60 border-white/5" delay={0.2}>
-                                <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center border border-green-500/30">
-                                    <Wifi className="w-5 h-5 text-green-500" />
-                                </div>
-                                <div>
-                                    <div className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Network</div>
-                                    <div className="text-xs text-white font-bold">Encrypted Mesh</div>
-                                </div>
-                            </FloatingWidget>
-
-                            {/* Middle Left - Activity Graph */}
-                            <FloatingWidget className="top-1/3 left-8 w-48 backdrop-blur-3xl bg-black/60 border-white/5" delay={0.4}>
-                                <div className="flex justify-between items-center mb-2">
-                                    <span className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Sys Load</span>
-                                    <span className="text-xs text-custom-bright font-bold">94%</span>
-                                </div>
-                                <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
-                                    <div className="w-[94%] h-full bg-gradient-to-r from-custom-blue to-custom-bright" />
-                                </div>
-                                <div className="flex gap-1 mt-2">
-                                    <div className="w-1 h-4 bg-white/10 rounded-full" />
-                                    <div className="w-1 h-6 bg-white/20 rounded-full" />
-                                    <div className="w-1 h-3 bg-white/10 rounded-full" />
-                                    <div className="w-1 h-8 bg-custom-bright rounded-full shadow-[0_0_10px_rgba(124,58,237,0.5)]" />
-                                    <div className="w-1 h-5 bg-white/20 rounded-full" />
-                                    <div className="w-1 h-3 bg-white/10 rounded-full" />
-                                </div>
-                            </FloatingWidget>
-
-                            {/* Bottom Center - User Badge */}
-                            <FloatingWidget className="bottom-8 left-8 right-8 flex justify-between items-center backdrop-blur-3xl bg-black/60 border-white/5" delay={0.6}>
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
-                                        <Lock className="w-5 h-5 text-indigo-400" />
-                                    </div>
-                                    <div>
-                                        <div className="text-xs text-white font-bold">Security Level 5</div>
-                                        <div className="text-[10px] text-gray-400">Clearance Verified</div>
-                                    </div>
-                                </div>
-                                <div className="px-2 py-1 rounded bg-green-500/10 border border-green-500/20">
-                                    <ShieldCheck className="w-4 h-4 text-green-500" />
-                                </div>
-                            </FloatingWidget>
+                            {/* Overlay Gradient for Text Readability */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none z-20" />
                         </div>
 
                     </SpotlightCard>
