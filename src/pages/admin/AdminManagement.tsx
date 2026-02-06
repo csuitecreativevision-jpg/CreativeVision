@@ -28,10 +28,10 @@ export default function AdminManagement() {
             title: 'Manage Team',
             description: 'View team performance and manage member roles.',
             icon: <Users className="w-8 h-8 text-blue-400" />,
-            action: () => { },
+            action: () => navigate('/admin-portal/users'),
             gradient: 'from-blue-500/20 to-cyan-500/20',
             border: 'group-hover:border-blue-500/50',
-            disabled: true
+            disabled: false
         },
         {
             id: 'financials',

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Download, FileText, Loader2, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getAssetPublicUrl, normalizeMondayFileUrl } from '../../services/mondayService';
@@ -324,62 +325,86 @@ interface FilePreviewModalProps {
 }
 
 export const FilePreviewModal = ({ previewFile, isLoading, onClose }: FilePreviewModalProps) => {
-    if (!previewFile) return null;
+    // Only render if we have a file or are loading a specific file
+    if (!previewFile && !isLoading) return null;
+    if (typeof document === 'undefined') return null;
 
-    return (
+    return createPortal(
         <AnimatePresence>
-            <div className="fixed inset-0 z-[100] flex items-center justify-center">
-                {/* Backdrop */}
+            <div className="fixed inset-0 z-[10000] flex items-center justify-center">
+                {/* Backdrop - Darker and more blurred for focus */}
                 <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                    className="absolute inset-0 bg-black/95 backdrop-blur-xl"
                     onClick={onClose}
                 />
 
                 {/* Modal Content */}
                 <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    className="relative z-10 w-[90vw] h-[90vh] max-w-6xl bg-slate-900/90 rounded-2xl overflow-hidden border border-white/10 shadow-2xl flex flex-col"
+                    initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                    className="relative z-10 w-[95vw] h-[95vh] max-w-7xl bg-[#0E0E1A] rounded-3xl overflow-hidden border border-white/5 shadow-2xl flex flex-col"
                 >
-                    {/* Header */}
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-black/30">
-                        <h3 className="text-white font-semibold truncate max-w-[70%]">
-                            {previewFile.name || 'File Preview'}
-                        </h3>
-                        <div className="flex items-center gap-2">
+                    {/* Header - Minimalist Floating */}
+                    <div className="flex items-center justify-between px-8 py-6 z-20 absolute top-0 left-0 right-0 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
+                        <div className="pointer-events-auto flex items-center gap-4">
+                            <div className="p-3 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10">
+                                {previewFile?.name?.match(/\.(mp4|mov|webm)$/i) ? (
+                                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
+                                ) : (
+                                    <FileText className="w-5 h-5 text-white/70" />
+                                )}
+                            </div>
+                            <div>
+                                <h3 className="text-white font-bold text-lg leading-none tracking-tight shadow-black drop-shadow-lg">
+                                    {previewFile?.name || 'File Preview'}
+                                </h3>
+                                <p className="text-[10px] text-gray-400 font-mono mt-1 opacity-80 uppercase tracking-widest">
+                                    Preview Mode
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="pointer-events-auto flex items-center gap-3">
                             <a
-                                href={previewFile.url}
+                                href={previewFile?.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white transition-colors"
+                                className="flex items-center justify-center w-12 h-12 rounded-full bg-white/5 hover:bg-white/10 backdrop-blur-md border border-white/10 text-white transition-all hover:scale-105 active:scale-95 group"
                                 title="Download"
                             >
-                                <Download className="w-5 h-5" />
+                                <Download className="w-5 h-5 opacity-70 group-hover:opacity-100" />
                             </a>
                             <button
                                 onClick={onClose}
-                                className="p-2 rounded-lg bg-white/5 hover:bg-red-500/20 text-white hover:text-red-400 transition-colors"
+                                className="flex items-center justify-center w-12 h-12 rounded-full bg-white/5 hover:bg-red-500/20 backdrop-blur-md border border-white/10 text-white hover:text-red-400 transition-all hover:scale-105 active:scale-95 group"
                             >
-                                <X className="w-5 h-5" />
+                                <X className="w-5 h-5 opacity-70 group-hover:opacity-100" />
                             </button>
                         </div>
                     </div>
 
-                    {/* Content */}
-                    <div className="flex-1 bg-black/50 relative flex items-center justify-center p-4 overflow-hidden">
-                        <FilePreviewer
-                            url={previewFile.url}
-                            name={previewFile.name}
-                            isLoading={isLoading || !!previewFile.assetId}
-                        />
+                    {/* Content - Cinematic Background */}
+                    <div className="flex-1 bg-black relative flex items-center justify-center p-0 overflow-hidden">
+                        {/* Ambient Glows */}
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none" />
+
+                        <div className="relative z-10 w-full h-full flex items-center justify-center p-4 md:p-12 pt-24 pb-12">
+                            <FilePreviewer
+                                url={previewFile?.url || ''}
+                                name={previewFile?.name || ''}
+                                isLoading={isLoading || !!previewFile?.assetId}
+                            />
+                        </div>
                     </div>
                 </motion.div>
             </div>
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     );
 };
 

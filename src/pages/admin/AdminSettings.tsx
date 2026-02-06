@@ -1,12 +1,9 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AdminPageLayout } from '../../components/layout/AdminPageLayout';
-import { UserManagement } from '../../components/admin/UserManagement';
 import { GlassCard } from '../../components/ui/GlassCard';
-import { SettingsToggleItem } from '../../components/admin/settings/SettingsToggleItem';
 import {
     Settings,
-    UserCog,
     ShieldCheck,
     Palette,
     Bell,
@@ -16,10 +13,9 @@ import {
 } from 'lucide-react';
 
 export default function AdminSettings() {
-    const [activeTab, setActiveTab] = useState<'general' | 'users' | 'security'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'security'>('general');
 
     // Stub state for visuals
-    const [darkMode, setDarkMode] = useState(true);
     const [emailNotifs, setEmailNotifs] = useState(true);
 
     const currentUserRole = localStorage.getItem('portal_user_role') || 'Admin';
@@ -28,14 +24,13 @@ export default function AdminSettings() {
 
     const tabs = [
         { id: 'general', label: 'General', icon: Settings },
-        { id: 'users', label: 'User Management', icon: UserCog },
         { id: 'security', label: 'Security', icon: ShieldCheck },
     ];
 
     return (
         <AdminPageLayout
             title="Settings"
-            subtitle="Manage your platform preferences, team access, and security configurations."
+            subtitle="Manage your platform preferences and security configurations."
         >
             {/* Tabs Navigation */}
             <div className="flex flex-wrap gap-2 pb-6 border-b border-white/5 mb-8">
@@ -153,15 +148,6 @@ export default function AdminSettings() {
                         </div>
                     )}
 
-                    {activeTab === 'users' && (
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.98 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ duration: 0.4 }}
-                        >
-                            <UserManagement />
-                        </motion.div>
-                    )}
 
                     {activeTab === 'security' && (
                         <div className="max-w-2xl">

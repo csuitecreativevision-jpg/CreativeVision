@@ -23,6 +23,7 @@ const AdminClients = lazy(() => import('./pages/admin/AdminClients'));
 const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics'));
 const EditorPortal = lazy(() => import('./pages/EditorPortal'));
 const ClientPortal = lazy(() => import('./pages/ClientPortal'));
+const AdminUserManagement = lazy(() => import('./pages/admin/AdminUserManagement'));
 
 export default function App() {
   const navigate = useNavigate();
@@ -91,6 +92,7 @@ export default function App() {
             <Route path="settings" element={<AdminSettings />} />
             <Route path="team" element={<AdminTeam />} />
             <Route path="clients" element={<AdminClients />} />
+            <Route path="users" element={<AdminUserManagement />} />
             <Route path="analytics" element={<AdminAnalytics />} />
           </Route>
           <Route path="/editor-portal" element={<EditorPortal />} />
