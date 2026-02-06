@@ -6,7 +6,6 @@ import {
     User,
     Briefcase,
     Check,
-    ChevronRight,
     ArrowLeft,
     AlertCircle,
     DollarSign,
@@ -339,10 +338,10 @@ export default function AdminProjectAssignment() {
 
                         <button
                             onClick={step === 3 ? () => console.log('Submit', formData) : handleNext}
-                            className="flex items-center px-8 py-3 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-xl text-white font-bold hover:shadow-lg hover:shadow-violet-600/30 transition-all active:scale-95"
+                            className="px-8 py-3 rounded-full bg-white text-black font-bold hover:bg-custom-bright hover:text-white transition-all flex items-center gap-2"
                         >
                             {step === 3 ? 'Create Assignment' : 'Continue'}
-                            {step < 3 && <ChevronRight className="w-4 h-4 ml-2" />}
+
                         </button>
                     </div>
                 </GlassCard>

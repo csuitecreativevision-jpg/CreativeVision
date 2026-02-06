@@ -414,7 +414,7 @@ export function UserManagement() {
                         </div>
 
                         {/* Actions */}
-                        <div className="pt-4 border-t border-white/5 flex gap-3">
+                        <div className="pt-4 border-t border-white/5 flex justify-center gap-3">
                             {editingUserId && (
                                 <button
                                     type="button"
@@ -427,7 +427,7 @@ export function UserManagement() {
                             <button
                                 type="submit"
                                 disabled={isCreatingUser}
-                                className="flex-1 py-3 rounded-xl bg-violet-600 text-white font-bold hover:bg-violet-500 hover:shadow-lg hover:shadow-violet-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-20 py-3 rounded-full bg-white text-black font-bold hover:bg-custom-bright hover:text-white transition-all flex items-center gap-2"
                             >
                                 {isCreatingUser ? 'Processing...' : (editingUserId ? 'Save Changes' : 'Create User')}
                             </button>
