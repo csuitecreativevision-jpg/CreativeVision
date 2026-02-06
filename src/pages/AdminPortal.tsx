@@ -8,7 +8,8 @@ import {
     Activity,
     Menu,
     LogOut,
-    Briefcase
+    Briefcase,
+    LayoutList
 } from 'lucide-react';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 
@@ -40,6 +41,7 @@ export default function AdminPortal() {
     const getActiveTab = () => {
         const path = location.pathname;
         if (path.includes('overview')) return 'Overview';
+        if (path.includes('management')) return 'Management';
         if (path.includes('boards')) return 'Boards';
         if (path.includes('users')) return 'Users';
         if (path.includes('settings')) return 'Settings';
@@ -66,6 +68,7 @@ export default function AdminPortal() {
                     <SidebarItem icon={<LayoutDashboard className="w-5 h-5" />} label="Overview" active={activeTab === 'Overview'} onClick={() => navigate('/admin-portal/overview')} />
                     {currentUserRole === 'admin' && (
                         <>
+                            <SidebarItem icon={<LayoutList className="w-5 h-5" />} label="Management" active={activeTab === 'Management'} onClick={() => navigate('/admin-portal/management')} />
                             <SidebarItem icon={<Briefcase className="w-5 h-5" />} label="Clients" active={activeTab === 'Clients'} onClick={() => navigate('/admin-portal/clients')} />
                             <SidebarItem icon={<Activity className="w-5 h-5" />} label="Analytics" active={activeTab === 'Analytics'} onClick={() => navigate('/admin-portal/analytics')} />
                             <SidebarItem icon={<Users className="w-5 h-5" />} label="Team" active={activeTab === 'Team'} onClick={() => navigate('/admin-portal/team')} />
