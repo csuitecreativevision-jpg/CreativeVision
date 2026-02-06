@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminPageLayout } from '../../components/layout/AdminPageLayout';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -7,15 +7,78 @@ import {
     Briefcase,
     Check,
     ChevronRight,
-    Search,
+    ArrowLeft,
+    AlertCircle,
     DollarSign,
-    ArrowLeft
+    Search
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { getAllBoards } from '../../services/mondayService';
 
 export default function AdminProjectAssignment() {
     const navigate = useNavigate();
     const [step, setStep] = useState(1);
+
+    // Data State
+    const [availableClients, setAvailableClients] = useState<string[]>([]);
+    const [availableTeam, setAvailableTeam] = useState<string[]>([]);
+    const [loadingClients, setLoadingClients] = useState(false);
+    const [debugLogs, setDebugLogs] = useState<string[]>([]); // Debugging
+
+    // Fetch Clients & Team Logic
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoadingClients(true);
+            const logs: string[] = [];
+            try {
+                logs.push("Starting data fetch...");
+
+                // 1. Fetch All Boards
+                const boards = await getAllBoards();
+                logs.push(`Fetched ${boards?.length || 0} total boards.`);
+
+                // --- FETCH CLIENTS ---
+                // Pattern: "[Client Name] - Fulfillment Board"
+                const clientBoards = boards.filter((b: any) =>
+                    (b.name.toLowerCase().includes('fulfillment board') ||
+                        b.name.toLowerCase().includes('fullfillment board')) &&
+                    !b.name.startsWith("Subitems")
+                );
+
+                const clients = clientBoards.map((b: any) => {
+                    return b.name.replace(/ - ?Full?fillment Board/i, "").trim();
+                });
+                const uniqueClients = Array.from(new Set(clients)).sort() as string[];
+                logs.push(`Extracted ${uniqueClients.length} unique clients: ${uniqueClients.join(', ')}`);
+
+                setAvailableClients(uniqueClients);
+
+
+                // --- FETCH TEAM ---
+                // Pattern: "[User Name] - Workspace"
+                const teamBoards = boards.filter((b: any) =>
+                    b.name.toLowerCase().includes(' - workspace') &&
+                    !b.name.startsWith("Subitems")
+                );
+
+                const teamMembers = teamBoards.map((b: any) => {
+                    return b.name.replace(/ - Workspace/i, "").trim();
+                });
+                const uniqueTeam = Array.from(new Set(teamMembers)).sort() as string[];
+                setAvailableTeam(uniqueTeam);
+                logs.push(`Found ${uniqueTeam.length} team members: ${uniqueTeam.join(', ')}`);
+
+            } catch (error: any) {
+                console.error("Failed to fetch data", error);
+                logs.push(`❌ Error: ${error.message || error}`);
+            } finally {
+                setLoadingClients(false);
+                setDebugLogs(logs);
+            }
+        };
+
+        fetchData();
+    }, []);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -27,9 +90,11 @@ export default function AdminProjectAssignment() {
         deadline: ''
     });
 
+    const [teamSearch, setTeamSearch] = useState('');
+    const [clientSearch, setClientSearch] = useState('');
+
     // Mock Data (replace with real fetches later)
     const projectTypes = ['Video Editing', 'Thumbnail Design', 'Channel Management', 'Shorts/Reels'];
-    const users = ['Editor 1', 'Editor 2', 'Manager 1']; // Need to fetch real users
 
     const handleNext = () => setStep(prev => prev + 1);
     const handleBack = () => setStep(prev => prev - 1);
@@ -130,17 +195,60 @@ export default function AdminProjectAssignment() {
                                     Client & Pricing
                                 </h3>
 
-                                {/* Client (Mock for now) */}
-                                <div className="space-y-2">
+                                {/* Client (Likely from Fulfillment Board) */}
+                                <div className="space-y-2 relative">
                                     <label className="text-sm font-medium text-gray-300">Client</label>
-                                    <div className="relative">
-                                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                                        <input
-                                            type="text"
-                                            placeholder="Search client..."
-                                            className="w-full bg-[#0E0E1A] border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-violet-500 transition-colors placeholder:text-gray-600"
-                                        />
+                                    {/* Search Client */}
+                                    <div className="relative mb-4">
+                                        <div className="relative">
+                                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                                            <input
+                                                type="text"
+                                                value={clientSearch}
+                                                onChange={(e) => setClientSearch(e.target.value)}
+                                                placeholder="Search or select client..."
+                                                className="w-full bg-[#0E0E1A] border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-violet-500 transition-colors placeholder:text-gray-600"
+                                            />
+                                        </div>
                                     </div>
+
+                                    {/* Client List */}
+                                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                                        {availableClients.filter(c => c.toLowerCase().includes(clientSearch.toLowerCase())).length > 0 ? (
+                                            availableClients
+                                                .filter(c => c.toLowerCase().includes(clientSearch.toLowerCase()))
+                                                .map((client, idx) => (
+                                                    <button
+                                                        key={idx}
+                                                        onClick={() => setFormData({ ...formData, client: client })}
+                                                        className={`w-full text-left px-4 py-3 rounded-xl transition-all flex items-center justify-between ${formData.client === client
+                                                            ? 'bg-violet-500/20 border border-violet-500 text-white'
+                                                            : 'bg-white/5 border border-white/5 text-gray-300 hover:bg-white/10 hover:text-white'
+                                                            }`}
+                                                    >
+                                                        <span className="font-medium">{client}</span>
+                                                        {formData.client === client && <Check className="w-4 h-4 text-violet-400" />}
+                                                    </button>
+                                                ))
+                                        ) : (
+                                            <div className="text-center py-4 text-gray-500 bg-white/5 rounded-xl border border-white/5 border-dashed">
+                                                {loadingClients ? "Loading clients..." : "No clients found."}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Debug Logs (Only if empty or error) */}
+                                    {availableClients.length === 0 && !loadingClients && (
+                                        <div className="mt-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                                            <div className="flex items-center text-red-400 mb-2">
+                                                <AlertCircle className="w-4 h-4 mr-2" />
+                                                <span className="text-xs font-bold">Debug Info (No Clients Found)</span>
+                                            </div>
+                                            <div className="text-[10px] font-mono text-gray-400 whitespace-pre-wrap max-h-40 overflow-y-auto">
+                                                {debugLogs.join('\n')}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Price */}
@@ -173,28 +281,48 @@ export default function AdminProjectAssignment() {
                                     Assign to Team
                                 </h3>
 
-                                <div className="space-y-4">
-                                    {users.map(user => (
-                                        <button
-                                            key={user}
-                                            onClick={() => setFormData({ ...formData, editor: user })}
-                                            className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${formData.editor === user
-                                                ? 'bg-blue-500/20 border-blue-500'
-                                                : 'bg-white/5 border-white/5 hover:bg-white/10'
-                                                }`}
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-600 flex items-center justify-center text-white font-bold">
-                                                    {user.charAt(0)}
-                                                </div>
-                                                <div className="text-left">
-                                                    <p className="text-white font-bold">{user}</p>
-                                                    <p className="text-xs text-gray-400">Available • 3 Projects Active</p>
-                                                </div>
-                                            </div>
-                                            {formData.editor === user && <Check className="w-5 h-5 text-blue-400" />}
-                                        </button>
-                                    ))}
+                                {/* Search Team */}
+                                <div className="relative mb-4">
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                                    <input
+                                        type="text"
+                                        value={teamSearch}
+                                        onChange={(e) => setTeamSearch(e.target.value)}
+                                        placeholder="Search team members..."
+                                        className="w-full bg-[#0E0E1A] border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors placeholder:text-gray-600"
+                                    />
+                                </div>
+
+                                <div className="space-y-4 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                                    {availableTeam.filter(u => u.toLowerCase().includes(teamSearch.toLowerCase())).length > 0 ? (
+                                        availableTeam
+                                            .filter(u => u.toLowerCase().includes(teamSearch.toLowerCase()))
+                                            .map(user => (
+                                                <button
+                                                    key={user}
+                                                    onClick={() => setFormData({ ...formData, editor: user })}
+                                                    className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${formData.editor === user
+                                                        ? 'bg-blue-500/20 border-blue-500'
+                                                        : 'bg-white/5 border-white/5 hover:bg-white/10'
+                                                        }`}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-600 flex items-center justify-center text-white font-bold">
+                                                            {user.charAt(0)}
+                                                        </div>
+                                                        <div className="text-left">
+                                                            <p className="text-white font-bold">{user}</p>
+                                                            <p className="text-xs text-gray-400">Team Member</p>
+                                                        </div>
+                                                    </div>
+                                                    {formData.editor === user && <Check className="w-5 h-5 text-blue-400" />}
+                                                </button>
+                                            ))
+                                    ) : (
+                                        <div className="text-center py-8 text-gray-500">
+                                            {loadingClients ? "Loading team members..." : "No team members found."}
+                                        </div>
+                                    )}
                                 </div>
                             </motion.div>
                         )}
