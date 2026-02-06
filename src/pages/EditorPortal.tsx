@@ -105,7 +105,7 @@ export default function EditorPortal() {
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${!selectedBoard ? 'bg-white/10 text-white shadow-lg shadow-white/5' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
                     >
                         <LayoutDashboard className={`w-5 h-5 transition-transform duration-300 ${!selectedBoard ? 'scale-110' : 'group-hover:scale-110'}`} />
-                        <span className="text-sm font-bold tracking-tight">Experience</span>
+                        <span className="text-sm font-bold tracking-tight">Main</span>
                     </button>
 
                     {boards.map((board) => (
@@ -177,7 +177,7 @@ export default function EditorPortal() {
                                             className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20"
                                         >
                                             <Sparkles className="w-4 h-4 text-emerald-400" />
-                                            <span className="text-xs font-bold text-emerald-200 uppercase tracking-widest">Team Experience</span>
+                                            <span className="text-xs font-bold text-emerald-200 uppercase tracking-widest">Welcome, editor!</span>
                                         </motion.div>
                                         <motion.h1
                                             initial={{ y: 20, opacity: 0 }}
@@ -185,7 +185,7 @@ export default function EditorPortal() {
                                             transition={{ delay: 0.1 }}
                                             className="text-5xl md:text-6xl font-black text-white tracking-tight uppercase"
                                         >
-                                            Team Portal
+                                            Your Portal
                                         </motion.h1>
                                         <motion.p
                                             initial={{ y: 20, opacity: 0 }}

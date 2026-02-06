@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { PortalLayout } from '../components/shared/PortalLayout';
 import { SidebarItem } from '../components/shared/SidebarItem';
 import {
@@ -7,7 +7,6 @@ import {
     UserPlus,
     Settings,
     Activity,
-    Search,
     Menu,
     LogOut,
     AlignLeft,
@@ -18,6 +17,7 @@ import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 export default function AdminPortal() {
     const navigate = useNavigate();
     const location = useLocation();
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
     // Strict Role Check
     useEffect(() => {
@@ -61,7 +61,8 @@ export default function AdminPortal() {
 
     return (
         <PortalLayout
-
+            isMobileSidebarOpen={isMobileSidebarOpen}
+            onMobileSidebarClose={() => setIsMobileSidebarOpen(false)}
             sidebarContent={
                 <>
                     <SidebarItem icon={<LayoutDashboard className="w-5 h-5" />} label="Overview" active={activeTab === 'Overview'} onClick={() => navigate('/admin-portal/overview')} />
@@ -97,32 +98,15 @@ export default function AdminPortal() {
             }
             mainContent={
                 <>
-                    {/* Header */}
-                    <header className="h-16 px-8 flex items-center justify-between border-b border-white/5 bg-black/20 backdrop-blur-xl flex-shrink-0">
-                        <div className="flex items-center gap-4 lg:hidden">
-                            <button className="text-white"><Menu className="w-6 h-6" /></button>
-                        </div>
-
-                        <div className="hidden lg:block">
-                            <h1 className="text-lg font-bold text-white tracking-tight">
-                                {activeTab}
-                            </h1>
-                        </div>
-
-                        <div className="flex items-center gap-6">
-                            <div className="relative hidden md:block group">
-                                <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-custom-bright transition-colors" />
-                                <input
-                                    type="text"
-                                    placeholder="Search..."
-                                    className="bg-white/5 border border-white/10 rounded-full pl-10 pr-4 py-1.5 text-sm text-white focus:outline-none focus:border-custom-bright/50 focus:bg-white/10 transition-all w-64"
-                                />
-                            </div>
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-custom-blue to-custom-purple p-[1px]">
-                                <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&auto=format&fit=crop" alt="Admin" className="w-full h-full rounded-full object-cover" />
-                            </div>
-                        </div>
-                    </header>
+                    {/* Mobile Menu Trigger (Floating) */}
+                    <div className="absolute top-4 left-4 z-50 lg:hidden">
+                        <button
+                            onClick={() => setIsMobileSidebarOpen(true)}
+                            className="p-2 rounded-lg bg-black/40 backdrop-blur-md border border-white/10 text-white hover:bg-white/10 transition-colors"
+                        >
+                            <Menu className="w-6 h-6" />
+                        </button>
+                    </div>
 
                     {/* Content Area */}
                     <div className="flex-1 overflow-hidden flex relative">

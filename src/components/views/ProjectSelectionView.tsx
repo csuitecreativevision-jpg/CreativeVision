@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, Calendar, Activity } from 'lucide-react';
 import { ProjectCard } from '../shared/ProjectCard';
 import { BoardCell } from '../shared/BoardCell';
+import { PremiumModal } from '../ui/PremiumModal';
 
 interface ProjectSelectionViewProps {
     boardData: any;
@@ -291,74 +292,83 @@ export const ProjectSelectionView = ({
             )}
 
             {/* Detail Modal */}
-            <AnimatePresence>
+            <PremiumModal
+                isOpen={!!selectedProject}
+                onClose={() => setSelectedProject(null)}
+            >
                 {selectedProject && (
                     <>
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            onClick={() => setSelectedProject(null)}
-                            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 overflow-y-auto cursor-pointer"
-                        />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none p-4"
-                        >
-                            <div className="bg-[#0E0E1A] border border-white/10 w-full max-w-2xl max-h-[90vh] rounded-3xl shadow-2xl overflow-hidden pointer-events-auto flex flex-col">
+                        {/* Modal Header containing Status & Title */}
+                        <div className="p-8 border-b border-white/5 bg-[#131322] relative">
+                            {/* Ambient Glow */}
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-[80px] pointer-events-none" />
 
-                                {/* Modal Header */}
-                                <div className="p-6 border-b border-white/5 flex items-start justify-between bg-[#131322]">
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: getStatusColor(selectedProject) }} />
-                                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{getStatusText(selectedProject)}</span>
-                                        </div>
-                                        <h2 className="text-2xl font-black text-white leading-tight">{selectedProject.name}</h2>
+                            <div className="relative z-10 flex items-start justify-between gap-4">
+                                <div className="space-y-4">
+                                    {/* Status Badge */}
+                                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
+                                        <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: getStatusColor(selectedProject) }} />
+                                        <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest leading-none pt-0.5">
+                                            {getStatusText(selectedProject)}
+                                        </span>
                                     </div>
-                                    <button
-                                        onClick={() => setSelectedProject(null)}
-                                        className="p-2 rounded-full hover:bg-white/5 text-gray-500 hover:text-white transition-all"
-                                    >
-                                        <X className="w-6 h-6" />
-                                    </button>
+
+                                    {/* Title */}
+                                    <h2 className="text-3xl font-black text-white leading-tight tracking-tight">
+                                        {selectedProject.name}
+                                    </h2>
                                 </div>
 
-                                {/* Modal Content - Scrollable */}
-                                <div className="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-6">
-                                    <div className="space-y-6">
-                                        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-                                            <Activity className="w-4 h-4" /> Project Details
-                                        </h3>
+                                <button
+                                    onClick={() => setSelectedProject(null)}
+                                    className="p-2.5 rounded-xl hover:bg-white/10 text-gray-500 hover:text-white transition-all duration-200"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                        </div>
 
-                                        <div className="grid grid-cols-1 gap-4">
-                                            {boardData.columns?.filter((col: any) => col.type !== 'name' && !col.title.startsWith('C-F-')).map((col: any) => (
-                                                <div key={col.id} className="bg-white/5 border border-white/5 rounded-xl p-4 hover:border-white/10 transition-colors">
-                                                    <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold opacity-70 block mb-2">{col.title}</span>
-                                                    <BoardCell
-                                                        item={selectedProject}
-                                                        column={col}
-                                                        boardId={selectedBoardId}
-                                                        onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
-                                                        onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
-                                                    />
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
+                        {/* Modal Content - Scrollable */}
+                        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-8 bg-[#0E0E1A]">
+                            <div className="space-y-6">
+                                <div className="flex items-center gap-2 pb-2 border-b border-white/5">
+                                    <Activity className="w-4 h-4 text-violet-400" />
+                                    <h3 className="text-xs font-bold text-white uppercase tracking-widest">Project Details</h3>
                                 </div>
 
-                                {/* Modal Footer */}
-                                <div className="p-4 border-t border-white/5 bg-[#131322] text-center text-xs text-gray-500 font-mono">
-                                    Project ID: {selectedProject.id}
+                                <div className="grid grid-cols-1 gap-5">
+                                    {boardData.columns?.filter((col: any) => col.type !== 'name' && !col.title.startsWith('C-F-')).map((col: any) => (
+                                        <div key={col.id} className="group bg-[#131322]/50 border border-white/5 rounded-2xl p-5 hover:border-white/10 transition-all duration-300 hover:bg-[#131322]">
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <div className="w-1 h-3 rounded-full bg-violet-500/20 group-hover:bg-violet-500 transition-colors" />
+                                                <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold group-hover:text-gray-300 transition-colors">
+                                                    {col.title}
+                                                </span>
+                                            </div>
+                                            <div className="pl-3">
+                                                <BoardCell
+                                                    item={selectedProject}
+                                                    column={col}
+                                                    boardId={selectedBoardId}
+                                                    onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
+                                                    onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
-                        </motion.div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="p-4 border-t border-white/5 bg-[#0a0a12] text-center">
+                            <span className="text-[10px] font-mono text-gray-600">
+                                Project ID: {selectedProject.id}
+                            </span>
+                        </div>
                     </>
                 )}
-            </AnimatePresence>
+            </PremiumModal>
         </div>
     );
 };

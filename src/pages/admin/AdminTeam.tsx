@@ -12,8 +12,6 @@ export default function AdminTeam() {
     const [loading, setLoading] = useState(true);
     const [boards, setBoards] = useState<any[]>([]);
     const [selectedBoard, setSelectedBoard] = useState<any | null>(null);
-    const [sortOption, setSortOption] = useState<'name' | 'count'>('name');
-    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
     const { previewFile, isLoading: isPreviewLoading, setPreviewFile, closePreview } = useProtectedPreview();
 
     // Fetch Data
@@ -120,55 +118,7 @@ export default function AdminTeam() {
                                     Choose a workspace to view active cycles and project status.
                                 </motion.p>
 
-                                {/* Sort Controls */}
-                                <motion.div
-                                    initial={{ y: 20, opacity: 0 }}
-                                    animate={{ y: 0, opacity: 1 }}
-                                    transition={{ delay: 0.3 }}
-                                    className="flex items-center justify-center gap-4 pt-4"
-                                >
-                                    <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 relative">
-                                        <div className="relative flex gap-1">
-                                            {['name', 'count'].map((option) => (
-                                                <button
-                                                    key={option}
-                                                    onClick={() => setSortOption(option as 'name' | 'count')}
-                                                    className={`relative px-4 py-1.5 rounded-lg text-sm font-medium transition-all z-10 ${sortOption === option ? 'text-white' : 'text-gray-400 hover:text-white'}`}
-                                                >
-                                                    {sortOption === option && (
-                                                        <motion.div
-                                                            layoutId="sortOptionHighlight"
-                                                            className="absolute inset-0 bg-white/10 rounded-lg"
-                                                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                                                        />
-                                                    )}
-                                                    {option === 'name' ? 'Name' : 'Projects'}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 relative">
-                                        <div className="relative flex gap-1">
-                                            {['asc', 'desc'].map((dir) => (
-                                                <button
-                                                    key={dir}
-                                                    onClick={() => setSortDirection(dir as 'asc' | 'desc')}
-                                                    className={`relative px-3 py-1.5 rounded-lg text-sm font-medium transition-all z-10 ${sortDirection === dir ? 'text-white' : 'text-gray-400 hover:text-white'}`}
-                                                >
-                                                    {sortDirection === dir && (
-                                                        <motion.div
-                                                            layoutId="sortDirHighlight"
-                                                            className="absolute inset-0 bg-white/10 rounded-lg"
-                                                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                                                        />
-                                                    )}
-                                                    {dir === 'asc' ? '↑' : '↓'}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </motion.div>
+                                {/* Sort Controls removed for consistency */}
                             </div>
 
                             {/* Cards Grid */}
@@ -179,26 +129,14 @@ export default function AdminTeam() {
                             ) : boards.length > 0 ? (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 pb-20">
                                     {[...boards].sort((a, b) => {
-                                        if (sortOption === 'name') {
-                                            const cleanName = (name: string) => name.replace(/- Workspace/i, '').replace(/\(c-w-[\w-]+\)/i, '').trim().toLowerCase();
-                                            const nameA = cleanName(a.name);
-                                            const nameB = cleanName(b.name);
-                                            return sortDirection === 'asc'
-                                                ? nameA.localeCompare(nameB)
-                                                : nameB.localeCompare(nameA);
-                                        } else {
-                                            const countA = a.items_count || 0;
-                                            const countB = b.items_count || 0;
-                                            return sortDirection === 'asc'
-                                                ? countA - countB
-                                                : countB - countA;
-                                        }
+                                        const cleanName = (name: string) => name.replace(/- Workspace/i, '').replace(/\(c-w-[\w-]+\)/i, '').trim().toLowerCase();
+                                        return cleanName(a.name).localeCompare(cleanName(b.name));
                                     }).map((board, index) => (
                                         <WorkspaceCard
                                             key={board.id}
                                             index={index}
                                             name={board.name}
-                                            itemCount={board.items_count || 0} // Use count from getAllBoards summary
+                                            itemCount={board.items_count || 0}
                                             // Fallback colors for visual variety
                                             color={[
                                                 '#8b5cf6', // Violet

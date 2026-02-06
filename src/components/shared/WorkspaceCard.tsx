@@ -54,7 +54,7 @@ export const WorkspaceCard = ({ name, itemCount = 0, onClick, color = '#8b5cf6',
 
                         <div className="flex items-center justify-between">
                             <div className="flex flex-col">
-                                <span className="text-xs text-gray-400 font-medium">Active Projects</span>
+                                <span className="text-xs text-gray-400 font-medium">All Projects</span>
                                 <span className="text-lg font-bold text-white font-mono">{itemCount}</span>
                             </div>
 
