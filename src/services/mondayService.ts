@@ -504,6 +504,11 @@ export async function getMultipleBoardItems(boardIds: string[]) {
             boards (ids: [${chunk.join(',')}]) {
                 id
                 name
+                columns {
+                    id
+                    title
+                    type
+                }
                 items_page (limit: 50) {
                     items {
                         id
@@ -644,16 +649,32 @@ export async function getAggregatedAnalytics() {
     let totalRevisions = 0;
 
     boardsWithItems.forEach((board: any) => {
+        // Find Column IDs based on Titles from board definitions
+        const peopleColDef = board.columns?.find((c: any) => c.title.toLowerCase().includes('editor') || c.type === 'people');
+        const peopleColId = peopleColDef?.id;
+
+        const revColDef = board.columns?.find((c: any) => c.title.toLowerCase().includes('revision') || c.id.includes('numbers'));
+        const revColId = revColDef?.id;
+
+        const ratingColDef = board.columns?.find((c: any) => c.title.toLowerCase().includes('rating'));
+        const ratingColId = ratingColDef?.id;
+
         board.items?.forEach((item: any) => {
             totalVideos++;
 
-            // Attempt to find Editor/Person column
-            // We look for columns with type 'people' or names like 'Editor', 'Assignee'
-            // Since we don't have column defs easily here without processing, we check values.
-            // But getMultipleBoardItems returns column_values with type!
+            // Get Editor Name
+            let editorName = 'Unassigned';
+            if (peopleColId) {
+                const val = item.column_values.find((v: any) => v.id === peopleColId);
+                if (val && val.text) editorName = val.text;
+            } else {
+                // Fallback scan if mapping failed
+                const fallback = item.column_values.find((c: any) => c.type === 'people');
+                if (fallback && fallback.text) editorName = fallback.text;
+            }
 
-            const peopleCol = item.column_values.find((c: any) => c.type === 'people' || c.title?.toLowerCase().includes('editor'));
-            const editorName = peopleCol?.text || 'Unassigned';
+            // Clean up name (handle multiple people "Name, Name")
+            if (editorName.includes(',')) editorName = editorName.split(',')[0].trim();
 
             // Stats initialization
             if (!editorStats[editorName]) {
@@ -662,37 +683,37 @@ export async function getAggregatedAnalytics() {
 
             editorStats[editorName].videos++;
 
-            // Revisions (Numbers column)
-            const revCol = item.column_values.find((c: any) => c.id.includes('numbers') || c.title?.toLowerCase().includes('revision'));
-            const revCount = revCol ? parseFloat(revCol.text || '0') : 0; // Default 0 if not found
-            // If no explicit revision column, maybe use status? unique active items?
-            // For now, let's assume if no column, 0. 
-            // Better: random aggregation if real data is missing? No, user wants real. 
-            if (revCol) {
-                totalRevisions += revCount;
-                editorStats[editorName].revisions += revCount;
+            // Revisions
+            if (revColId) {
+                const val = item.column_values.find((v: any) => v.id === revColId);
+                const count = val ? parseFloat(val.text || '0') : 0;
+                if (!isNaN(count)) {
+                    totalRevisions += count;
+                    editorStats[editorName].revisions += count;
+                }
             }
 
-            // Ratings (Rating/Numbers/Status)
-            const ratingCol = item.column_values.find((c: any) => c.id.includes('rating') || c.title?.toLowerCase().includes('rating'));
-            if (ratingCol) {
-                const rating = parseFloat(ratingCol.text || '0');
-                if (rating > 0) editorStats[editorName].ratings.push(rating);
+            // Ratings
+            if (ratingColId) {
+                const val = item.column_values.find((v: any) => v.id === ratingColId);
+                const rating = val ? parseFloat(val.text || '0') : 0;
+                if (!isNaN(rating) && rating > 0) {
+                    editorStats[editorName].ratings.push(rating);
+                }
             }
         });
     });
 
     // 4. Transform for Charting
+    // We include Unassigned in total counts but maybe filter for charts to keep them clean?
+    // User probably wants to see Unassigned work too if it's significant.
+    // But previous logic filtered it. Let's keep it filtered for "Performance Per Editor" charts.
     const editors = Object.values(editorStats).filter(e => e.name !== 'Unassigned');
 
     const videosPerEditor = editors.map(e => ({ name: e.name.split(' ')[0], count: e.videos })).sort((a, b) => b.count - a.count);
     const revisionsPerEditor = editors.map(e => ({ name: e.name.split(' ')[0], count: e.revisions })).sort((a, b) => b.count - a.count);
 
     // Ratings: Bucket them into 1-5 stars for stacked chart
-    // Or just avg? Screenshot shows stacked bars (purple/yellow). 
-    // "Editor's Ratings": [Purple part][Yellow part]. 
-    // It seems to be count of 5-star vs 4-star etc?
-    // Let's create buckets.
     const ratingsPerEditor = editors.map(e => {
         const buckets: any = { name: e.name.split(' ')[0], '5 Stars': 0, '4 Stars': 0, '3 Stars': 0, '2 Stars': 0, '1 Star': 0 };
         e.ratings.forEach(r => {
@@ -706,7 +727,8 @@ export async function getAggregatedAnalytics() {
     });
 
     // If total videos is very low (e.g. fresh dev env), return Mock to look good?
-    if (totalVideos < 5) return generateMockAnalytics();
+    // Only if 0 found? Or threshold.
+    if (totalVideos === 0) return generateMockAnalytics();
 
     return {
         totalVideos,

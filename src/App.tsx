@@ -15,7 +15,7 @@ const PortalRouter = lazy(() => import('./pages/PortalRouter'));
 const AdminPortal = lazy(() => import('./pages/AdminPortal'));
 const AdminOverview = lazy(() => import('./pages/admin/AdminOverview'));
 const AdminBoards = lazy(() => import('./pages/admin/AdminBoards'));
-const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
+const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
 const AdminTeam = lazy(() => import('./pages/admin/AdminTeam'));
 const AdminClients = lazy(() => import('./pages/admin/AdminClients'));
 const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics'));
@@ -84,7 +84,7 @@ export default function App() {
             <Route index element={<Navigate to="overview" replace />} />
             <Route path="overview" element={<AdminOverview />} />
             <Route path="boards" element={<AdminBoards />} />
-            <Route path="users" element={<AdminUsers />} />
+            <Route path="settings" element={<AdminSettings />} />
             <Route path="team" element={<AdminTeam />} />
             <Route path="clients" element={<AdminClients />} />
             <Route path="analytics" element={<AdminAnalytics />} />

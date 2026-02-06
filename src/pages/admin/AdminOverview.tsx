@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { StatCard } from '../../components/shared/StatCard';
+import { AdminPageLayout } from '../../components/layout/AdminPageLayout';
 import {
     Activity,
     TrendingUp,
@@ -162,9 +163,12 @@ export default function AdminOverview() {
     };
 
     return (
-        <div className="p-8 overflow-y-auto w-full h-full animate-in fade-in duration-500">
+        <AdminPageLayout
+            title="Overview"
+            subtitle="Platform activity at a glance. Real-time metrics and performance tracking."
+        >
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard
                     title="Active Clients"
                     value={overviewLoading ? "..." : String(overviewStats.activeClientsCount)}
@@ -190,37 +194,40 @@ export default function AdminOverview() {
                     title="Active Editors"
                     value={overviewLoading ? "..." : String(overviewStats.activeEditorsCount)}
                     change="In Workspace"
-                    icon={<Users className="w-5 h-5 text-custom-bright" />}
+                    icon={<Users className="w-5 h-5 text-emerald-400" />}
                     delay={0.4}
                 />
             </div>
 
             {/* Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Client Distribution */}
-                <div className="bg-[#1a1a2e] border border-white/5 rounded-2xl p-6 relative overflow-hidden group">
+                <div className="bg-[#0E0E1A]/80 backdrop-blur-md border border-white/5 rounded-3xl p-8 shadow-xl relative overflow-hidden group hover:border-white/10 transition-colors">
                     {/* Glossy Effect */}
                     <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                    <div className="absolute -right-20 -top-20 w-64 h-64 bg-purple-600/10 rounded-full blur-[80px] pointer-events-none group-hover:bg-purple-600/20 transition-all duration-700" />
 
-                    <h3 className="text-white font-bold mb-6 flex items-center gap-2">
-                        <Activity className="w-4 h-4 text-purple-400" />
+                    <h3 className="text-white font-bold mb-6 flex items-center gap-2 relative z-10">
+                        <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400">
+                            <Activity className="w-4 h-4" />
+                        </div>
                         Active Projects
                     </h3>
-                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar relative z-10">
                         {overviewStats.clientProjectDistribution.length > 0 ? (
                             overviewStats.clientProjectDistribution.map((client, i) => (
-                                <div key={i} className="flex items-center gap-4">
-                                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-xs font-bold text-gray-400">
+                                <div key={i} className="flex items-center gap-4 group/item">
+                                    <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/5 flex items-center justify-center text-xs font-bold text-gray-400 group-hover/item:border-purple-500/30 group-hover/item:text-purple-400 transition-colors">
                                         {i + 1}
                                     </div>
                                     <div className="flex-1">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="text-sm text-gray-300 font-medium">{client.name}</span>
-                                            <span className="text-xs text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded-full">{client.count} Active</span>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-sm text-gray-300 font-medium group-hover/item:text-white transition-colors">{client.name}</span>
+                                            <span className="text-[10px] font-bold text-purple-300 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-full">{client.count} Active</span>
                                         </div>
                                         <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
                                             <div
-                                                className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full"
+                                                className="h-full bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full"
                                                 style={{ width: `${(client.count / Math.max(1, overviewStats.activeProjectsCount)) * 100}%` }}
                                             />
                                         </div>
@@ -228,35 +235,40 @@ export default function AdminOverview() {
                                 </div>
                             ))
                         ) : (
-                            <div className="text-center text-gray-500 py-10">No active projects found</div>
+                            <div className="text-center text-gray-500 py-10 border border-dashed border-white/5 rounded-2xl">
+                                No active projects found
+                            </div>
                         )}
                     </div>
                 </div>
 
                 {/* Editor Performance */}
-                <div className="bg-[#1a1a2e] border border-white/5 rounded-2xl p-6 relative overflow-hidden group">
+                <div className="bg-[#0E0E1A]/80 backdrop-blur-md border border-white/5 rounded-3xl p-8 shadow-xl relative overflow-hidden group hover:border-white/10 transition-colors">
                     {/* Glossy Effect */}
                     <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                    <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-emerald-600/10 rounded-full blur-[80px] pointer-events-none group-hover:bg-emerald-600/20 transition-all duration-700" />
 
-                    <h3 className="text-white font-bold mb-6 flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4 text-green-400" />
+                    <h3 className="text-white font-bold mb-6 flex items-center gap-2 relative z-10">
+                        <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                            <TrendingUp className="w-4 h-4" />
+                        </div>
                         Editor Workload
                     </h3>
-                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar relative z-10">
                         {overviewStats.editorPerformance.length > 0 ? (
                             overviewStats.editorPerformance.map((editor, i) => (
-                                <div key={i} className="flex items-center gap-4">
-                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center text-xs font-bold text-white border border-white/10">
+                                <div key={i} className="flex items-center gap-4 group/item">
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-800 to-black border border-white/10 flex items-center justify-center text-xs font-bold text-gray-400 group-hover/item:border-emerald-500/30 group-hover/item:text-emerald-400 transition-colors shadow-lg">
                                         {editor.name.charAt(0)}
                                     </div>
                                     <div className="flex-1">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="text-sm text-gray-300 font-medium">{editor.name}</span>
-                                            <span className="text-xs text-green-300 bg-green-500/10 px-2 py-0.5 rounded-full">{editor.count} Projects</span>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-sm text-gray-300 font-medium group-hover/item:text-white transition-colors">{editor.name}</span>
+                                            <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">{editor.count} Projects</span>
                                         </div>
                                         <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
                                             <div
-                                                className="h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-full"
+                                                className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full"
                                                 style={{ width: `${(editor.count / Math.max(1, overviewStats.topEditor.count || 10)) * 100}%` }}
                                             />
                                         </div>
@@ -264,11 +276,13 @@ export default function AdminOverview() {
                                 </div>
                             ))
                         ) : (
-                            <div className="text-center text-gray-500 py-10">No active editors found</div>
+                            <div className="text-center text-gray-500 py-10 border border-dashed border-white/5 rounded-2xl">
+                                No active editors found
+                            </div>
                         )}
                     </div>
                 </div>
             </div>
-        </div>
+        </AdminPageLayout>
     );
 }

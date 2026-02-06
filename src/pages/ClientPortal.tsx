@@ -7,7 +7,8 @@ import {
     Loader2,
     ArrowLeft,
     Sparkles,
-    LogOut
+    LogOut,
+    Menu
 } from 'lucide-react';
 import { PortalLayout } from '../components/shared/PortalLayout';
 import { PortalBoardCard } from '../components/shared/PortalBoardCard';
@@ -24,6 +25,7 @@ export default function ClientPortal() {
     const [boards, setBoards] = useState<any[]>([]);
     const [selectedBoard, setSelectedBoard] = useState<any | null>(null);
     const [currentUserName, setCurrentUserName] = useState<string | null>(null);
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const { previewFile, isLoading: isPreviewLoading, setPreviewFile, closePreview } = useProtectedPreview();
 
     useEffect(() => {
@@ -117,6 +119,8 @@ export default function ClientPortal() {
 
     return (
         <PortalLayout
+            isMobileSidebarOpen={isMobileSidebarOpen}
+            onMobileSidebarClose={() => setIsMobileSidebarOpen(false)}
             sidebarContent={
                 <div className="space-y-1">
                     <button
@@ -172,6 +176,16 @@ export default function ClientPortal() {
             }
             mainContent={
                 <div className="flex-1 flex flex-col h-full bg-[#050511] overflow-hidden relative">
+                    {/* Mobile Menu Trigger */}
+                    <div className="absolute top-4 left-4 z-50 lg:hidden">
+                        <button
+                            onClick={() => setIsMobileSidebarOpen(true)}
+                            className="p-2 rounded-lg bg-black/40 backdrop-blur-md border border-white/10 text-white hover:bg-white/10 transition-colors"
+                        >
+                            <Menu className="w-6 h-6" />
+                        </button>
+                    </div>
+
                     {/* Background Texture */}
                     <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none mix-blend-overlay" />
                     <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[100px] pointer-events-none" />

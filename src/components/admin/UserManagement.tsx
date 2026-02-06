@@ -10,7 +10,6 @@ import {
     Wand2,
     ChevronDown,
     Search,
-    Table,
     X,
     Shield,
     Briefcase,
@@ -20,8 +19,7 @@ import {
     createUser, getAllUsers, updateUser, deleteUser
 } from '../../services/boardsService';
 import { getAllWorkspaces, getAllBoards } from '../../services/mondayService';
-import { AdminPageLayout } from '../../components/layout/AdminPageLayout';
-import { PremiumModal } from '../../components/ui/PremiumModal';
+import { PremiumModal } from '../ui/PremiumModal';
 
 // --- Reusable UI Sub-Components (Internal) ---
 
@@ -54,9 +52,7 @@ const StyledSelect = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
     </div>
 );
 
-// ---------------------------------------------
-
-export default function AdminUsers() {
+export function UserManagement() {
     // User Management State
     const [newUserName, setNewUserName] = useState('');
     const [newUserEmail, setNewUserEmail] = useState('');
@@ -211,24 +207,26 @@ export default function AdminUsers() {
     };
 
     return (
-        <AdminPageLayout
-            title="User Management"
-            subtitle="Manage authorized personnel, assigning roles and access levels."
-            action={
+        <div className="space-y-6">
+            {/* Header/Actions for the Component */}
+            <div className="flex justify-between items-center bg-[#0E0E1A]/50 p-4 rounded-2xl border border-white/5">
+                <div>
+                    <h3 className="text-white font-bold">User Database</h3>
+                    <p className="text-xs text-gray-500">Create, edit, and manage system access.</p>
+                </div>
                 <button
                     onClick={() => setIsUserListOpen(true)}
-                    className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white font-bold transition-all group"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white font-bold text-sm transition-all group"
                 >
-                    <Users className="w-5 h-5 text-gray-400 group-hover:text-white" />
+                    <Users className="w-4 h-4 text-gray-400 group-hover:text-white" />
                     Directory
-                    <span className="px-2 py-0.5 rounded bg-black/30 text-xs text-gray-400 border border-white/5">
+                    <span className="px-1.5 py-0.5 rounded bg-black/30 text-[10px] text-gray-400 border border-white/5">
                         {userList.length}
                     </span>
                 </button>
-            }
-        >
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+            </div>
 
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
                 {/* --- Left Column: Create/Edit Form --- */}
                 <GlassCard className="space-y-6">
                     <div className="flex items-center gap-3 pb-6 border-b border-white/5">
@@ -246,7 +244,6 @@ export default function AdminUsers() {
                     </div>
 
                     <form onSubmit={handleCreateUser} className="space-y-6">
-
                         {/* Role Selector */}
                         <div>
                             <FormLabel>Access Role</FormLabel>
@@ -268,7 +265,7 @@ export default function AdminUsers() {
                                         <role.icon className={`w-5 h-5 ${newUserRole === role.id ? `text-${role.color}-400` : 'text-gray-500 group-hover:text-gray-300'}`} />
                                         <span className={`text-xs font-bold ${newUserRole === role.id ? 'text-white' : 'text-gray-500'}`}>{role.label}</span>
                                         {newUserRole === role.id && (
-                                            <motion.div layoutId="role-selected" className={`absolute inset-0 rounded-xl border-2 border-${role.color}-500`} />
+                                            <motion.div layoutId="role-selected-um" className={`absolute inset-0 rounded-xl border-2 border-${role.color}-500`} />
                                         )}
                                     </button>
                                 ))}
@@ -478,7 +475,6 @@ export default function AdminUsers() {
             </div>
 
             {/* --- User Directory Modal --- */}
-            {/* --- User Directory Modal --- */}
             <PremiumModal
                 isOpen={isUserListOpen}
                 onClose={() => setIsUserListOpen(false)}
@@ -552,6 +548,6 @@ export default function AdminUsers() {
                     </table>
                 </div>
             </PremiumModal>
-        </AdminPageLayout>
+        </div>
     );
 }
