@@ -7,12 +7,11 @@ import {
     Briefcase,
     Check,
     ArrowLeft,
-    AlertCircle,
     DollarSign,
     Search
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getAllBoards } from '../../services/mondayService';
+import { getAllBoards, getBoardColumns } from '../../services/mondayService';
 
 export default function AdminProjectAssignment() {
     const navigate = useNavigate();
@@ -22,9 +21,28 @@ export default function AdminProjectAssignment() {
     const [availableClients, setAvailableClients] = useState<string[]>([]);
     const [availableTeam, setAvailableTeam] = useState<string[]>([]);
     const [loadingClients, setLoadingClients] = useState(false);
-    const [debugLogs, setDebugLogs] = useState<string[]>([]); // Debugging
 
-    // Fetch Clients & Team Logic
+
+    // Form State
+    const [formData, setFormData] = useState({
+        projectName: '',
+        projectStatus: '', // Was projectType, now Project Status
+        projectType: '',   // NEW: Type column
+        client: '',
+        price: '',
+        editor: '',
+        deadline: ''
+    });
+
+    const [teamSearch, setTeamSearch] = useState('');
+    const [clientSearch, setClientSearch] = useState('');
+
+    // Dynamic Options State
+    const [projectStatuses, setProjectStatuses] = useState<string[]>([]);
+    const [projectTypes, setProjectTypes] = useState<string[]>([]);
+
+
+    // Fetch Clients & Team & Board Data Logic
     useEffect(() => {
         const fetchData = async () => {
             setLoadingClients(true);
@@ -67,33 +85,104 @@ export default function AdminProjectAssignment() {
                 setAvailableTeam(uniqueTeam);
                 logs.push(`Found ${uniqueTeam.length} team members: ${uniqueTeam.join(', ')}`);
 
+                // --- FETCH PROJECT DETAILS From "VE Project Board" ---
+                // Target: "VE Project Board"
+                const projectBoard = boards.find((b: any) =>
+                    (b.name.toLowerCase().includes('ve project board') ||
+                        b.name.toLowerCase().includes('video editing project')) &&
+                    !b.name.toLowerCase().startsWith("subitems")
+                );
+
+                if (projectBoard) {
+                    logs.push(`Found Project Board: ${projectBoard.name} (${projectBoard.id})`);
+
+                    const columns = await getBoardColumns(projectBoard.id);
+
+                    // DEBUG: Log all columns to help find the right one
+                    logs.push(`--- Columns on ${projectBoard.name} ---`);
+                    columns.forEach((c: any) => logs.push(`[${c.id}] ${c.title} (${c.type})`));
+                    logs.push(`-----------------------------------`);
+
+                    // 1. PROJECT STATUS (formerly Project Type)
+                    const statusCol = columns.find((c: any) =>
+                        c.title.toLowerCase() === 'project status' ||
+                        (c.title.toLowerCase() === 'status' && c.id !== 'status') // prioritized last
+                    );
+
+                    if (statusCol && statusCol.settings_str) {
+                        try {
+                            const settings = JSON.parse(statusCol.settings_str);
+                            // Monday.com settings_str structure for status:
+                            // { labels: { "0": "Working on it", "1": "Done", ... }, labels_positions_v2: { ... } }
+                            // or sometimes just labels map.
+
+                            let labels: string[] = [];
+                            if (settings.labels) {
+                                labels = Object.values(settings.labels);
+                            }
+
+                            // Filter out default/irrelevant labels if needed
+                            // For now, take them all, maybe filter empty strings
+                            labels = labels.filter(l => l && l.trim().length > 0 && l.toLowerCase() !== 'default'); // 'default' is sometimes a key, sometimes a label? Usually labels are values.
+
+                            if (labels.length > 0) {
+                                setProjectStatuses(labels);
+                                setFormData(prev => ({ ...prev, projectStatus: labels[0] }));
+                                logs.push(`Extracted Statuses: ${labels.join(', ')}`);
+                            } else {
+                                logs.push("⚠️ No labels found in status column.");
+                            }
+                        } catch (e) {
+                            console.error("Error parsing status column settings", e);
+                            logs.push("❌ Error parsing status settings");
+                        }
+                    } else {
+                        logs.push("⚠️ 'Project Status' column not found.");
+                    }
+
+                    // 2. PROJECT TYPE (New field from 'Type' column)
+                    const typeCol = columns.find((c: any) =>
+                        c.title.toLowerCase() === 'type' ||
+                        c.title.toLowerCase() === 'project type'
+                    );
+
+                    if (typeCol && typeCol.settings_str) {
+                        try {
+                            const settings = JSON.parse(typeCol.settings_str);
+                            let labels: string[] = [];
+                            if (settings.labels) labels = Object.values(settings.labels);
+                            labels = labels.filter(l => l && l.trim().length > 0 && l.toLowerCase() !== 'default');
+
+                            if (labels.length > 0) {
+                                setProjectTypes(labels);
+                                setFormData(prev => ({ ...prev, projectType: labels[0] }));
+                                logs.push(`Extracted Types: ${labels.join(', ')}`);
+                            } else {
+                                logs.push("⚠️ No labels found in type column.");
+                            }
+                        } catch (e) {
+                            console.error("Error parsing type column settings", e);
+                            logs.push("❌ Error parsing type settings");
+                        }
+                    } else {
+                        logs.push("⚠️ 'Type' column not found.");
+                    }
+
+                } else {
+                    logs.push("⚠️ 'VE Project Board' not found.");
+                }
+
             } catch (error: any) {
                 console.error("Failed to fetch data", error);
                 logs.push(`❌ Error: ${error.message || error}`);
             } finally {
                 setLoadingClients(false);
-                setDebugLogs(logs);
+                setLoadingClients(false);
             }
         };
 
         fetchData();
     }, []);
-
-    // Form State
-    const [formData, setFormData] = useState({
-        projectName: '',
-        projectType: 'Video Editing', // Video Editing, Graphic Design, etc.
-        client: '',
-        price: '',
-        editor: '',
-        deadline: ''
-    });
-
-    const [teamSearch, setTeamSearch] = useState('');
-    const [clientSearch, setClientSearch] = useState('');
-
-    // Mock Data (replace with real fetches later)
-    const projectTypes = ['Video Editing', 'Thumbnail Design', 'Channel Management', 'Shorts/Reels'];
 
     const handleNext = () => setStep(prev => prev + 1);
     const handleBack = () => setStep(prev => prev - 1);
@@ -160,24 +249,48 @@ export default function AdminProjectAssignment() {
                                     />
                                 </div>
 
-                                {/* Project Type */}
+                                {/* Project Status (Formerly Project Type) */}
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-300">Project Type</label>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        {projectTypes.map(type => (
+                                    <label className="text-sm font-medium text-gray-300">Project Status</label>
+                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                        {projectStatuses.length > 0 ? projectStatuses.map(status => (
                                             <button
-                                                key={type}
-                                                onClick={() => setFormData({ ...formData, projectType: type })}
-                                                className={`p-4 rounded-xl border text-left transition-all ${formData.projectType === type
+                                                key={status}
+                                                onClick={() => setFormData({ ...formData, projectStatus: status })}
+                                                className={`p-4 rounded-xl border text-left transition-all ${formData.projectStatus === status
                                                     ? 'bg-violet-500/20 border-violet-500 text-white'
                                                     : 'bg-white/5 border-white/5 text-gray-400 hover:bg-white/10'
                                                     }`}
                                             >
-                                                <span className="font-bold block">{type}</span>
+                                                <span className="font-bold block text-sm">{status}</span>
                                             </button>
-                                        ))}
+                                        )) : (
+                                            <div className="col-span-4 text-gray-500 italic text-sm p-2">Loading Statuses...</div>
+                                        )}
                                     </div>
                                 </div>
+
+                                {/* Project Type (New - from Type column) */}
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-gray-300">Project Type</label>
+                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                        {projectTypes.length > 0 ? projectTypes.map(type => (
+                                            <button
+                                                key={type}
+                                                onClick={() => setFormData({ ...formData, projectType: type })}
+                                                className={`p-4 rounded-xl border text-left transition-all ${formData.projectType === type
+                                                    ? 'bg-blue-500/20 border-blue-500 text-white'
+                                                    : 'bg-white/5 border-white/5 text-gray-400 hover:bg-white/10'
+                                                    }`}
+                                            >
+                                                <span className="font-bold block text-sm">{type}</span>
+                                            </button>
+                                        )) : (
+                                            <div className="col-span-4 text-gray-500 italic text-sm p-2">Loading Types...</div>
+                                        )}
+                                    </div>
+                                </div>
+
                             </motion.div>
                         )}
 
@@ -235,19 +348,6 @@ export default function AdminProjectAssignment() {
                                             </div>
                                         )}
                                     </div>
-
-                                    {/* Debug Logs (Only if empty or error) */}
-                                    {availableClients.length === 0 && !loadingClients && (
-                                        <div className="mt-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-                                            <div className="flex items-center text-red-400 mb-2">
-                                                <AlertCircle className="w-4 h-4 mr-2" />
-                                                <span className="text-xs font-bold">Debug Info (No Clients Found)</span>
-                                            </div>
-                                            <div className="text-[10px] font-mono text-gray-400 whitespace-pre-wrap max-h-40 overflow-y-auto">
-                                                {debugLogs.join('\n')}
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
 
                                 {/* Price */}

@@ -454,6 +454,23 @@ export async function getBoardItems(boardId: string) {
     }, false); // meta=false -> cache_monday_board_items
 }
 
+export async function getBoardColumns(boardId: string) {
+    return getCachedOrFetch(`columns_${boardId}`, async () => {
+        const query = `query {
+        boards (ids: [${boardId}]) {
+            columns {
+                id
+                title
+                type
+                settings_str
+            }
+        }
+    }`;
+        const data = await mondayRequest(query);
+        return data.boards[0]?.columns || [];
+    }, true); // meta=true -> cache_monday_meta
+}
+
 export async function createNewBoard(name: string) {
     const query = `mutation {
         create_board (board_name: "${name}", board_kind: public) {
