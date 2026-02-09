@@ -13,7 +13,8 @@ import {
     Layers
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getAllBoards, getBoardColumns } from '../../services/mondayService';
+import { getAllBoards, getBoardColumns, getBoardGroups, submitProjectAssignment } from '../../services/mondayService';
+import { RichTextEditor } from '../../components/ui/RichTextEditor';
 
 export default function AdminProjectAssignment() {
     const navigate = useNavigate();
@@ -22,8 +23,10 @@ export default function AdminProjectAssignment() {
     // Data State
     const [availableClients, setAvailableClients] = useState<string[]>([]); // Source 1: Active Clients (Boards)
     const [veBoardClients, setVeBoardClients] = useState<string[]>([]);     // Source 2: VE Project Board (Labels)
-    const [availableTeam, setAvailableTeam] = useState<string[]>([]);
+    const [veBoardGroups, setVeBoardGroups] = useState<{ id: string, title: string }[]>([]); // For Submission Mapping
+    const [availableTeam, setAvailableTeam] = useState<{ name: string, id: string }[]>([]);
     const [loadingClients, setLoadingClients] = useState(false);
+    const [veProjectBoardId, setVeProjectBoardId] = useState<string | null>(null);
 
 
     // Form State
@@ -35,7 +38,9 @@ export default function AdminProjectAssignment() {
         client: '',
         price: '',
         editor: '',
-        deadline: ''
+        deadline: '',
+        priority: '',
+        instructions: ''
     });
 
     const [teamSearch, setTeamSearch] = useState('');
@@ -44,6 +49,7 @@ export default function AdminProjectAssignment() {
     // Dynamic Options State
     const [projectStatuses, setProjectStatuses] = useState<string[]>([]);
     const [projectTypes, setProjectTypes] = useState<string[]>([]);
+    const [projectPriorities, setProjectPriorities] = useState<string[]>([]);
 
 
     // Fetch Clients & Team & Board Data Logic
@@ -75,10 +81,20 @@ export default function AdminProjectAssignment() {
                 );
 
                 const teamMembers = teamBoards.map((b: any) => {
-                    return b.name.replace(/ - Workspace/i, "").trim();
+                    // Extract name: "John Mark Ormido (C-W-3)" -> "John Mark Ormido"
+                    // Also handle "John Name - Workspace"
+                    let cleanName = b.name.replace(/ - Workspace/i, "").trim();
+                    cleanName = cleanName.replace(/\s*\(.*?\)\s*/g, "").trim(); // Remove (...) content
+
+                    return {
+                        name: cleanName,
+                        id: b.id
+                    };
                 });
-                const uniqueTeam = Array.from(new Set(teamMembers)).sort() as string[];
-                setAvailableTeam(uniqueTeam);
+                // Unique by name, prefer ones with ID if duplicates (imperfect but simple)
+                // Actually map returns objects, let's just sort by name
+                teamMembers.sort((a: any, b: any) => a.name.localeCompare(b.name));
+                setAvailableTeam(teamMembers);
 
                 // --- FETCH VE PROJECT BOARD (Source 2 & Status/Type) ---
                 const projectBoard = boards.find((b: any) =>
@@ -88,6 +104,7 @@ export default function AdminProjectAssignment() {
                 );
 
                 if (projectBoard) {
+                    setVeProjectBoardId(projectBoard.id);
 
                     // A. Fetch Columns for Status/Type
                     const columns = await getBoardColumns(projectBoard.id);
@@ -122,6 +139,25 @@ export default function AdminProjectAssignment() {
                                 setProjectTypes(labels);
                                 setFormData(prev => ({ ...prev, projectType: labels[0] }));
                             }
+                            if (labels.length > 0) {
+                                setProjectTypes(labels);
+                                setFormData(prev => ({ ...prev, projectType: labels[0] }));
+                            }
+                        } catch (e) { }
+                    }
+
+                    // 3. Priority
+                    const priorityCol = columns.find((c: any) => c.title.toLowerCase() === 'priority');
+                    if (priorityCol && priorityCol.settings_str) {
+                        try {
+                            const settings = JSON.parse(priorityCol.settings_str);
+                            let labels: string[] = [];
+                            if (settings.labels) labels = Object.values(settings.labels);
+                            labels = labels.filter(l => l && l.trim().length > 0 && l.toLowerCase() !== 'default');
+                            if (labels.length > 0) {
+                                setProjectPriorities(labels);
+                                setFormData(prev => ({ ...prev, priority: labels[0] }));
+                            }
                         } catch (e) { }
                     }
 
@@ -155,6 +191,14 @@ export default function AdminProjectAssignment() {
                         }
                     }
 
+                    // C. Fetch Groups for Submission Mapping
+                    try {
+                        const groups = await getBoardGroups(projectBoard.id);
+                        if (groups) setVeBoardGroups(groups);
+                    } catch (e) {
+                        console.error("Failed to fetch groups", e);
+                    }
+
                 }
 
             } catch (error: any) {
@@ -166,6 +210,41 @@ export default function AdminProjectAssignment() {
 
         fetchData();
     }, []);
+
+    const handleSubmit = async () => {
+        if (!veProjectBoardId) {
+            alert("Configuration Error: VE Project Board not found.");
+            return;
+        }
+
+        setLoadingClients(true);
+        try {
+            // Find Group ID
+            const targetGroup = veBoardGroups.find(g => g.title.toLowerCase() === formData.client.toLowerCase());
+            const groupId = targetGroup ? targetGroup.id : 'topics'; // Default to top group if mismatch
+
+            if (!targetGroup) console.warn(`Group not found for client: ${formData.client}. Using default.`);
+
+            await submitProjectAssignment(veProjectBoardId, groupId, {
+                itemName: formData.projectName,
+                status: formData.projectStatus,
+                type: formData.projectType,
+                editor: formData.editor,
+                price: formData.price,
+                timeline: formData.deadline,
+                priority: formData.priority,
+                instructions: formData.instructions
+            });
+
+            alert("Project Assigned Successfully!");
+            navigate('/admin-portal/management');
+        } catch (error) {
+            console.error(error);
+            alert("Failed to create assignment. Check console.");
+        } finally {
+            setLoadingClients(false);
+        }
+    };
 
     const handleNext = () => setStep(prev => prev + 1);
     const handleBack = () => setStep(prev => prev - 1);
@@ -224,16 +303,44 @@ export default function AdminProjectAssignment() {
                                     Project Details
                                 </h3>
 
-                                {/* Project Name */}
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {/* Project Name */}
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-gray-300">Project Name</label>
+                                        <input
+                                            type="text"
+                                            value={formData.projectName}
+                                            onChange={(e) => setFormData({ ...formData, projectName: e.target.value })}
+                                            placeholder="e.g. Nike Commercial Edit Q1"
+                                            className="w-full bg-[#0E0E1A] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500 transition-colors placeholder:text-gray-600"
+                                        />
+                                    </div>
+
+                                    {/* Deadline */}
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-gray-300">Deadline</label>
+                                        <div className="relative">
+                                            <input
+                                                type="datetime-local"
+                                                value={formData.deadline}
+                                                onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+                                                className="w-full bg-[#0E0E1A] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500 transition-colors placeholder:text-gray-600 appearance-none [&::-webkit-calendar-picker-indicator]:invert"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Instructions */}
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-300">Project Name</label>
-                                    <input
-                                        type="text"
-                                        value={formData.projectName}
-                                        onChange={(e) => setFormData({ ...formData, projectName: e.target.value })}
-                                        placeholder="e.g. Nike Commercial Edit Q1"
-                                        className="w-full bg-[#0E0E1A] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500 transition-colors placeholder:text-gray-600"
-                                    />
+                                    <label className="text-sm font-medium text-gray-300">Instructions / Notes</label>
+                                    <div className="bg-[#0E0E1A] rounded-xl border border-white/10 overflow-hidden">
+                                        <RichTextEditor
+                                            value={formData.instructions || ''}
+                                            onChange={(val) => setFormData({ ...formData, instructions: val })}
+                                            placeholder="Enter project instructions..."
+                                            className="min-h-[150px] text-white"
+                                        />
+                                    </div>
                                 </div>
 
                                 {/* Project Status */}
@@ -274,6 +381,27 @@ export default function AdminProjectAssignment() {
                                             </button>
                                         )) : (
                                             <div className="col-span-4 text-gray-500 italic text-sm p-2">Loading Types...</div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Priority */}
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-gray-300">Priority</label>
+                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                        {projectPriorities.length > 0 ? projectPriorities.map(p => (
+                                            <button
+                                                key={p}
+                                                onClick={() => setFormData({ ...formData, priority: p })}
+                                                className={`p-4 rounded-xl border text-left transition-all ${formData.priority === p
+                                                    ? 'bg-red-500/20 border-red-500 text-white'
+                                                    : 'bg-white/5 border-white/5 text-gray-400 hover:bg-white/10'
+                                                    }`}
+                                            >
+                                                <span className="font-bold block text-sm">{p}</span>
+                                            </button>
+                                        )) : (
+                                            <div className="col-span-4 text-gray-500 italic text-sm p-2">Loading Priorities...</div>
                                         )}
                                     </div>
                                 </div>
@@ -406,28 +534,28 @@ export default function AdminProjectAssignment() {
                                 </div>
 
                                 <div className="space-y-4 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                                    {availableTeam.filter(u => u.toLowerCase().includes(teamSearch.toLowerCase())).length > 0 ? (
+                                    {availableTeam.filter(u => u.name.toLowerCase().includes(teamSearch.toLowerCase())).length > 0 ? (
                                         availableTeam
-                                            .filter(u => u.toLowerCase().includes(teamSearch.toLowerCase()))
+                                            .filter(u => u.name.toLowerCase().includes(teamSearch.toLowerCase()))
                                             .map(user => (
                                                 <button
-                                                    key={user}
-                                                    onClick={() => setFormData({ ...formData, editor: user })}
-                                                    className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${formData.editor === user
+                                                    key={user.id}
+                                                    onClick={() => setFormData({ ...formData, editor: user.name })}
+                                                    className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${formData.editor === user.name
                                                         ? 'bg-blue-500/20 border-blue-500'
                                                         : 'bg-white/5 border-white/5 hover:bg-white/10'
                                                         }`}
                                                 >
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-600 flex items-center justify-center text-white font-bold">
-                                                            {user.charAt(0)}
+                                                            {user.name.charAt(0)}
                                                         </div>
                                                         <div className="text-left">
-                                                            <p className="text-white font-bold">{user}</p>
+                                                            <p className="text-white font-bold">{user.name}</p>
                                                             <p className="text-xs text-gray-400">Team Member</p>
                                                         </div>
                                                     </div>
-                                                    {formData.editor === user && <Check className="w-5 h-5 text-blue-400" />}
+                                                    {formData.editor === user.name && <Check className="w-5 h-5 text-blue-400" />}
                                                 </button>
                                             ))
                                     ) : (
@@ -450,15 +578,16 @@ export default function AdminProjectAssignment() {
                         </button>
 
                         <button
-                            onClick={step === 3 ? () => console.log('Submit', formData) : handleNext}
-                            className="px-8 py-3 rounded-full bg-white text-black font-bold hover:bg-custom-bright hover:text-white transition-all flex items-center gap-2"
+                            onClick={step === 3 ? handleSubmit : handleNext}
+                            disabled={loadingClients}
+                            className={`px-8 py-3 rounded-full bg-white text-black font-bold hover:bg-custom-bright hover:text-white transition-all flex items-center gap-2 ${loadingClients ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
-                            {step === 3 ? 'Create Assignment' : 'Continue'}
+                            {loadingClients ? 'Processing...' : (step === 3 ? 'Create Assignment' : 'Continue')}
 
                         </button>
                     </div>
                 </GlassCard>
-            </div>
-        </AdminPageLayout>
+            </div >
+        </AdminPageLayout >
     );
 }

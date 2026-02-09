@@ -30,6 +30,25 @@ async function delay(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+export async function getUsers() {
+    const query = `query {
+        users (limit: 500) {
+            id
+            name
+            email
+            is_guest
+        }
+    }`;
+    const response = await mondayRequest(query);
+
+    if (!response?.users) {
+        console.error("Failed to fetch users from Monday.com", response);
+        return [];
+    }
+
+    return response.users;
+}
+
 async function mondayRequest(query: string, variables?: any, retries = 3, backoff = 1000) {
     try {
         const response = await fetch(MONDAY_API_URL, {
@@ -212,6 +231,21 @@ async function getOrCreateGroup(boardId: string, groupName: string): Promise<str
     return createData.create_group.id;
 }
 
+export async function getBoardGroups(boardId: string) {
+    return getCachedOrFetch(`groups_${boardId}`, async () => {
+        const query = `query {
+            boards (ids: [${boardId}]) {
+                groups {
+                    id
+                    title
+                }
+            }
+        }`;
+        const data = await mondayRequest(query);
+        return data.boards[0]?.groups || [];
+    }, true);
+}
+
 async function createColumn(boardId: string, title: string, type: string, label?: string) {
     const query = `mutation {
         create_column (board_id: ${boardId}, title: "${label || title}", column_type: ${type}) {
@@ -336,7 +370,7 @@ export async function submitApplicationToMonday(data: ApplicationData) {
             create_item (board_id: $boardId, group_id: $groupId, item_name: $itemName, column_values: $columnValues, create_labels_if_missing: true) {
                 id
             }
-        }`;
+            }`;
 
         const variables = {
             boardId: Number(boardId),
@@ -850,3 +884,145 @@ function generateMockAnalytics() {
         ]
     };
 }
+
+export async function submitProjectAssignment(
+    boardId: string,
+    groupId: string,
+    data: {
+        itemName: string,
+        status?: string,
+        type?: string,
+        editor?: string,
+        price?: string,
+        timeline?: string,
+        priority?: string,
+        instructions?: string
+    }
+) {
+    // 1. Fetch Columns to map IDs
+    const columns = await getBoardColumns(boardId);
+
+    const getColId = (title: string) => columns.find((c: any) => c.title.toLowerCase().includes(title.toLowerCase()))?.id;
+
+    const statusId = getColId('status') || 'status'; // fallback
+    const typeId = getColId('type') || 'type';
+    const priceId = getColId('price') || getColId('budget') || 'numbers';
+    const instructionId = getColId('instruction') || getColId('notes') || 'text';
+    const priorityId = getColId('priority');
+
+    const columnValues: any = {};
+
+    if (data.status) columnValues[statusId] = { label: data.status };
+    if (data.type) columnValues[typeId] = { label: data.type };
+    if (data.price) columnValues[priceId] = data.price;
+    if (data.priority && priorityId) columnValues[priorityId] = { label: data.priority };
+    if (data.instructions) columnValues[instructionId] = { text: data.instructions };
+
+    // Editor Logic for VE Board: Handle both People (Editor) and Text (Editors) columns
+    if (data.editor) {
+        // 1. Try to find the People column (usually named "Editor")
+        const peopleCol = columns.find((c: any) => c.type === 'people' && c.title.toLowerCase() === 'editor')
+            || columns.find((c: any) => c.type === 'people' && c.title.toLowerCase().includes('editor'));
+
+        // 2. Try to find the Text/Status column (usually named "Editors")
+        const textCol = columns.find((c: any) => c.title.toLowerCase() === 'editors')
+            || columns.find((c: any) => (c.type === 'text' || c.type === 'status') && c.title.toLowerCase().includes('editor'));
+
+        // Assign to People Column
+        if (peopleCol) {
+            try {
+                const allUsers = await getUsers();
+                // data.editor is the clean name "John Mark Ormido"
+                const matchedUser = allUsers.find((u: any) => u.name.toLowerCase() === data.editor?.toLowerCase());
+                if (matchedUser) {
+                    columnValues[peopleCol.id] = { personsAndTeams: [{ id: Number(matchedUser.id), kind: "person" }] };
+                } else {
+                    console.warn(`Could not find Monday User ID for editor: ${data.editor}`);
+                }
+            } catch (err) {
+                console.error("Failed to map editor to User ID", err);
+            }
+        }
+
+        // Assign to Text/Status Column (if distinct from people column)
+        if (textCol && textCol.id !== peopleCol?.id) {
+            if (textCol.type === 'text') {
+                columnValues[textCol.id] = data.editor;
+            } else if (['status', 'dropdown'].includes(textCol.type)) {
+                columnValues[textCol.id] = { label: data.editor };
+            }
+        }
+    }
+
+    // NEW: Deadline / Date Logic
+    const deadlineId = getColId('deadline') || getColId('date') || getColId('timeline');
+    if (data.timeline && deadlineId) {
+        const col = columns.find((c: any) => c.id === deadlineId);
+        if (col?.type === 'date') {
+            // Check if input is datetime-local (YYYY-MM-DDTHH:mm)
+            if (data.timeline.includes('T')) {
+                let [datePart, timePart] = data.timeline.split('T');
+                // Ensure time has seconds (HH:mm:ss) required by Monday API
+                if (timePart.length === 5) {
+                    timePart += ':00';
+                }
+                columnValues[deadlineId] = { date: datePart, time: timePart };
+            } else {
+                columnValues[deadlineId] = { date: data.timeline };
+            }
+        } else if (col?.type === 'timeline') {
+            // Timeline usually doesn't support time well via API in this simple format, send date
+            const dateOnly = data.timeline.split('T')[0];
+            columnValues[deadlineId] = { from: dateOnly, to: dateOnly };
+        } else {
+            // Text fallback - pretty print roughly
+            columnValues[deadlineId] = data.timeline.replace('T', ' ');
+        }
+    }
+
+    // Note: Editor Board submission removed - handled by Monday.com automations
+
+    // IMPORTANT: Two-step process to ensure automations are triggered
+    // Step 1: Create the item WITHOUT column values
+    const createQuery = `mutation ($boardId: ID!, $groupId: String!, $itemName: String!) {
+        create_item (board_id: $boardId, group_id: $groupId, item_name: $itemName) {
+            id
+        }
+    }`;
+
+    console.log("[DEBUG] Creating item:", data.itemName);
+
+    const createVariables = {
+        boardId: Number(boardId),
+        groupId,
+        itemName: data.itemName
+    };
+
+    const createResult = await mondayRequest(createQuery, createVariables);
+    const newItemId = createResult.create_item.id;
+
+    console.log("[DEBUG] Item created with ID:", newItemId);
+
+    // Step 2: Update column values to trigger automations
+    if (Object.keys(columnValues).length > 0) {
+        const updateQuery = `mutation ($boardId: ID!, $itemId: ID!, $columnValues: JSON!) {
+            change_multiple_column_values (board_id: $boardId, item_id: $itemId, column_values: $columnValues) {
+                id
+            }
+        }`;
+
+        console.log("[DEBUG] Final Column Values Payload:", JSON.stringify(columnValues, null, 2));
+
+        const updateVariables = {
+            boardId: Number(boardId),
+            itemId: Number(newItemId),
+            columnValues: JSON.stringify(columnValues)
+        };
+
+        await mondayRequest(updateQuery, updateVariables);
+        console.log("[DEBUG] Column values updated successfully");
+    }
+
+    return createResult;
+}
+
