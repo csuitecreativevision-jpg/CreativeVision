@@ -151,6 +151,7 @@ async function ensureColumnsExist(boardId: string) {
                 id
                 title
                 type
+                settings_str
             }
         }
     }`;
@@ -400,6 +401,7 @@ export async function getAllWorkspaces() {
             id
             name
             kind
+            }
         }
     }`;
         const data = await mondayRequest(query);
@@ -409,46 +411,105 @@ export async function getAllWorkspaces() {
 
 export async function getBoardItems(boardId: string) {
     return getCachedOrFetch(boardId, async () => {
+        let allItems: any[] = [];
+        let cursor: string | null = null;
+        let hasMore = true;
+
+        // Initial Fetch
         const query = `query {
-        boards (ids: [${boardId}]) {
-            name
-            columns {
-                id
-                title
-                type
-                settings_str
-            }
-            groups {
-                id
-                title
-                color
-            }
-            items_page (limit: 50) {
-                items {
+            boards (ids: [${boardId}]) {
+                name
+                columns {
                     id
-                    name
-                    created_at
-                    group {
+                    title
+                    type
+                    settings_str
+                }
+                groups {
+                    id
+                    title
+                    color
+                }
+                items_page (limit: 500) {
+                    cursor
+                    items {
                         id
-                    }
-                    column_values {
-                        id
-                        text
-                        value
-                        type
-                        ... on MirrorValue {
-                            display_value
+                        name
+                        created_at
+                        group {
+                            id
+                        }
+                        column_values {
+                            id
+                            text
+                            value
+                            type
+                            ... on MirrorValue {
+                                display_value
+                            }
                         }
                     }
                 }
             }
-        }
-    }`;
+        }`;
+
         const data = await mondayRequest(query);
         const board = data.boards[0];
-        // Flatten items structure for easier consumption
+
         if (board && board.items_page) {
-            board.items = board.items_page.items;
+            allItems = [...board.items_page.items];
+            cursor = board.items_page.cursor;
+        }
+
+        // Pagination Loop
+        while (cursor) {
+            const nextQuery = `query {
+                next_items_page (limit: 500, cursor: "${cursor}") {
+                    cursor
+                    items {
+                        id
+                        name
+                        created_at
+                        group {
+                            id
+                        }
+                        column_values {
+                            id
+                            text
+                            value
+                            type
+                            ... on MirrorValue {
+                                display_value
+                            }
+                        }
+                    }
+                }
+            }`;
+
+            try {
+                // Wait a bit to be nice to the API
+                await new Promise(resolve => setTimeout(resolve, 200));
+
+                const nextData = await mondayRequest(nextQuery);
+                if (nextData && nextData.next_items_page) {
+                    allItems = [...allItems, ...nextData.next_items_page.items];
+                    cursor = nextData.next_items_page.cursor;
+                    // Safety break
+                    if (allItems.length > 5000) {
+                        console.warn("Reached 5000 items limit, stopping pagination.");
+                        break;
+                    }
+                } else {
+                    cursor = null;
+                }
+            } catch (e) {
+                console.error("Error fetching next page of items", e);
+                cursor = null;
+            }
+        }
+
+        if (board) {
+            board.items = allItems;
         }
         return board;
     }, false); // meta=false -> cache_monday_board_items
@@ -583,6 +644,7 @@ export async function getMultipleBoardActivityLogs(boardIds: string[], fromDate:
         const query = `query {
             boards (ids: [${chunk.join(',')}]) {
                 id
+                name
                 activity_logs (from: "${fromDate}"${colFilter}, limit: 1000) {
                     id
                     event

@@ -8,7 +8,9 @@ import {
     Check,
     ArrowLeft,
     DollarSign,
-    Search
+    Search,
+    BookOpen,
+    Layers
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getAllBoards, getBoardColumns } from '../../services/mondayService';
@@ -18,7 +20,8 @@ export default function AdminProjectAssignment() {
     const [step, setStep] = useState(1);
 
     // Data State
-    const [availableClients, setAvailableClients] = useState<string[]>([]);
+    const [availableClients, setAvailableClients] = useState<string[]>([]); // Source 1: Active Clients (Boards)
+    const [veBoardClients, setVeBoardClients] = useState<string[]>([]);     // Source 2: VE Project Board (Labels)
     const [availableTeam, setAvailableTeam] = useState<string[]>([]);
     const [loadingClients, setLoadingClients] = useState(false);
 
@@ -26,8 +29,9 @@ export default function AdminProjectAssignment() {
     // Form State
     const [formData, setFormData] = useState({
         projectName: '',
-        projectStatus: '', // Was projectType, now Project Status
-        projectType: '',   // NEW: Type column
+        projectStatus: '',
+        projectType: '',
+        clientSource: 'active_clients', // 'active_clients' | 've_board'
         client: '',
         price: '',
         editor: '',
@@ -46,16 +50,11 @@ export default function AdminProjectAssignment() {
     useEffect(() => {
         const fetchData = async () => {
             setLoadingClients(true);
-            const logs: string[] = [];
             try {
-                logs.push("Starting data fetch...");
-
                 // 1. Fetch All Boards
                 const boards = await getAllBoards();
-                logs.push(`Fetched ${boards?.length || 0} total boards.`);
 
-                // --- FETCH CLIENTS ---
-                // Pattern: "[Client Name] - Fulfillment Board"
+                // --- FETCH CLIENTS (Source 1: Active Clients / Fulfillment Boards) ---
                 const clientBoards = boards.filter((b: any) =>
                     (b.name.toLowerCase().includes('fulfillment board') ||
                         b.name.toLowerCase().includes('fullfillment board')) &&
@@ -66,13 +65,10 @@ export default function AdminProjectAssignment() {
                     return b.name.replace(/ - ?Full?fillment Board/i, "").trim();
                 });
                 const uniqueClients = Array.from(new Set(clients)).sort() as string[];
-                logs.push(`Extracted ${uniqueClients.length} unique clients: ${uniqueClients.join(', ')}`);
-
                 setAvailableClients(uniqueClients);
 
 
                 // --- FETCH TEAM ---
-                // Pattern: "[User Name] - Workspace"
                 const teamBoards = boards.filter((b: any) =>
                     b.name.toLowerCase().includes(' - workspace') &&
                     !b.name.startsWith("Subitems")
@@ -83,10 +79,8 @@ export default function AdminProjectAssignment() {
                 });
                 const uniqueTeam = Array.from(new Set(teamMembers)).sort() as string[];
                 setAvailableTeam(uniqueTeam);
-                logs.push(`Found ${uniqueTeam.length} team members: ${uniqueTeam.join(', ')}`);
 
-                // --- FETCH PROJECT DETAILS From "VE Project Board" ---
-                // Target: "VE Project Board"
+                // --- FETCH VE PROJECT BOARD (Source 2 & Status/Type) ---
                 const projectBoard = boards.find((b: any) =>
                     (b.name.toLowerCase().includes('ve project board') ||
                         b.name.toLowerCase().includes('video editing project')) &&
@@ -94,89 +88,78 @@ export default function AdminProjectAssignment() {
                 );
 
                 if (projectBoard) {
-                    logs.push(`Found Project Board: ${projectBoard.name} (${projectBoard.id})`);
 
+                    // A. Fetch Columns for Status/Type
                     const columns = await getBoardColumns(projectBoard.id);
 
-                    // DEBUG: Log all columns to help find the right one
-                    logs.push(`--- Columns on ${projectBoard.name} ---`);
-                    columns.forEach((c: any) => logs.push(`[${c.id}] ${c.title} (${c.type})`));
-                    logs.push(`-----------------------------------`);
-
-                    // 1. PROJECT STATUS (formerly Project Type)
+                    // 1. Project Status
                     const statusCol = columns.find((c: any) =>
                         c.title.toLowerCase() === 'project status' ||
-                        (c.title.toLowerCase() === 'status' && c.id !== 'status') // prioritized last
+                        (c.title.toLowerCase() === 'status' && c.id !== 'status')
                     );
-
                     if (statusCol && statusCol.settings_str) {
                         try {
                             const settings = JSON.parse(statusCol.settings_str);
-                            // Monday.com settings_str structure for status:
-                            // { labels: { "0": "Working on it", "1": "Done", ... }, labels_positions_v2: { ... } }
-                            // or sometimes just labels map.
-
                             let labels: string[] = [];
-                            if (settings.labels) {
-                                labels = Object.values(settings.labels);
-                            }
-
-                            // Filter out default/irrelevant labels if needed
-                            // For now, take them all, maybe filter empty strings
-                            labels = labels.filter(l => l && l.trim().length > 0 && l.toLowerCase() !== 'default'); // 'default' is sometimes a key, sometimes a label? Usually labels are values.
-
+                            if (settings.labels) labels = Object.values(settings.labels);
+                            labels = labels.filter(l => l && l.trim().length > 0 && l.toLowerCase() !== 'default');
                             if (labels.length > 0) {
                                 setProjectStatuses(labels);
                                 setFormData(prev => ({ ...prev, projectStatus: labels[0] }));
-                                logs.push(`Extracted Statuses: ${labels.join(', ')}`);
-                            } else {
-                                logs.push("⚠️ No labels found in status column.");
                             }
-                        } catch (e) {
-                            console.error("Error parsing status column settings", e);
-                            logs.push("❌ Error parsing status settings");
-                        }
-                    } else {
-                        logs.push("⚠️ 'Project Status' column not found.");
+                        } catch (e) { }
                     }
 
-                    // 2. PROJECT TYPE (New field from 'Type' column)
-                    const typeCol = columns.find((c: any) =>
-                        c.title.toLowerCase() === 'type' ||
-                        c.title.toLowerCase() === 'project type'
-                    );
-
+                    // 2. Project Type
+                    const typeCol = columns.find((c: any) => c.title.toLowerCase() === 'type' || c.title.toLowerCase() === 'project type');
                     if (typeCol && typeCol.settings_str) {
                         try {
                             const settings = JSON.parse(typeCol.settings_str);
                             let labels: string[] = [];
                             if (settings.labels) labels = Object.values(settings.labels);
                             labels = labels.filter(l => l && l.trim().length > 0 && l.toLowerCase() !== 'default');
-
                             if (labels.length > 0) {
                                 setProjectTypes(labels);
                                 setFormData(prev => ({ ...prev, projectType: labels[0] }));
-                                logs.push(`Extracted Types: ${labels.join(', ')}`);
-                            } else {
-                                logs.push("⚠️ No labels found in type column.");
                             }
-                        } catch (e) {
-                            console.error("Error parsing type column settings", e);
-                            logs.push("❌ Error parsing type settings");
-                        }
-                    } else {
-                        logs.push("⚠️ 'Type' column not found.");
+                        } catch (e) { }
                     }
 
-                } else {
-                    logs.push("⚠️ 'VE Project Board' not found.");
+                    // B. Fetch Clients from VE Project Board (Source 2)
+                    // Strategy: Extract labels from "Client" Status/Dropdown column settings.
+                    const clientCol = columns.find((c: any) => c.title.toLowerCase() === 'client');
+
+                    if (clientCol && clientCol.settings_str) {
+                        try {
+                            const settings = JSON.parse(clientCol.settings_str);
+                            let labels: string[] = [];
+
+                            // Handle Status Column (Map: { "0": "Label", ... })
+                            if (settings.labels && !Array.isArray(settings.labels) && typeof settings.labels === 'object') {
+                                labels = Object.values(settings.labels);
+                            }
+                            // Handle Dropdown Column (Array: [{name: "Label"}, ...])
+                            else if (settings.labels && Array.isArray(settings.labels)) {
+                                labels = settings.labels.map((l: any) => l.name);
+                            }
+
+                            // Filter valid labels
+                            labels = labels.filter(l => l && typeof l === 'string' && l.trim().length > 0 && l.toLowerCase() !== 'default');
+
+                            if (labels.length > 0) {
+                                const uniqueVeClients = Array.from(new Set(labels)).sort();
+                                setVeBoardClients(uniqueVeClients);
+                            }
+                        } catch (e) {
+                            console.error(e);
+                        }
+                    }
+
                 }
 
             } catch (error: any) {
                 console.error("Failed to fetch data", error);
-                logs.push(`❌ Error: ${error.message || error}`);
             } finally {
-                setLoadingClients(false);
                 setLoadingClients(false);
             }
         };
@@ -205,6 +188,10 @@ export default function AdminProjectAssignment() {
             ))}
         </div>
     );
+
+    // Filter clients based on source and search
+    const currentClientList = formData.clientSource === 'active_clients' ? availableClients : veBoardClients;
+    const filteredClients = currentClientList.filter(c => c.toLowerCase().includes(clientSearch.toLowerCase()));
 
     return (
         <AdminPageLayout
@@ -249,7 +236,7 @@ export default function AdminProjectAssignment() {
                                     />
                                 </div>
 
-                                {/* Project Status (Formerly Project Type) */}
+                                {/* Project Status */}
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-gray-300">Project Status</label>
                                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -270,7 +257,7 @@ export default function AdminProjectAssignment() {
                                     </div>
                                 </div>
 
-                                {/* Project Type (New - from Type column) */}
+                                {/* Project Type */}
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-gray-300">Project Type</label>
                                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -290,7 +277,6 @@ export default function AdminProjectAssignment() {
                                         )}
                                     </div>
                                 </div>
-
                             </motion.div>
                         )}
 
@@ -307,10 +293,37 @@ export default function AdminProjectAssignment() {
                                     Client & Pricing
                                 </h3>
 
-                                {/* Client (Likely from Fulfillment Board) */}
+                                {/* Source Toggle */}
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-gray-300">Client Source</label>
+                                    <div className="flex p-1 bg-black/40 rounded-xl border border-white/5 w-fit">
+                                        <button
+                                            onClick={() => setFormData({ ...formData, clientSource: 'active_clients' })}
+                                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${formData.clientSource === 'active_clients'
+                                                ? 'bg-violet-500 text-white shadow-lg'
+                                                : 'text-gray-400 hover:text-white'
+                                                }`}
+                                        >
+                                            <Layers className="w-4 h-4" />
+                                            Active Clients (Folder)
+                                        </button>
+                                        <button
+                                            onClick={() => setFormData({ ...formData, clientSource: 've_board' })}
+                                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${formData.clientSource === 've_board'
+                                                ? 'bg-violet-500 text-white shadow-lg'
+                                                : 'text-gray-400 hover:text-white'
+                                                }`}
+                                        >
+                                            <BookOpen className="w-4 h-4" />
+                                            VE Project Board
+                                        </button>
+                                    </div>
+                                </div>
+
+
+                                {/* Client Selection */}
                                 <div className="space-y-2 relative">
-                                    <label className="text-sm font-medium text-gray-300">Client</label>
-                                    {/* Search Client */}
+                                    <label className="text-sm font-medium text-gray-300">Select Client</label>
                                     <div className="relative mb-4">
                                         <div className="relative">
                                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
@@ -318,7 +331,7 @@ export default function AdminProjectAssignment() {
                                                 type="text"
                                                 value={clientSearch}
                                                 onChange={(e) => setClientSearch(e.target.value)}
-                                                placeholder="Search or select client..."
+                                                placeholder={`Search in ${formData.clientSource === 'active_clients' ? 'Active Clients' : 'VE Board'}...`}
                                                 className="w-full bg-[#0E0E1A] border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-violet-500 transition-colors placeholder:text-gray-600"
                                             />
                                         </div>
@@ -326,25 +339,23 @@ export default function AdminProjectAssignment() {
 
                                     {/* Client List */}
                                     <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                                        {availableClients.filter(c => c.toLowerCase().includes(clientSearch.toLowerCase())).length > 0 ? (
-                                            availableClients
-                                                .filter(c => c.toLowerCase().includes(clientSearch.toLowerCase()))
-                                                .map((client, idx) => (
-                                                    <button
-                                                        key={idx}
-                                                        onClick={() => setFormData({ ...formData, client: client })}
-                                                        className={`w-full text-left px-4 py-3 rounded-xl transition-all flex items-center justify-between ${formData.client === client
-                                                            ? 'bg-violet-500/20 border border-violet-500 text-white'
-                                                            : 'bg-white/5 border border-white/5 text-gray-300 hover:bg-white/10 hover:text-white'
-                                                            }`}
-                                                    >
-                                                        <span className="font-medium">{client}</span>
-                                                        {formData.client === client && <Check className="w-4 h-4 text-violet-400" />}
-                                                    </button>
-                                                ))
+                                        {filteredClients.length > 0 ? (
+                                            filteredClients.map((client, idx) => (
+                                                <button
+                                                    key={`${client}-${idx}`}
+                                                    onClick={() => setFormData({ ...formData, client: client })}
+                                                    className={`w-full text-left px-4 py-3 rounded-xl transition-all flex items-center justify-between ${formData.client === client
+                                                        ? 'bg-violet-500/20 border-violet-500 text-white'
+                                                        : 'bg-white/5 border-white/5 text-gray-300 hover:bg-white/10 hover:text-white'
+                                                        }`}
+                                                >
+                                                    <span className="font-medium">{client}</span>
+                                                    {formData.client === client && <Check className="w-4 h-4 text-violet-400" />}
+                                                </button>
+                                            ))
                                         ) : (
                                             <div className="text-center py-4 text-gray-500 bg-white/5 rounded-xl border border-white/5 border-dashed">
-                                                {loadingClients ? "Loading clients..." : "No clients found."}
+                                                {loadingClients ? "Loading clients..." : "No clients found in this source."}
                                             </div>
                                         )}
                                     </div>
@@ -364,6 +375,8 @@ export default function AdminProjectAssignment() {
                                         />
                                     </div>
                                 </div>
+
+
                             </motion.div>
                         )}
 
