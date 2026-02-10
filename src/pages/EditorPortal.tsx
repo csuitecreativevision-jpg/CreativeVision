@@ -118,7 +118,6 @@ function EditorPortalContent() {
                         <button
                             key={board.id}
                             onClick={async () => {
-                                triggerRefresh();
                                 setLoading(true);
                                 try {
                                     const fullBoardData = await getBoardItems(board.id);
@@ -235,7 +234,6 @@ function EditorPortalContent() {
                                                         '#f59e0b', // Amber
                                                     ][index % 5]}
                                                     onClick={async () => {
-                                                        triggerRefresh();
                                                         setLoading(true);
                                                         try {
                                                             const fullBoardData = await getBoardItems(board.id);

@@ -137,7 +137,6 @@ function ClientPortalContent() {
                         <button
                             key={board.id}
                             onClick={async () => {
-                                triggerRefresh();
                                 setLoading(true);
                                 try {
                                     const fullBoardData = await getBoardItems(board.id);
@@ -261,7 +260,6 @@ function ClientPortalContent() {
                                                         '#14b8a6', // Teal
                                                     ][index % 5]}
                                                     onClick={async () => {
-                                                        triggerRefresh();
                                                         setLoading(true);
                                                         try {
                                                             const fullBoardData = await getBoardItems(board.id);

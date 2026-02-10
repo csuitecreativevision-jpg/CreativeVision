@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { ArrowUpRight, Calendar, Clock, Sparkles } from 'lucide-react';
+import { forwardRef } from 'react';
 
 interface ProjectCardProps {
     name: string;
@@ -11,17 +12,21 @@ interface ProjectCardProps {
     index?: number;
 }
 
-export const ProjectCard = ({
-    name,
-    status = 'Active',
-    cycle,
-    date,
-    color = '#8b5cf6',
-    onClick,
-    index = 0
-}: ProjectCardProps) => {
+export const ProjectCard = forwardRef<HTMLDivElement, ProjectCardProps>((
+    {
+        name,
+        status = 'Active',
+        cycle,
+        date,
+        color = '#8b5cf6',
+        onClick,
+        index = 0
+    },
+    ref
+) => {
     return (
         <motion.div
+            ref={ref}
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: index * 0.05, duration: 0.4 }}
@@ -86,4 +91,6 @@ export const ProjectCard = ({
             </div>
         </motion.div>
     );
-};
+});
+
+ProjectCard.displayName = 'ProjectCard';

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode, useCallback, useRef } from 'react';
 
 interface RefreshContextType {
     refreshKey: number;
@@ -9,10 +9,19 @@ const RefreshContext = createContext<RefreshContextType | undefined>(undefined);
 
 export function RefreshProvider({ children }: { children: ReactNode }) {
     const [refreshKey, setRefreshKey] = useState(0);
+    const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    const triggerRefresh = () => {
-        setRefreshKey(prev => prev + 1);
-    };
+    const triggerRefresh = useCallback(() => {
+        // Clear any pending refresh
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+        }
+
+        // Debounce refresh to prevent API flooding (300ms delay)
+        debounceTimerRef.current = setTimeout(() => {
+            setRefreshKey(prev => prev + 1);
+        }, 300);
+    }, []);
 
     return (
         <RefreshContext.Provider value={{ refreshKey, triggerRefresh }}>

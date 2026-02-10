@@ -148,8 +148,6 @@ export default function AdminTeam() {
                                                 '#f59e0b', // Amber
                                             ][index % 5]}
                                             onClick={async () => {
-                                                // Trigger refresh when card is selected
-                                                triggerRefresh();
                                                 try {
                                                     const fullBoardData = await getBoardItems(board.id);
                                                     setSelectedBoard(fullBoardData);
