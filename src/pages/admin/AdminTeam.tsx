@@ -6,6 +6,7 @@ import { ProjectSelectionView } from '../../components/views/ProjectSelectionVie
 import { getAllBoards, getBoardItems } from '../../services/mondayService';
 import { supabase } from '../../lib/supabaseClient';
 import { FilePreviewModal, useProtectedPreview } from '../../components/ui/FilePreviewModal';
+import { useRefresh } from '../../contexts/RefreshContext';
 
 export default function AdminTeam() {
     // State
@@ -13,11 +14,12 @@ export default function AdminTeam() {
     const [boards, setBoards] = useState<any[]>([]);
     const [selectedBoard, setSelectedBoard] = useState<any | null>(null);
     const { previewFile, isLoading: isPreviewLoading, setPreviewFile, closePreview } = useProtectedPreview();
+    const { refreshKey, triggerRefresh } = useRefresh();
 
-    // Fetch Data
+    // Fetch Data on mount and when refreshKey changes
     useEffect(() => {
         loadTeamBoards();
-    }, []);
+    }, [refreshKey]);
 
     const loadTeamBoards = async () => {
         setLoading(true);
@@ -146,8 +148,8 @@ export default function AdminTeam() {
                                                 '#f59e0b', // Amber
                                             ][index % 5]}
                                             onClick={async () => {
-                                                // Set selected board immediately to show loading state (if desired) or simple transition
-                                                // Ideally, we fetch detailed items now
+                                                // Trigger refresh when card is selected
+                                                triggerRefresh();
                                                 try {
                                                     const fullBoardData = await getBoardItems(board.id);
                                                     setSelectedBoard(fullBoardData);

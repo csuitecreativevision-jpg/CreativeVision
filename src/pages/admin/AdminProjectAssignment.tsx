@@ -8,7 +8,6 @@ import {
     Check,
     ArrowLeft,
     DollarSign,
-    Search,
     BookOpen,
     Layers
 } from 'lucide-react';
@@ -16,13 +15,15 @@ import { useNavigate } from 'react-router-dom';
 import { getAllBoards, getBoardColumns, getBoardGroups, submitProjectAssignment } from '../../services/mondayService';
 import { RichTextEditor } from '../../components/ui/RichTextEditor';
 
+import { SelectionModal } from '../../components/ui/SelectionModal';
+
 export default function AdminProjectAssignment() {
     const navigate = useNavigate();
     const [step, setStep] = useState(1);
+    const [activeModal, setActiveModal] = useState<'status' | 'type' | 'priority' | 'client' | 'team' | null>(null);
 
     // Data State
-    const [availableClients, setAvailableClients] = useState<string[]>([]); // Source 1: Active Clients (Boards)
-    const [veBoardClients, setVeBoardClients] = useState<string[]>([]);     // Source 2: VE Project Board (Labels)
+    const [availableClients, setAvailableClients] = useState<string[]>([]); // Active Clients (Fulfillment Boards)
     const [veBoardGroups, setVeBoardGroups] = useState<{ id: string, title: string }[]>([]); // For Submission Mapping
     const [availableTeam, setAvailableTeam] = useState<{ name: string, id: string }[]>([]);
     const [loadingClients, setLoadingClients] = useState(false);
@@ -34,7 +35,6 @@ export default function AdminProjectAssignment() {
         projectName: '',
         projectStatus: '',
         projectType: '',
-        clientSource: 'active_clients', // 'active_clients' | 've_board'
         client: '',
         price: '',
         editor: '',
@@ -43,8 +43,7 @@ export default function AdminProjectAssignment() {
         instructions: ''
     });
 
-    const [teamSearch, setTeamSearch] = useState('');
-    const [clientSearch, setClientSearch] = useState('');
+
 
     // Dynamic Options State
     const [projectStatuses, setProjectStatuses] = useState<string[]>([]);
@@ -60,21 +59,8 @@ export default function AdminProjectAssignment() {
                 // 1. Fetch All Boards
                 const boards = await getAllBoards();
 
-                // --- FETCH CLIENTS (Source 1: Active Clients / Fulfillment Boards) ---
-                const clientBoards = boards.filter((b: any) =>
-                    (b.name.toLowerCase().includes('fulfillment board') ||
-                        b.name.toLowerCase().includes('fullfillment board')) &&
-                    !b.name.startsWith("Subitems")
-                );
-
-                const clients = clientBoards.map((b: any) => {
-                    return b.name.replace(/ - ?Full?fillment Board/i, "").trim();
-                });
-                const uniqueClients = Array.from(new Set(clients)).sort() as string[];
-                setAvailableClients(uniqueClients);
-
-
                 // --- FETCH TEAM ---
+
                 const teamBoards = boards.filter((b: any) =>
                     b.name.toLowerCase().includes(' - workspace') &&
                     !b.name.startsWith("Subitems")
@@ -139,10 +125,6 @@ export default function AdminProjectAssignment() {
                                 setProjectTypes(labels);
                                 setFormData(prev => ({ ...prev, projectType: labels[0] }));
                             }
-                            if (labels.length > 0) {
-                                setProjectTypes(labels);
-                                setFormData(prev => ({ ...prev, projectType: labels[0] }));
-                            }
                         } catch (e) { }
                     }
 
@@ -161,10 +143,8 @@ export default function AdminProjectAssignment() {
                         } catch (e) { }
                     }
 
-                    // B. Fetch Clients from VE Project Board (Source 2)
-                    // Strategy: Extract labels from "Client" Status/Dropdown column settings.
+                    // 4. Clients (from VE Project Board)
                     const clientCol = columns.find((c: any) => c.title.toLowerCase() === 'client');
-
                     if (clientCol && clientCol.settings_str) {
                         try {
                             const settings = JSON.parse(clientCol.settings_str);
@@ -183,15 +163,15 @@ export default function AdminProjectAssignment() {
                             labels = labels.filter(l => l && typeof l === 'string' && l.trim().length > 0 && l.toLowerCase() !== 'default');
 
                             if (labels.length > 0) {
-                                const uniqueVeClients = Array.from(new Set(labels)).sort();
-                                setVeBoardClients(uniqueVeClients);
+                                const uniqueClients = Array.from(new Set(labels)).sort();
+                                setAvailableClients(uniqueClients);
                             }
                         } catch (e) {
-                            console.error(e);
+                            console.error("Failed to fetch clients from VE Board", e);
                         }
                     }
 
-                    // C. Fetch Groups for Submission Mapping
+                    // B. Fetch Groups for Submission Mapping
                     try {
                         const groups = await getBoardGroups(projectBoard.id);
                         if (groups) setVeBoardGroups(groups);
@@ -268,10 +248,6 @@ export default function AdminProjectAssignment() {
         </div>
     );
 
-    // Filter clients based on source and search
-    const currentClientList = formData.clientSource === 'active_clients' ? availableClients : veBoardClients;
-    const filteredClients = currentClientList.filter(c => c.toLowerCase().includes(clientSearch.toLowerCase()));
-
     return (
         <AdminPageLayout
             title="Project Assignment"
@@ -343,233 +319,161 @@ export default function AdminProjectAssignment() {
                                     </div>
                                 </div>
 
-                                {/* Project Status */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-300">Project Status</label>
-                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                                        {projectStatuses.length > 0 ? projectStatuses.map(status => (
-                                            <button
-                                                key={status}
-                                                onClick={() => setFormData({ ...formData, projectStatus: status })}
-                                                className={`p-4 rounded-xl border text-left transition-all ${formData.projectStatus === status
-                                                    ? 'bg-violet-500/20 border-violet-500 text-white'
-                                                    : 'bg-white/5 border-white/5 text-gray-400 hover:bg-white/10'
-                                                    }`}
-                                            >
-                                                <span className="font-bold block text-sm">{status}</span>
-                                            </button>
-                                        )) : (
-                                            <div className="col-span-4 text-gray-500 italic text-sm p-2">Loading Statuses...</div>
-                                        )}
+                                {/* MODAL SELECTION SECTION */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    {/* Project Status */}
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-gray-300">Project Status</label>
+                                        <button
+                                            onClick={() => setActiveModal('status')}
+                                            className="w-full p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-violet-500/50 transition-all text-left flex items-center justify-between group"
+                                        >
+                                            <div>
+                                                <span className="text-xs text-violet-400 uppercase tracking-wider font-bold mb-1 block">Current Status</span>
+                                                <span className="text-lg font-bold text-white block truncate">
+                                                    {formData.projectStatus || 'Select Status...'}
+                                                </span>
+                                            </div>
+                                            <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-violet-500 group-hover:text-white transition-colors">
+                                                <Layers className="w-5 h-5 text-gray-400 group-hover:text-white" />
+                                            </div>
+                                        </button>
                                     </div>
-                                </div>
 
-                                {/* Project Type */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-300">Project Type</label>
-                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                                        {projectTypes.length > 0 ? projectTypes.map(type => (
-                                            <button
-                                                key={type}
-                                                onClick={() => setFormData({ ...formData, projectType: type })}
-                                                className={`p-4 rounded-xl border text-left transition-all ${formData.projectType === type
-                                                    ? 'bg-blue-500/20 border-blue-500 text-white'
-                                                    : 'bg-white/5 border-white/5 text-gray-400 hover:bg-white/10'
-                                                    }`}
-                                            >
-                                                <span className="font-bold block text-sm">{type}</span>
-                                            </button>
-                                        )) : (
-                                            <div className="col-span-4 text-gray-500 italic text-sm p-2">Loading Types...</div>
-                                        )}
+                                    {/* Project Type */}
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-gray-300">Project Type</label>
+                                        <button
+                                            onClick={() => setActiveModal('type')}
+                                            className="w-full p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-blue-500/50 transition-all text-left flex items-center justify-between group"
+                                        >
+                                            <div>
+                                                <span className="text-xs text-blue-400 uppercase tracking-wider font-bold mb-1 block">Type</span>
+                                                <span className="text-lg font-bold text-white block truncate">
+                                                    {formData.projectType || 'Select Type...'}
+                                                </span>
+                                            </div>
+                                            <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                                                <BookOpen className="w-5 h-5 text-gray-400 group-hover:text-white" />
+                                            </div>
+                                        </button>
                                     </div>
-                                </div>
 
-                                {/* Priority */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-300">Priority</label>
-                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                                        {projectPriorities.length > 0 ? projectPriorities.map(p => (
-                                            <button
-                                                key={p}
-                                                onClick={() => setFormData({ ...formData, priority: p })}
-                                                className={`p-4 rounded-xl border text-left transition-all ${formData.priority === p
-                                                    ? 'bg-red-500/20 border-red-500 text-white'
-                                                    : 'bg-white/5 border-white/5 text-gray-400 hover:bg-white/10'
-                                                    }`}
-                                            >
-                                                <span className="font-bold block text-sm">{p}</span>
-                                            </button>
-                                        )) : (
-                                            <div className="col-span-4 text-gray-500 italic text-sm p-2">Loading Priorities...</div>
-                                        )}
+                                    {/* Priority */}
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-gray-300">Priority</label>
+                                        <button
+                                            onClick={() => setActiveModal('priority')}
+                                            className="w-full p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-red-500/50 transition-all text-left flex items-center justify-between group"
+                                        >
+                                            <div>
+                                                <span className="text-xs text-red-400 uppercase tracking-wider font-bold mb-1 block">Priority</span>
+                                                <span className="text-lg font-bold text-white block truncate">
+                                                    {formData.priority || 'Select Priority...'}
+                                                </span>
+                                            </div>
+                                            <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-red-500 group-hover:text-white transition-colors">
+                                                <Layers className="w-5 h-5 text-gray-400 group-hover:text-white" />
+                                            </div>
+                                        </button>
                                     </div>
                                 </div>
                             </motion.div>
-                        )}
+                        )
+                        }
 
-                        {step === 2 && (
-                            <motion.div
-                                key="step2"
-                                initial={{ opacity: 0, x: 20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: -20 }}
-                                className="space-y-6"
-                            >
-                                <h3 className="text-xl font-bold text-white mb-6 flex items-center">
-                                    <DollarSign className="w-5 h-5 mr-3 text-emerald-400" />
-                                    Client & Pricing
-                                </h3>
+                        {
+                            step === 2 && (
+                                <motion.div
+                                    key="step2"
+                                    initial={{ opacity: 0, x: 20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -20 }}
+                                    className="space-y-6"
+                                >
+                                    <h3 className="text-xl font-bold text-white mb-6 flex items-center">
+                                        <DollarSign className="w-5 h-5 mr-3 text-emerald-400" />
+                                        Client & Pricing
+                                    </h3>
 
-                                {/* Source Toggle */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-300">Client Source</label>
-                                    <div className="flex p-1 bg-black/40 rounded-xl border border-white/5 w-fit">
+                                    {/* Client Selection Card */}
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-gray-300">Select Client</label>
                                         <button
-                                            onClick={() => setFormData({ ...formData, clientSource: 'active_clients' })}
-                                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${formData.clientSource === 'active_clients'
-                                                ? 'bg-violet-500 text-white shadow-lg'
-                                                : 'text-gray-400 hover:text-white'
-                                                }`}
+                                            onClick={() => setActiveModal('client')}
+                                            className="w-full p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-emerald-500/50 transition-all text-left flex items-center justify-between group"
                                         >
-                                            <Layers className="w-4 h-4" />
-                                            Active Clients (Folder)
-                                        </button>
-                                        <button
-                                            onClick={() => setFormData({ ...formData, clientSource: 've_board' })}
-                                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${formData.clientSource === 've_board'
-                                                ? 'bg-violet-500 text-white shadow-lg'
-                                                : 'text-gray-400 hover:text-white'
-                                                }`}
-                                        >
-                                            <BookOpen className="w-4 h-4" />
-                                            VE Project Board
+                                            <div>
+                                                <span className="text-xs text-emerald-400 uppercase tracking-wider font-bold mb-1 block">Client</span>
+                                                <span className="text-lg font-bold text-white block truncate">
+                                                    {formData.client || 'Select Client...'}
+                                                </span>
+                                            </div>
+                                            <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                                                <User className="w-5 h-5 text-gray-400 group-hover:text-white" />
+                                            </div>
                                         </button>
                                     </div>
-                                </div>
 
-
-                                {/* Client Selection */}
-                                <div className="space-y-2 relative">
-                                    <label className="text-sm font-medium text-gray-300">Select Client</label>
-                                    <div className="relative mb-4">
+                                    {/* Price */}
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-gray-300">Project Budget / Price (PHP)</label>
                                         <div className="relative">
-                                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">₱</div>
                                             <input
-                                                type="text"
-                                                value={clientSearch}
-                                                onChange={(e) => setClientSearch(e.target.value)}
-                                                placeholder={`Search in ${formData.clientSource === 'active_clients' ? 'Active Clients' : 'VE Board'}...`}
-                                                className="w-full bg-[#0E0E1A] border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-violet-500 transition-colors placeholder:text-gray-600"
+                                                type="number"
+                                                value={formData.price}
+                                                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                                                placeholder="0.00"
+                                                className="w-full bg-[#0E0E1A] border border-white/10 rounded-xl pl-8 pr-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors placeholder:text-gray-600 font-mono"
                                             />
                                         </div>
                                     </div>
 
-                                    {/* Client List */}
-                                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                                        {filteredClients.length > 0 ? (
-                                            filteredClients.map((client, idx) => (
-                                                <button
-                                                    key={`${client}-${idx}`}
-                                                    onClick={() => setFormData({ ...formData, client: client })}
-                                                    className={`w-full text-left px-4 py-3 rounded-xl transition-all flex items-center justify-between ${formData.client === client
-                                                        ? 'bg-violet-500/20 border-violet-500 text-white'
-                                                        : 'bg-white/5 border-white/5 text-gray-300 hover:bg-white/10 hover:text-white'
-                                                        }`}
-                                                >
-                                                    <span className="font-medium">{client}</span>
-                                                    {formData.client === client && <Check className="w-4 h-4 text-violet-400" />}
-                                                </button>
-                                            ))
-                                        ) : (
-                                            <div className="text-center py-4 text-gray-500 bg-white/5 rounded-xl border border-white/5 border-dashed">
-                                                {loadingClients ? "Loading clients..." : "No clients found in this source."}
+
+                                </motion.div>
+                            )
+                        }
+
+                        {
+                            step === 3 && (
+                                <motion.div
+                                    key="step3"
+                                    initial={{ opacity: 0, x: 20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -20 }}
+                                    className="space-y-6"
+                                >
+                                    <h3 className="text-xl font-bold text-white mb-6 flex items-center">
+                                        <User className="w-5 h-5 mr-3 text-blue-400" />
+                                        Assign to Team
+                                    </h3>
+
+                                    {/* Team Member Selection Card */}
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-gray-300">Select Team Member</label>
+                                        <button
+                                            onClick={() => setActiveModal('team')}
+                                            className="w-full p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-blue-500/50 transition-all text-left flex items-center justify-between group"
+                                        >
+                                            <div>
+                                                <span className="text-xs text-blue-400 uppercase tracking-wider font-bold mb-1 block">Team Member</span>
+                                                <span className="text-lg font-bold text-white block truncate">
+                                                    {formData.editor || 'Select Team Member...'}
+                                                </span>
                                             </div>
-                                        )}
+                                            <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                                                <User className="w-5 h-5 text-gray-400 group-hover:text-white" />
+                                            </div>
+                                        </button>
                                     </div>
-                                </div>
-
-                                {/* Price */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-300">Project Budget / Price</label>
-                                    <div className="relative">
-                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</div>
-                                        <input
-                                            type="number"
-                                            value={formData.price}
-                                            onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                                            placeholder="0.00"
-                                            className="w-full bg-[#0E0E1A] border border-white/10 rounded-xl pl-8 pr-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors placeholder:text-gray-600 font-mono"
-                                        />
-                                    </div>
-                                </div>
-
-
-                            </motion.div>
-                        )}
-
-                        {step === 3 && (
-                            <motion.div
-                                key="step3"
-                                initial={{ opacity: 0, x: 20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: -20 }}
-                                className="space-y-6"
-                            >
-                                <h3 className="text-xl font-bold text-white mb-6 flex items-center">
-                                    <User className="w-5 h-5 mr-3 text-blue-400" />
-                                    Assign to Team
-                                </h3>
-
-                                {/* Search Team */}
-                                <div className="relative mb-4">
-                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                                    <input
-                                        type="text"
-                                        value={teamSearch}
-                                        onChange={(e) => setTeamSearch(e.target.value)}
-                                        placeholder="Search team members..."
-                                        className="w-full bg-[#0E0E1A] border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors placeholder:text-gray-600"
-                                    />
-                                </div>
-
-                                <div className="space-y-4 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                                    {availableTeam.filter(u => u.name.toLowerCase().includes(teamSearch.toLowerCase())).length > 0 ? (
-                                        availableTeam
-                                            .filter(u => u.name.toLowerCase().includes(teamSearch.toLowerCase()))
-                                            .map(user => (
-                                                <button
-                                                    key={user.id}
-                                                    onClick={() => setFormData({ ...formData, editor: user.name })}
-                                                    className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${formData.editor === user.name
-                                                        ? 'bg-blue-500/20 border-blue-500'
-                                                        : 'bg-white/5 border-white/5 hover:bg-white/10'
-                                                        }`}
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-600 flex items-center justify-center text-white font-bold">
-                                                            {user.name.charAt(0)}
-                                                        </div>
-                                                        <div className="text-left">
-                                                            <p className="text-white font-bold">{user.name}</p>
-                                                            <p className="text-xs text-gray-400">Team Member</p>
-                                                        </div>
-                                                    </div>
-                                                    {formData.editor === user.name && <Check className="w-5 h-5 text-blue-400" />}
-                                                </button>
-                                            ))
-                                    ) : (
-                                        <div className="text-center py-8 text-gray-500">
-                                            {loadingClients ? "Loading team members..." : "No team members found."}
-                                        </div>
-                                    )}
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+                                </motion.div>
+                            )
+                        }
+                    </AnimatePresence >
 
                     {/* Navigation Buttons */}
-                    <div className="flex items-center justify-between mt-10 pt-6 border-t border-white/5">
+                    < div className="flex items-center justify-between mt-10 pt-6 border-t border-white/5" >
                         <button
                             onClick={step === 1 ? () => navigate('/admin-portal/management') : handleBack}
                             className="px-6 py-2 text-gray-400 hover:text-white transition-colors"
@@ -585,9 +489,56 @@ export default function AdminProjectAssignment() {
                             {loadingClients ? 'Processing...' : (step === 3 ? 'Create Assignment' : 'Continue')}
 
                         </button>
-                    </div>
-                </GlassCard>
-            </div >
-        </AdminPageLayout >
+                    </div >
+                </GlassCard >
+            </div>
+
+            {/* Selection Modals */}
+            <SelectionModal
+                isOpen={activeModal === 'status'}
+                onClose={() => setActiveModal(null)}
+                title="Select Project Status"
+                options={projectStatuses}
+                selected={formData.projectStatus}
+                onSelect={(val) => setFormData({ ...formData, projectStatus: val })}
+                icon={Layers}
+            />
+            <SelectionModal
+                isOpen={activeModal === 'type'}
+                onClose={() => setActiveModal(null)}
+                title="Select Project Type"
+                options={projectTypes}
+                selected={formData.projectType}
+                onSelect={(val) => setFormData({ ...formData, projectType: val })}
+                icon={BookOpen}
+            />
+            <SelectionModal
+                isOpen={activeModal === 'priority'}
+                onClose={() => setActiveModal(null)}
+                title="Select Priority"
+                options={projectPriorities}
+                selected={formData.priority}
+                onSelect={(val) => setFormData({ ...formData, priority: val })}
+                icon={Layers}
+            />
+            <SelectionModal
+                isOpen={activeModal === 'client'}
+                onClose={() => setActiveModal(null)}
+                title="Select Client"
+                options={availableClients}
+                selected={formData.client}
+                onSelect={(val) => setFormData({ ...formData, client: val })}
+                icon={User}
+            />
+            <SelectionModal
+                isOpen={activeModal === 'team'}
+                onClose={() => setActiveModal(null)}
+                title="Select Team Member"
+                options={availableTeam.map(u => u.name)}
+                selected={formData.editor}
+                onSelect={(val) => setFormData({ ...formData, editor: val })}
+                icon={User}
+            />
+        </AdminPageLayout>
     );
 }

@@ -18,8 +18,9 @@ import { getAllBoards, getBoardItems, getAllFolders } from '../services/mondaySe
 import { supabase } from '../lib/supabaseClient';
 import { FilePreviewModal, useProtectedPreview } from '../components/ui/FilePreviewModal';
 import { useNavigate } from 'react-router-dom';
+import { RefreshProvider, useRefresh } from '../contexts/RefreshContext';
 
-export default function ClientPortal() {
+function ClientPortalContent() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [boards, setBoards] = useState<any[]>([]);
@@ -27,6 +28,7 @@ export default function ClientPortal() {
     const [currentUserName, setCurrentUserName] = useState<string | null>(null);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const { previewFile, isLoading: isPreviewLoading, setPreviewFile, closePreview } = useProtectedPreview();
+    const { refreshKey, triggerRefresh } = useRefresh();
 
     useEffect(() => {
         setCurrentUserName(localStorage.getItem('portal_user_name'));
@@ -104,7 +106,7 @@ export default function ClientPortal() {
 
     useEffect(() => {
         loadData();
-    }, []);
+    }, [refreshKey]);
 
     const handleLogout = () => {
         localStorage.clear();
@@ -135,6 +137,7 @@ export default function ClientPortal() {
                         <button
                             key={board.id}
                             onClick={async () => {
+                                triggerRefresh();
                                 setLoading(true);
                                 try {
                                     const fullBoardData = await getBoardItems(board.id);
@@ -258,6 +261,7 @@ export default function ClientPortal() {
                                                         '#14b8a6', // Teal
                                                     ][index % 5]}
                                                     onClick={async () => {
+                                                        triggerRefresh();
                                                         setLoading(true);
                                                         try {
                                                             const fullBoardData = await getBoardItems(board.id);
@@ -330,5 +334,13 @@ export default function ClientPortal() {
                 </div>
             }
         />
+    );
+}
+
+export default function ClientPortal() {
+    return (
+        <RefreshProvider>
+            <ClientPortalContent />
+        </RefreshProvider>
     );
 }

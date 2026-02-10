@@ -16,11 +16,13 @@ import { getAllBoards, getBoardItems } from '../services/mondayService';
 import { supabase } from '../services/boardsService';
 import { FilePreviewModal, useProtectedPreview } from '../components/ui/FilePreviewModal';
 import { useNavigate } from 'react-router-dom';
+import { RefreshProvider, useRefresh } from '../contexts/RefreshContext';
 
-export default function EditorPortal() {
+function EditorPortalContent() {
     const navigate = useNavigate();
     const { previewFile, isLoading: isPreviewLoading, setPreviewFile, closePreview } = useProtectedPreview();
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const { refreshKey, triggerRefresh } = useRefresh();
 
     // State
     const [loading, setLoading] = useState(true);
@@ -40,7 +42,7 @@ export default function EditorPortal() {
             return;
         }
         loadEditorBoards();
-    }, [navigate]);
+    }, [navigate, refreshKey]);
 
     const loadEditorBoards = async () => {
         setLoading(true);
@@ -116,6 +118,7 @@ export default function EditorPortal() {
                         <button
                             key={board.id}
                             onClick={async () => {
+                                triggerRefresh();
                                 setLoading(true);
                                 try {
                                     const fullBoardData = await getBoardItems(board.id);
@@ -232,6 +235,7 @@ export default function EditorPortal() {
                                                         '#f59e0b', // Amber
                                                     ][index % 5]}
                                                     onClick={async () => {
+                                                        triggerRefresh();
                                                         setLoading(true);
                                                         try {
                                                             const fullBoardData = await getBoardItems(board.id);
@@ -305,5 +309,13 @@ export default function EditorPortal() {
                 </div>
             }
         />
+    );
+}
+
+export default function EditorPortal() {
+    return (
+        <RefreshProvider>
+            <EditorPortalContent />
+        </RefreshProvider>
     );
 }

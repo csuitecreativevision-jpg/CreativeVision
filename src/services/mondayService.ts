@@ -918,15 +918,12 @@ export async function submitProjectAssignment(
     if (data.priority && priorityId) columnValues[priorityId] = { label: data.priority };
     if (data.instructions) columnValues[instructionId] = { text: data.instructions };
 
-    // Editor Logic for VE Board: Handle both People (Editor) and Text (Editors) columns
+
+    // Editor Logic for VE Board: Assign to People column only
     if (data.editor) {
-        // 1. Try to find the People column (usually named "Editor")
+        // Find the People column (usually named "Editor")
         const peopleCol = columns.find((c: any) => c.type === 'people' && c.title.toLowerCase() === 'editor')
             || columns.find((c: any) => c.type === 'people' && c.title.toLowerCase().includes('editor'));
-
-        // 2. Try to find the Text/Status column (usually named "Editors")
-        const textCol = columns.find((c: any) => c.title.toLowerCase() === 'editors')
-            || columns.find((c: any) => (c.type === 'text' || c.type === 'status') && c.title.toLowerCase().includes('editor'));
 
         // Assign to People Column
         if (peopleCol) {
@@ -941,15 +938,6 @@ export async function submitProjectAssignment(
                 }
             } catch (err) {
                 console.error("Failed to map editor to User ID", err);
-            }
-        }
-
-        // Assign to Text/Status Column (if distinct from people column)
-        if (textCol && textCol.id !== peopleCol?.id) {
-            if (textCol.type === 'text') {
-                columnValues[textCol.id] = data.editor;
-            } else if (['status', 'dropdown'].includes(textCol.type)) {
-                columnValues[textCol.id] = { label: data.editor };
             }
         }
     }
@@ -990,8 +978,6 @@ export async function submitProjectAssignment(
         }
     }`;
 
-    console.log("[DEBUG] Creating item:", data.itemName);
-
     const createVariables = {
         boardId: Number(boardId),
         groupId,
@@ -1001,8 +987,6 @@ export async function submitProjectAssignment(
     const createResult = await mondayRequest(createQuery, createVariables);
     const newItemId = createResult.create_item.id;
 
-    console.log("[DEBUG] Item created with ID:", newItemId);
-
     // Step 2: Update column values to trigger automations
     if (Object.keys(columnValues).length > 0) {
         const updateQuery = `mutation ($boardId: ID!, $itemId: ID!, $columnValues: JSON!) {
@@ -1011,8 +995,6 @@ export async function submitProjectAssignment(
             }
         }`;
 
-        console.log("[DEBUG] Final Column Values Payload:", JSON.stringify(columnValues, null, 2));
-
         const updateVariables = {
             boardId: Number(boardId),
             itemId: Number(newItemId),
@@ -1020,7 +1002,6 @@ export async function submitProjectAssignment(
         };
 
         await mondayRequest(updateQuery, updateVariables);
-        console.log("[DEBUG] Column values updated successfully");
     }
 
     return createResult;

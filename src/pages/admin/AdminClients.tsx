@@ -6,6 +6,7 @@ import { ProjectSelectionView } from '../../components/views/ProjectSelectionVie
 import { getAllBoards, getBoardItems, getAllFolders } from '../../services/mondayService';
 import { supabase } from '../../lib/supabaseClient';
 import { FilePreviewModal, useProtectedPreview } from '../../components/ui/FilePreviewModal';
+import { useRefresh } from '../../contexts/RefreshContext';
 
 export default function AdminClients() {
     // State
@@ -14,11 +15,12 @@ export default function AdminClients() {
     const [selectedBoard, setSelectedBoard] = useState<any | null>(null);
     const [showInactive, setShowInactive] = useState(false); // Reverted to Toggle
     const { previewFile, isLoading: isPreviewLoading, setPreviewFile, closePreview } = useProtectedPreview();
+    const { refreshKey, triggerRefresh } = useRefresh();
 
-    // Fetch Data
+    // Fetch Data on mount and when refreshKey changes
     useEffect(() => {
         loadData();
-    }, []);
+    }, [refreshKey]);
 
     const loadData = async () => {
         setLoading(true);
@@ -195,6 +197,8 @@ export default function AdminClients() {
                                                 '#14b8a6', // Teal
                                             ][index % 5]}
                                             onClick={async () => {
+                                                // Trigger refresh when card is selected
+                                                triggerRefresh();
                                                 try {
                                                     const fullBoardData = await getBoardItems(board.id);
                                                     setSelectedBoard(fullBoardData);

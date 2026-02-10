@@ -12,11 +12,13 @@ import {
     LayoutList
 } from 'lucide-react';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
+import { RefreshProvider, useRefresh } from '../contexts/RefreshContext';
 
-export default function AdminPortal() {
+function AdminPortalContent() {
     const navigate = useNavigate();
     const location = useLocation();
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const { triggerRefresh } = useRefresh();
 
     // Strict Role Check
     useEffect(() => {
@@ -69,9 +71,25 @@ export default function AdminPortal() {
                     {currentUserRole === 'admin' && (
                         <>
                             <SidebarItem icon={<LayoutList className="w-5 h-5" />} label="Management" active={activeTab === 'Management'} onClick={() => navigate('/admin-portal/management')} />
-                            <SidebarItem icon={<Briefcase className="w-5 h-5" />} label="Clients" active={activeTab === 'Clients'} onClick={() => navigate('/admin-portal/clients')} />
+                            <SidebarItem
+                                icon={<Briefcase className="w-5 h-5" />}
+                                label="Clients"
+                                active={activeTab === 'Clients'}
+                                onClick={() => {
+                                    triggerRefresh();
+                                    navigate('/admin-portal/clients');
+                                }}
+                            />
                             <SidebarItem icon={<Activity className="w-5 h-5" />} label="Analytics" active={activeTab === 'Analytics'} onClick={() => navigate('/admin-portal/analytics')} />
-                            <SidebarItem icon={<Users className="w-5 h-5" />} label="Team" active={activeTab === 'Team'} onClick={() => navigate('/admin-portal/team')} />
+                            <SidebarItem
+                                icon={<Users className="w-5 h-5" />}
+                                label="Team"
+                                active={activeTab === 'Team'}
+                                onClick={() => {
+                                    triggerRefresh();
+                                    navigate('/admin-portal/team');
+                                }}
+                            />
                             <SidebarItem icon={<Settings className="w-5 h-5" />} label="Settings" active={activeTab === 'Settings'} onClick={() => navigate('/admin-portal/settings')} />
                         </>
                     )}
@@ -114,5 +132,13 @@ export default function AdminPortal() {
                 </>
             }
         />
+    );
+}
+
+export default function AdminPortal() {
+    return (
+        <RefreshProvider>
+            <AdminPortalContent />
+        </RefreshProvider>
     );
 }
