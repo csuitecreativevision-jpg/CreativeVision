@@ -3,8 +3,8 @@ import { AdminPageLayout } from '../../components/layout/AdminPageLayout';
 import { AnalyticCard } from '../../components/analytics/AnalyticCard';
 import { AnalyticAreaChart } from '../../components/analytics/AnalyticAreaChart';
 import { AnalyticBarChart } from '../../components/analytics/AnalyticBarChart';
-import { DateFilterModal } from '../../components/analytics/DateFilterModal';
-import { Play, Filter, Users, Calendar, ChevronDown } from 'lucide-react';
+import { AnalyticsFilterModal } from '../../components/analytics/AnalyticsFilterModal';
+import { Play, Filter, Users, Calendar, Settings2 } from 'lucide-react';
 
 export default function AdminAnalytics() {
     const [loading, setLoading] = useState(true);
@@ -17,10 +17,7 @@ export default function AdminAnalytics() {
 
     // Filter State
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
-    const [dateFilter, setDateFilter] = useState<{ year: number, month: number | null } | null>(null);
-
-    // Dropdown State
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [dateFilter, setDateFilter] = useState<{ year: number, month: number | null, cycle: string } | null>(null);
 
     // View Mode: 'productivity' (Videos) or 'earnings' (Payments)
     const [viewMode, setViewMode] = useState<'productivity' | 'earnings'>('productivity');
@@ -48,10 +45,11 @@ export default function AdminAnalytics() {
                     const monthName = parts[1];
                     const year = parseInt(parts[2]);
                     const month = new Date(`${monthName} 1, 2000`).getMonth() + 1;
-                    // Default to Specific Month so Bar Chart matches specific cycle
-                    setDateFilter({ year, month });
+
+                    // Default to Specific Month & Cycle
+                    setDateFilter({ year, month, cycle: latest });
+                    setSelectedCycle(latest);
                 }
-                setSelectedCycle(latest);
             }
         } catch (error) {
             console.error("Failed to load analytics:", error);
@@ -66,9 +64,10 @@ export default function AdminAnalytics() {
         return match ? parseInt(match[0]) : new Date().getFullYear();
     }))).sort((a, b) => b - a);
 
-    // Derived State: Filtered Cycles based on Date Filter
+    // Filter Logic is now handled by the Modal selection, we just use dateFilter state directly
     const filteredCycles = availableCycles.filter(cycle => {
         if (!dateFilter) return true;
+
         const cycleYear = parseInt(cycle.match(/\d{4}/)?.[0] || '0');
         const cycleMonthName = cycle.split(' ')[0];
         const cycleMonth = new Date(`${cycleMonthName} 1, 2000`).getMonth() + 1;
@@ -81,50 +80,84 @@ export default function AdminAnalytics() {
         return cycleYear === dateFilter.year && cycleMonth === dateFilter.month;
     });
 
-    const handleDateFilterApply = (year: number, month: number | null) => {
-        setDateFilter({ year, month });
-
-        if (month !== null) {
-            const monthName = new Date(2000, month - 1).toLocaleString('default', { month: 'long' });
-            // Find cycles matching this filter
-            const matching = availableCycles.filter(c => c.includes(`${monthName} ${year}`));
-            if (matching.length > 0) {
-                // AUTO-SELECT LATEST CYCLE for that month
-                setSelectedCycle(matching[0]);
-            } else {
-                setSelectedCycle('');
-            }
-        } else {
-            // Full Year -> Default to All Cycles (Empty String)
-            setSelectedCycle('');
-        }
+    const handleFilterApply = (year: number, month: number | null, cycle: string) => {
+        setDateFilter({ year, month, cycle });
+        setSelectedCycle(cycle); // Cycle is now explicitly passed from modal
     };
 
-    // Aggregation: Get Monthly Trend Data for the Selected Year
+    // Aggregation: Get Monthly Trend Data for the Selected Year AND Previous Year
     const getMonthlyTrendData = () => {
         const sourceData = viewMode === 'productivity' ? cycleData : paymentData;
         if (!sourceData) return [];
 
         const targetYear = dateFilter?.year || new Date().getFullYear();
+        const previousYear = targetYear - 1;
+
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonthIndex = now.getMonth(); // 0-11
+
         const months = [
             'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
             'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
         ];
 
         return months.map((monthName, index) => {
-            // Find all cycles matching this Month + Year
             const longMonth = new Date(targetYear, index).toLocaleString('default', { month: 'long' });
 
-            let total = 0;
+            // Future Data Logic: If target is current year and month is in future, return null
+            if (targetYear === currentYear && index > currentMonthIndex) {
+                // Still calculate previous year if needed, but current usage implies we might want to stop line
+                // If we return null for value, chart stops.
+                // We still might want previousValue? Yes, usually.
+                // But let's check sourceData for previous year regardless.
+
+                let previousTotal = 0;
+                Object.keys(sourceData).forEach(key => {
+                    if (key.includes(`${longMonth} ${previousYear}`)) {
+                        const cycleTotal = Object.values(sourceData[key]).reduce((acc: any, val: any) => acc + val, 0);
+                        previousTotal += cycleTotal;
+                    }
+                });
+
+                return { name: monthName, value: null, previousValue: previousTotal };
+            }
+
+            let currentTotal = 0;
+            let previousTotal = 0;
+
             Object.keys(sourceData).forEach(key => {
-                if (key.includes(`${longMonth} ${targetYear}`)) {
-                    // Sum up all editors' values for this cycle
-                    const cycleTotal = Object.values(sourceData[key]).reduce((acc: any, val: any) => acc + val, 0);
-                    total += cycleTotal;
+                // Parse Month and Year from Cycle Name (e.g. "January 2026 - Cycle 1")
+                // Robust Regex to find "MonthName YYYY" pattern
+                const match = key.match(/([a-zA-Z]+) (\d{4})/);
+
+                if (match) {
+                    const [_, cycleMonthName, cycleYearStr] = match;
+                    const cycleYear = parseInt(cycleYearStr);
+
+                    // Check if Month matches current loop month
+                    // (monthName is "Jan", "Feb", etc. from the loop, cycleMonthName is "January", etc.)
+                    // We need to normalize.
+
+                    const normalizeMonth = (m: string) => new Date(`${m} 1, 2000`).getMonth();
+
+                    const isSameMonth = normalizeMonth(cycleMonthName) === index; // index is 0-11
+
+                    // Current Year Match
+                    if (isSameMonth && cycleYear === targetYear) {
+                        const cycleTotal = Object.values(sourceData[key]).reduce((acc: any, val: any) => acc + val, 0);
+                        currentTotal += cycleTotal;
+                    }
+
+                    // Previous Year Match
+                    if (isSameMonth && cycleYear === previousYear) {
+                        const cycleTotal = Object.values(sourceData[key]).reduce((acc: any, val: any) => acc + val, 0);
+                        previousTotal += cycleTotal;
+                    }
                 }
             });
 
-            return { name: monthName, value: total };
+            return { name: monthName, value: currentTotal, previousValue: previousTotal };
         });
     };
 
@@ -140,7 +173,7 @@ export default function AdminAnalytics() {
                 .sort((a: any, b: any) => b.value - a.value);
         }
 
-        // Otherwise (All Cycles), aggregate across filtered cycles
+        // Otherwise (All Cycles), aggregate across filtered cycles (based on year/month filter)
         const totals: Record<string, number> = {};
 
         filteredCycles.forEach(cycle => {
@@ -184,6 +217,15 @@ export default function AdminAnalytics() {
 
     const formatCurrency = (val: number) => {
         return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(val);
+    };
+
+    const getFilterLabel = () => {
+        if (!dateFilter) return "Loading...";
+        const { year, month, cycle } = dateFilter;
+
+        if (cycle) return cycle;
+        if (month) return `${new Date(2000, month - 1).toLocaleString('default', { month: 'long' })} ${year} (All Cycles)`;
+        return `${year} (Full Year)`;
     };
 
     return (
@@ -232,72 +274,24 @@ export default function AdminAnalytics() {
                     {/* Controls & KPIs */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-                        {/* Cycle Selector */}
-                        <div className="bg-[#0e0e1a] p-6 rounded-2xl border border-white/5 flex flex-col justify-center space-y-3 relative">
-                            <label className="text-gray-400 text-sm font-bold flex items-center gap-2 mb-2">
-                                <Calendar className="w-4 h-4" />
-                                Select Cycle
+                        {/* Configuration Button (Unified) */}
+                        <div className="bg-[#0e0e1a] p-6 rounded-2xl border border-white/5 flex flex-col justify-center space-y-3 relative group hover:border-violet-500/30 transition-colors cursor-pointer" onClick={() => setIsFilterModalOpen(true)}>
+                            <label className="text-gray-400 text-sm font-bold flex items-center gap-2 mb-2 group-hover:text-violet-400 transition-colors">
+                                <Settings2 className="w-4 h-4" />
+                                Analytics Configuration
                             </label>
 
-                            <div className="flex gap-2">
-                                {/* Date Filter Button */}
-                                <button
-                                    onClick={() => setIsFilterModalOpen(true)}
-                                    className="flex-shrink-0 px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white font-bold transition-all flex items-center gap-2"
-                                >
-                                    {dateFilter
-                                        ? (dateFilter.month
-                                            ? `${new Date(2000, dateFilter.month - 1).toLocaleString('default', { month: 'short' })} ${dateFilter.year}`
-                                            : `${dateFilter.year} (Full Year)`)
-                                        : 'Filter Date'}
-                                    <Filter className="w-3 h-3 opacity-50" />
-                                </button>
-
-                                {/* Cycle Dropdown (Filtered) */}
-                                <div className="relative flex-grow">
-                                    <button
-                                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                        className="w-full flex items-center justify-between bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white transition-all text-left text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-                                        disabled={filteredCycles.length === 0}
-                                    >
-                                        <span className="truncate mr-2">{selectedCycle || "All Cycles"}</span>
-                                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                                    </button>
-
-                                    {isDropdownOpen && (
-                                        <div className="absolute top-full left-0 right-0 mt-2 bg-[#1a1a2e] border border-white/10 rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto">
-                                            {/* All Cycles Option */}
-                                            <button
-                                                onClick={() => {
-                                                    setSelectedCycle('');
-                                                    setIsDropdownOpen(false);
-                                                }}
-                                                className={`w-full text-left px-4 py-3 hover:bg-white/5 transition-colors text-sm border-b border-white/5 ${selectedCycle === '' ? 'text-violet-400 font-bold bg-violet-500/10' : 'text-gray-300'
-                                                    }`}
-                                            >
-                                                All Cycles
-                                            </button>
-
-                                            {filteredCycles.map(cycle => (
-                                                <button
-                                                    key={cycle}
-                                                    onClick={() => {
-                                                        setSelectedCycle(cycle);
-                                                        setIsDropdownOpen(false);
-                                                    }}
-                                                    className={`w-full text-left px-4 py-3 hover:bg-white/5 transition-colors text-sm ${selectedCycle === cycle ? 'text-violet-400 font-bold bg-violet-500/10' : 'text-gray-300'
-                                                        }`}
-                                                >
-                                                    {cycle}
-                                                </button>
-                                            ))}
-                                            {filteredCycles.length === 0 && (
-                                                <div className="px-4 py-3 text-gray-500 text-sm italic">
-                                                    No cycles found for this month.
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <div className="text-white font-bold text-lg truncate pr-4">
+                                        {getFilterLabel()}
+                                    </div>
+                                    <div className="text-xs text-gray-500 font-medium mt-1">
+                                        Click to change Year, Month, or Cycle
+                                    </div>
+                                </div>
+                                <div className="p-2 rounded-xl bg-white/5 group-hover:bg-violet-500/10 transition-colors">
+                                    <Calendar className="w-5 h-5 text-gray-400 group-hover:text-violet-400 transition-colors" />
                                 </div>
                             </div>
                         </div>
@@ -322,24 +316,26 @@ export default function AdminAnalytics() {
                     </div>
 
                     {/* Charts Section */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+                    <div className="flex flex-col gap-16 mt-8">
 
                         {/* 1. Yearly Trend (Area Chart) */}
-                        <div className="w-full h-[350px]">
+                        <div className="w-full">
                             <AnalyticAreaChart
-                                title={viewMode === 'productivity' ? `Yearly Production: ${dateFilter?.year || new Date().getFullYear()}` : `Yearly Income: ${dateFilter?.year || new Date().getFullYear()}`}
+                                title={viewMode === 'productivity' ? `Yearly Production: ${dateFilter?.year || new Date().getFullYear()} vs ${dateFilter?.year ? dateFilter.year - 1 : new Date().getFullYear() - 1}` : `Yearly Income: ${dateFilter?.year || new Date().getFullYear()} vs ${dateFilter?.year ? dateFilter.year - 1 : new Date().getFullYear() - 1}`}
                                 data={monthlyTrendData}
                                 dataKey="value"
+                                compareDataKey="previousValue"
                                 xAxisKey="name"
                                 color={viewMode === 'productivity' ? "#8b5cf6" : "#10b981"}
+                                compareColor="#64748b"
                                 delay={0.3}
-                                height={350}
+                                height={300}
                                 valuePrefix={viewMode === 'earnings' ? "₱" : ""}
                             />
                         </div>
 
                         {/* 2. Editor Breakdown (Bar Chart) */}
-                        <div className="w-full h-[350px]">
+                        <div className="w-full">
                             <AnalyticBarChart
                                 title={
                                     selectedCycle
@@ -355,20 +351,22 @@ export default function AdminAnalytics() {
                                 color={viewMode === 'productivity' ? "#8b5cf6" : "#10b981"}
                                 delay={0.4}
                                 layout="vertical"
-                                height={350}
+                                height={300}
                                 valuePrefix={viewMode === 'earnings' ? "₱" : ""}
                             />
                         </div>
                     </div>
 
-                    <DateFilterModal
+                    <AnalyticsFilterModal
                         isOpen={isFilterModalOpen}
                         onClose={() => setIsFilterModalOpen(false)}
-                        onApply={handleDateFilterApply}
+                        onApply={handleFilterApply}
                         availableYears={availableYears}
-                        initialDate={{
+                        availableCycles={availableCycles}
+                        initialFilter={{
                             year: dateFilter?.year || new Date().getFullYear(),
-                            month: dateFilter?.month || new Date().getMonth() + 1
+                            month: dateFilter?.month || null,
+                            cycle: dateFilter?.cycle || ''
                         }}
                     />
                 </div>

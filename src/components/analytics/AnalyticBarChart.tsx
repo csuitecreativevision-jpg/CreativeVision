@@ -1,4 +1,4 @@
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
 import { motion } from 'framer-motion';
 
 interface AnalyticBarChartProps {
@@ -49,7 +49,7 @@ export const AnalyticBarChart = ({
             className="w-full bg-[#0e0e1a] border border-white/5 rounded-3xl p-6 md:p-8 relative overflow-hidden"
         >
             {/* Header */}
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-bold text-white tracking-tight uppercase">{title}</h3>
                 <div className="p-2 rounded-lg bg-white/5 border border-white/5">
                     <div className="w-4 h-4 rounded-full" style={{ backgroundColor: color }} />
@@ -62,8 +62,17 @@ export const AnalyticBarChart = ({
                     <BarChart
                         data={data}
                         layout={layout}
-                        margin={{ top: 0, right: 30, left: 20, bottom: 0 }}
+                        margin={{ top: 0, right: 30, left: 10, bottom: 0 }}
                     >
+                        <defs>
+                            <linearGradient id={`gradient-${dataKey}`} x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="0%" stopColor={color} stopOpacity={0.6} />
+                                <stop offset="100%" stopColor={color} stopOpacity={1} />
+                            </linearGradient>
+                        </defs>
+
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#ffffff10" />
+
                         <XAxis
                             type="number"
                             hide
@@ -71,10 +80,11 @@ export const AnalyticBarChart = ({
                         <YAxis
                             dataKey={xAxisKey}
                             type="category"
-                            width={120}
-                            tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 600 }}
+                            width={180} // Increased width for long names
+                            tick={{ fill: '#94a3b8', fontSize: 13, fontWeight: 500 }}
                             axisLine={false}
                             tickLine={false}
+                            interval={0} // Force show all labels
                         />
                         <Tooltip
                             content={<CustomTooltip />}
@@ -82,12 +92,14 @@ export const AnalyticBarChart = ({
                         />
                         <Bar
                             dataKey={dataKey}
-                            radius={[0, 8, 8, 0]}
-                            barSize={32}
+                            radius={[0, 4, 4, 0]}
+                            barSize={12} // Very sleek bars
                             animationDuration={1500}
+                            fill={`url(#gradient-${dataKey})`}
                         >
+                            {/* Fallback to color if gradient fails, though fill above handles it */}
                             {data.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={color} fillOpacity={0.8} />
+                                <Cell key={`cell-${index}`} fill={`url(#gradient-${dataKey})`} />
                             ))}
                         </Bar>
                     </BarChart>
