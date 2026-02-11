@@ -6,6 +6,8 @@ import { AnalyticBarChart } from '../../components/analytics/AnalyticBarChart';
 import { AnalyticsFilterModal } from '../../components/analytics/AnalyticsFilterModal';
 import { Play, Filter, Users, Calendar, Settings2 } from 'lucide-react';
 
+import { getWorkspaceAnalytics } from '../../services/mondayService';
+
 export default function AdminAnalytics() {
     const [loading, setLoading] = useState(true);
 
@@ -30,7 +32,7 @@ export default function AdminAnalytics() {
         setLoading(true);
         try {
             // Fetch Cycle Based Analytics from Workspace Boards
-            const { cycles, data: cData, payments: pData } = await import('../../services/mondayService').then(m => m.getWorkspaceAnalytics());
+            const { cycles, data: cData, payments: pData } = await getWorkspaceAnalytics();
 
             setAvailableCycles(cycles);
             setCycleData(cData);
