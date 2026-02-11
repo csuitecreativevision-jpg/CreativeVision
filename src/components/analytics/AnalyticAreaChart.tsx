@@ -1,7 +1,7 @@
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer, Defs, LinearGradient, Stop } from 'recharts';
 import { motion } from 'framer-motion';
 
-interface AnalyticBarChartProps {
+interface AnalyticAreaChartProps {
     title: string;
     data: any[];
     dataKey: string;
@@ -9,11 +9,10 @@ interface AnalyticBarChartProps {
     color?: string;
     height?: number;
     delay?: number;
-    layout?: 'horizontal' | 'vertical';
-    valuePrefix?: string;
+    valuePrefix?: string; // e.g. "$" or "₱"
 }
 
-export const AnalyticBarChart = ({
+export const AnalyticAreaChart = ({
     title,
     data,
     dataKey,
@@ -21,9 +20,8 @@ export const AnalyticBarChart = ({
     color = "#8b5cf6", // Default Violet
     height = 400,
     delay = 0,
-    layout = 'vertical',
     valuePrefix = ""
-}: AnalyticBarChartProps) => {
+}: AnalyticAreaChartProps) => {
 
     // Custom Tooltip
     const CustomTooltip = ({ active, payload, label }: any) => {
@@ -50,7 +48,7 @@ export const AnalyticBarChart = ({
         >
             {/* Header */}
             <div className="flex items-center justify-between mb-8">
-                <h3 className="text-lg font-bold text-white tracking-tight uppercase">{title}</h3>
+                <h3 className="text-lg font-bold text-white tracking-tight">{title}</h3>
                 <div className="p-2 rounded-lg bg-white/5 border border-white/5">
                     <div className="w-4 h-4 rounded-full" style={{ backgroundColor: color }} />
                 </div>
@@ -59,38 +57,34 @@ export const AnalyticBarChart = ({
             {/* Chart */}
             <div style={{ height: height, width: '100%' }}>
                 <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                        data={data}
-                        layout={layout}
-                        margin={{ top: 0, right: 30, left: 20, bottom: 0 }}
-                    >
+                    <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <defs>
+                            <linearGradient id={`colorGradient-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor={color} stopOpacity={0.4} />
+                                <stop offset="95%" stopColor={color} stopOpacity={0} />
+                            </linearGradient>
+                        </defs>
+
                         <XAxis
-                            type="number"
-                            hide
-                        />
-                        <YAxis
                             dataKey={xAxisKey}
-                            type="category"
-                            width={120}
-                            tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 600 }}
                             axisLine={false}
                             tickLine={false}
+                            tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }}
+                            dy={15}
+                            interval={0} // Show all ticks (months)
                         />
-                        <Tooltip
-                            content={<CustomTooltip />}
-                            cursor={{ fill: 'rgba(255,255,255,0.05)', radius: 8 }}
-                        />
-                        <Bar
+
+                        <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 2, strokeDasharray: '5 5' }} />
+
+                        <Area
+                            type="monotone"
                             dataKey={dataKey}
-                            radius={[0, 8, 8, 0]}
-                            barSize={32}
+                            stroke={color}
+                            strokeWidth={4}
+                            fill={`url(#colorGradient-${dataKey})`}
                             animationDuration={1500}
-                        >
-                            {data.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={color} fillOpacity={0.8} />
-                            ))}
-                        </Bar>
-                    </BarChart>
+                        />
+                    </AreaChart>
                 </ResponsiveContainer>
             </div>
         </motion.div>

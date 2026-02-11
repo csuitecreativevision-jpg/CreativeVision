@@ -8,6 +8,7 @@ import {
     ChevronDown,
 } from 'lucide-react';
 import { BoardCell } from '../shared/BoardCell';
+import { getCycleFromDate } from '../../features/performance-dashboard/utils/dateUtils';
 
 interface GlobalCycleViewProps {
     boardData: any;
@@ -50,6 +51,9 @@ export const GlobalCycleView = ({ boardData, selectedBoardId, refreshBoardDetail
         });
 
     // 2. Cycle Grouping Logic
+
+
+    // ... inside component ...
     const getCycleKey = (item: any) => {
         if (!item.created_at) return 'Unknown Date';
         const date = new Date(item.created_at);
@@ -57,8 +61,8 @@ export const GlobalCycleView = ({ boardData, selectedBoardId, refreshBoardDetail
 
         const year = date.getFullYear();
         const month = date.toLocaleString('default', { month: 'long' });
-        const day = date.getDate();
-        const cycle = day <= 15 ? 1 : 2;
+        // const day = date.getDate(); // Unused now
+        const cycle = getCycleFromDate(date); // Use centralized logic
 
         return `${month} ${year} - Cycle ${cycle}`;
     };

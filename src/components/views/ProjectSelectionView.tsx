@@ -4,6 +4,7 @@ import { Search, X, Calendar, Activity } from 'lucide-react';
 import { ProjectCard } from '../shared/ProjectCard';
 import { BoardCell } from '../shared/BoardCell';
 import { PremiumModal } from '../ui/PremiumModal';
+import { getCycleFromDate } from '../../features/performance-dashboard/utils/dateUtils';
 
 interface ProjectSelectionViewProps {
     boardData: any;
@@ -51,6 +52,9 @@ export const ProjectSelectionView = ({
     }, [allItems, searchTerm, sortOrder]);
 
     // --- CYCLE LOGIC (Ported) ---
+
+
+    // ... inside component ...
     const getCycleKey = (item: any) => {
         if (!item.created_at) return 'Unknown Date';
         const date = new Date(item.created_at);
@@ -58,8 +62,8 @@ export const ProjectSelectionView = ({
 
         const year = date.getFullYear();
         const month = date.toLocaleString('default', { month: 'long' });
-        const day = date.getDate();
-        const cycle = day <= 15 ? 1 : 2;
+        // const day = date.getDate();
+        const cycle = getCycleFromDate(date);
 
         return `${month} ${year} - Cycle ${cycle}`;
     };
