@@ -8,12 +8,14 @@ interface BoardCellProps {
     item: MondayItem;
     column: MondayColumn;
     boardId: string | null;
-    allColumns?: MondayColumn[]; // NEW: For finding related columns
+    allColumns?: MondayColumn[];
+    uniqueValues?: string[]; // Pass strictly unique values from the board to populate dropdowns for Mirrors
+    dropdownOptions?: { label: string, color: string, id: string }[]; // NEW: Pass explicit options if we fetched them from source
     onUpdate: () => void;
     onPreview: (url: string, name: string, assetId?: string) => void;
 }
 
-export const BoardCell = ({ item, column, boardId, allColumns, onUpdate, onPreview }: BoardCellProps) => {
+export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dropdownOptions, onUpdate, onPreview }: BoardCellProps) => {
     // ... existing state ...
     const [isEditing, setIsEditing] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -42,9 +44,13 @@ export const BoardCell = ({ item, column, boardId, allColumns, onUpdate, onPrevi
             // Link
             if (column.type === 'link') {
                 linkUrl = val.url;
-                // If we haven't already set displayValue from mirror logic, use the link text
-                if (!colValueObj.display_value) {
-                    displayValue = val.text || val.url || displayValue;
+                // Use the link text if available, otherwise the URL
+                // If the column value has a 'text' property (from Monday), use it. 
+                // Sometimes Monday returns val.text as the label.
+                if (val.text) {
+                    displayValue = val.text;
+                } else if (val.url) {
+                    displayValue = val.url;
                 }
             }
             // Date
@@ -114,6 +120,17 @@ export const BoardCell = ({ item, column, boardId, allColumns, onUpdate, onPrevi
         }
     }
 
+    // DEBUG: temporary log to inspect settings for "Project Status"
+    if (column.title.toLowerCase().includes('status')) {
+        console.log(`[BoardCell] ${column.title} (${column.type}) Settings:`, column.settings_str);
+        console.log(`[BoardCell] Display Value:`, displayValue);
+    }
+
+    // DEBUG: Log "Priority" and "Client" column details to diagnose label issues
+    if (column.title === 'Priority' || column.title === 'Client') {
+        console.log(`[BoardCell Debug] Column: ${column.title}, Type: ${column.type}, Detail:`, column);
+    }
+
     const handleSave = async (newValue: string) => {
         if (newValue === displayValue) {
             setIsEditing(false);
@@ -181,16 +198,29 @@ export const BoardCell = ({ item, column, boardId, allColumns, onUpdate, onPrevi
         return <div className="text-gray-500 text-xs animate-pulse flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Saving...</div>;
     }
 
-    const isMirrorStatus = (column.type === 'mirror' || column.type === 'lookup') && column.title.toLowerCase().includes('status');
+    const isMirrorStatus = (column.type === 'mirror' || column.type === 'lookup') &&
+        (column.title.toLowerCase().includes('status') ||
+            column.title.toLowerCase().includes('priority') ||
+            column.title.toLowerCase().includes('client') ||
+            column.title.toLowerCase().includes('phase'));
 
     // Status / Dropdown Rendering OR Mirror Status
+    // We treat Priority and Client as "Status" for visual rendering (Chips)
     if (column.type === 'color' || column.type === 'status' || isMirrorStatus) {
         let currentOption = options.find(o => o.label === displayValue);
 
         // Manual Color Override for Mirror Statuses if options are missing
         if (!currentOption && isMirrorStatus) {
             const val = displayValue;
-            if (val.includes('Unassigned')) currentOption = { label: val, color: '#595959', id: 'unassigned' };
+            // Priorities (Visuals only)
+            if (val.includes('Critical')) currentOption = { label: val, color: '#333333', id: 'critical' }; // Black/Dark
+            else if (val.includes('High')) currentOption = { label: val, color: '#e2445c', id: 'high' }; // Red
+            else if (val.includes('Medium')) currentOption = { label: val, color: '#fdab3d', id: 'medium' }; // Orange
+            else if (val.includes('Low')) currentOption = { label: val, color: '#00c875', id: 'low' }; // Green
+            else if (val.includes('Normal')) currentOption = { label: val, color: '#579bfc', id: 'normal' }; // Blue
+
+            // Standard Statuses (Visuals only)
+            else if (val.includes('Unassigned')) currentOption = { label: val, color: '#595959', id: 'unassigned' };
             else if (val.includes('Assigned (CV)')) currentOption = { label: val, color: '#fec12d', id: 'assigned_cv' };
             else if (val.includes('Working on it (CV)')) currentOption = { label: val, color: '#fdab3d', id: 'working_cv' };
             else if (val.includes('Exporting')) currentOption = { label: val, color: '#ffadad', id: 'exporting' };
@@ -207,14 +237,66 @@ export const BoardCell = ({ item, column, boardId, allColumns, onUpdate, onPrevi
             else if (val.includes('Approved')) currentOption = { label: val, color: '#00c875', id: 'approved_gen' };
             else if (val.includes('Revision')) currentOption = { label: val, color: '#eebb4d', id: 'revision' };
             else if (val.includes('Stuck') || val.includes('Error')) currentOption = { label: val, color: '#e2445c', id: 'error' };
-            else if (val) currentOption = { label: val, color: '#579bfc', id: 'default' };
+            else if (val) {
+                // Generate a consistent pastel color for Clients or arbitrary labels
+                let hash = 0;
+                for (let i = 0; i < val.length; i++) {
+                    hash = val.charCodeAt(i) + ((hash << 5) - hash);
+                }
+                const h = Math.abs(hash) % 360;
+                const color = `hsl(${h}, 70%, 40%)`;
+                currentOption = { label: val, color: color, id: 'default_hash' };
+            }
         }
 
-        if (isEditing && !isMirrorStatus) {
+        // PRIORITY 1: Explicit Dropdown Options (Fetched from Source Board for Mirrors)
+        if (dropdownOptions && dropdownOptions.length > 0) {
+            options = dropdownOptions;
+        }
+        // PRIORITY 2: DATA DRIVEN POPULATION (from uniqueValues prop)
+        // If we don't have settings options (Mirror columns) and no explicit options passed, use the unique values collected from the board items
+        else if (options.length === 0 && uniqueValues && uniqueValues.length > 0) {
+            options = uniqueValues.map(val => {
+                let color = '#579bfc'; // Default Blue
+
+                // Apply Visual Colors
+                if (val.includes('Critical')) color = '#333333';
+                else if (val.includes('High')) color = '#e2445c';
+                else if (val.includes('Medium')) color = '#fdab3d';
+                else if (val.includes('Low')) color = '#00c875';
+                else if (val.includes('Normal')) color = '#579bfc';
+                else if (val.includes('Urgent')) color = '#333333';
+                else if (val.includes('Unassigned')) color = '#595959';
+                else if (val.includes('Assigned (CV)')) color = '#fec12d';
+                else if (val.includes('Working on it (CV)')) color = '#fdab3d';
+                else if (val.includes('Exporting')) color = '#ffadad';
+                else if (val.includes('Taking a break (CV)')) color = '#ff158a';
+                else if (val.includes('Client Info')) color = '#e2445c';
+                else if (val.includes('For Approval (CV)')) color = '#5D24AA';
+                else if (val.includes('1st Approval')) color = '#9cd326';
+                else if (val.includes('Waiting for Client')) color = '#579bfc';
+                else if (val.includes('Downloading')) color = '#505f79';
+                else if (val.includes('Approved')) color = '#00c875';
+                else if (val.includes('Error')) color = '#e2445c';
+                else {
+                    // Generate hash color for others
+                    let hash = 0;
+                    for (let i = 0; i < val.length; i++) {
+                        hash = val.charCodeAt(i) + ((hash << 5) - hash);
+                    }
+                    const h = Math.abs(hash) % 360;
+                    color = `hsl(${h}, 70%, 40%)`;
+                }
+
+                return { label: val, color, id: val };
+            });
+        }
+
+        if (isEditing) {
             return (
                 <div className="relative z-50">
                     <div className="fixed inset-0" onClick={() => setIsEditing(false)} />
-                    <div className="absolute top-0 left-0 min-w-[140px] bg-[#1a1a2e] border border-white/20 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 z-50 py-1">
+                    <div className="absolute top-0 left-0 min-w-[140px] bg-[#1a1a2e] border border-white/20 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 z-50 py-1 max-h-[300px] overflow-y-auto custom-scrollbar">
                         {options.map((opt: any) => (
                             <button
                                 key={opt.id}
@@ -225,6 +307,9 @@ export const BoardCell = ({ item, column, boardId, allColumns, onUpdate, onPrevi
                                 {opt.label}
                             </button>
                         ))}
+                        {options.length === 0 && (
+                            <div className="px-4 py-2 text-gray-500 text-xs italic">No options available</div>
+                        )}
                     </div>
                 </div>
             );
@@ -232,29 +317,13 @@ export const BoardCell = ({ item, column, boardId, allColumns, onUpdate, onPrevi
 
         return (
             <button
-                disabled={isMirrorStatus}
-                onClick={() => !isMirrorStatus && setIsEditing(true)}
+                onClick={() => setIsEditing(true)}
                 className={`px-4 py-1.5 rounded-full text-white text-[11px] font-bold text-center min-w-[90px] transition-all shadow-lg shadow-black/20
-                    ${!isMirrorStatus ? 'hover:brightness-110 active:scale-95 cursor-pointer' : 'cursor-default opacity-90'}`}
+                    hover:brightness-110 active:scale-95 cursor-pointer`}
                 style={currentOption && currentOption.label ? { backgroundColor: currentOption.color || '#7c3aed' } : { backgroundColor: '#2d2d3d', color: '#9ca3af' }}
             >
                 {currentOption ? currentOption.label : (displayValue || 'Empty')}
             </button>
-        );
-    }
-
-    // Link Rendering
-    if (column.type === 'link' && !isEditing && linkUrl) {
-        return (
-            <a
-                href={linkUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[#0073ea] hover:text-white hover:underline truncate text-sm flex items-center gap-1"
-            >
-                {displayValue}
-                <span className="text-[10px] opacity-50">↗</span>
-            </a>
         );
     }
 
@@ -330,18 +399,26 @@ export const BoardCell = ({ item, column, boardId, allColumns, onUpdate, onPrevi
         );
     }
 
-    // Generic Link in Text Column
-    if (!isEditing && displayValue && (displayValue.startsWith('http://') || displayValue.startsWith('https://'))) {
+    // Generic Link (Example: Raw Video Link)
+    // If we identify it as a link (either from column type or regex detection), render a clickable anchor
+    const isLink = linkUrl || (displayValue && (displayValue.startsWith('http://') || displayValue.startsWith('https://')));
+
+    if (!isEditing && isLink) {
+        // If it's a "Link" column, the display value might be "This is a video", while the URL is hidden.
+        // We want to make the text clickable.
+        const urlToUse = linkUrl || displayValue;
+
         return (
             <a
-                href={displayValue}
+                href={urlToUse}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="text-[#0073ea] hover:text-white hover:underline truncate text-sm flex items-center gap-1"
+                className="text-[#0073ea] hover:text-white hover:underline truncate text-sm flex items-center gap-1 group"
+                title={urlToUse}
             >
-                {displayValue}
-                <span className="text-[10px] opacity-50">↗</span>
+                <span className="truncate">{displayValue || urlToUse}</span>
+                <span className="text-[10px] opacity-50 group-hover:opacity-100 transition-opacity">↗</span>
             </a>
         );
     }

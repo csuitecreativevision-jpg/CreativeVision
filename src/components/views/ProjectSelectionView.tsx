@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, Calendar, Activity } from 'lucide-react';
 import { ProjectCard } from '../shared/ProjectCard';
 import { BoardCell } from '../shared/BoardCell';
 import { PremiumModal } from '../ui/PremiumModal';
 import { getCycleFromDate } from '../../features/performance-dashboard/utils/dateUtils';
+import { getBoardColumns } from '../../services/mondayService';
 
 interface ProjectSelectionViewProps {
     boardData: any;
@@ -25,6 +26,87 @@ export const ProjectSelectionView = ({
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
     const [viewMode, setViewMode] = useState<'all' | 'cycles'>('all'); // NEW: View Mode
     const [expandedCycles, setExpandedCycles] = useState<Set<string>>(new Set()); // NEW: Expanded Cycles
+    const [mirrorOptions, setMirrorOptions] = useState<Record<string, any[]>>({});
+
+    // Effect to fetch source columns for Mirror fields (Status/Priority)
+    useEffect(() => {
+        const fetchMirrorSourceColumns = async () => {
+            if (!boardData.columns) return;
+
+            const newMirrorOptions: Record<string, any[]> = {};
+
+            for (const col of boardData.columns) {
+                // Check if it's a Mirror Status column
+                if ((col.type === 'mirror' || col.type === 'lookup') &&
+                    (col.title.toLowerCase().includes('status') || col.title.toLowerCase().includes('priority') || col.title.toLowerCase().includes('client'))) {
+
+                    try {
+                        if (col.settings_str) {
+                            const settings = JSON.parse(col.settings_str);
+
+                            // Strategy for Mirror Columns:
+                            // The settings_str typically contains `displayed_linked_columns` which maps { sourceBoardId: [sourceColumnId] }
+                            // Example: {"displayed_linked_columns":{"7146314401":["color__1"]}}
+
+                            let sourceBoardId: string | null = null;
+                            let sourceColumnId: string | null = null;
+
+                            if (settings.displayed_linked_columns) {
+                                const boardIds = Object.keys(settings.displayed_linked_columns);
+                                if (boardIds.length > 0) {
+                                    sourceBoardId = boardIds[0];
+                                    const cols = settings.displayed_linked_columns[sourceBoardId];
+                                    if (cols && cols.length > 0) {
+                                        sourceColumnId = cols[0];
+                                    }
+                                }
+                            }
+                            // Fallback: Check board_ids (standard connect boards column sometimes used)
+                            else if (settings.board_ids && settings.board_ids.length > 0) {
+                                sourceBoardId = settings.board_ids[0];
+                            }
+
+                            if (sourceBoardId) {
+                                // Fetch columns from that board
+                                const sourceColumns = await getBoardColumns(sourceBoardId);
+
+                                // Find the matching status column on the source board
+                                // If we have the exact sourceColumnId, use it. Otherwise fall back to title matching.
+                                let sourceStatusCol;
+                                if (sourceColumnId) {
+                                    sourceStatusCol = sourceColumns?.find((sc: any) => sc.id === sourceColumnId);
+                                } else {
+                                    sourceStatusCol = sourceColumns?.find((sc: any) =>
+                                        sc.type === 'status' && (sc.title === col.title || sc.title.includes('Status') || sc.title.includes('Priority'))
+                                    );
+                                }
+
+                                if (sourceStatusCol && sourceStatusCol.settings_str) {
+                                    const sourceSettings = JSON.parse(sourceStatusCol.settings_str);
+                                    if (sourceSettings.labels) {
+                                        const options = Object.entries(sourceSettings.labels).map(([key, label]: any) => ({
+                                            id: key,
+                                            label: label,
+                                            color: sourceSettings.labels_colors ? sourceSettings.labels_colors[key]?.color : '#579bfc'
+                                        }));
+                                        newMirrorOptions[col.id] = options;
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Failed to fetch source for mirror:", col.title, e);
+                    }
+                }
+            }
+
+            if (Object.keys(newMirrorOptions).length > 0) {
+                setMirrorOptions(prev => ({ ...prev, ...newMirrorOptions }));
+            }
+        };
+
+        fetchMirrorSourceColumns();
+    }, [boardData.columns]);
 
     // Data Processing
     const allItems = useMemo(() => {
@@ -349,12 +431,23 @@ export const ProjectSelectionView = ({
                                                     {col.title}
                                                 </span>
                                             </div>
+
+
+
+
                                             <div className="pl-3">
                                                 <BoardCell
                                                     item={selectedProject}
                                                     column={col}
                                                     boardId={selectedBoardId}
-                                                    allColumns={boardData.columns} // Pass all columns for system logic
+                                                    allColumns={boardData.columns}
+                                                    uniqueValues={Array.from(new Set(
+                                                        boardData.items?.map((i: any) => {
+                                                            const val = i.column_values.find((cv: any) => cv.id === col.id);
+                                                            return val?.display_value || val?.text;
+                                                        }).filter(Boolean) as string[]
+                                                    ))}
+                                                    dropdownOptions={mirrorOptions[col.id]} // Pass fetched options
                                                     onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
                                                     onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
                                                 />
