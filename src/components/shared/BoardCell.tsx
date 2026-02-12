@@ -8,19 +8,23 @@ interface BoardCellProps {
     item: MondayItem;
     column: MondayColumn;
     boardId: string | null;
+    allColumns?: MondayColumn[]; // NEW: For finding related columns
     onUpdate: () => void;
     onPreview: (url: string, name: string, assetId?: string) => void;
 }
 
-export const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: BoardCellProps) => {
+export const BoardCell = ({ item, column, boardId, allColumns, onUpdate, onPreview }: BoardCellProps) => {
+    // ... existing state ...
     const [isEditing, setIsEditing] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const { mutateAsync: updateItem } = useUpdateItemValue();
 
+    // ... existing displayValue logic ...
     // Find value for this column
     const colValueObj = item.column_values.find((v) => v.id === column.id);
     let displayValue = colValueObj ? (colValueObj.text || '') : '';
 
+    // ... (rest of display value logic is same) ...
     // Robust Parsing for Complex Types
     let linkUrl: string | null = null;
     let fileName: string | null = null;
@@ -124,7 +128,45 @@ export const BoardCell = ({ item, column, boardId, onUpdate, onPreview }: BoardC
 
         setIsLoading(true);
         try {
+            // 1. Update the Main Column (e.g., Status)
             await updateItem({ boardId, itemId: item.id, columnId: column.id, value: newValue });
+
+            // 2. SYSTEM LOGIC: Check for Revision Logic
+            // If this is a Status column AND new value implies Revision (e.g. "Sent for Revisions")
+            // We check for "Sent for" to catch variations like "(CV) Sent for Revisions" or "(Client) Sent for Revisions"
+            const isRevisionStatus = newValue.toLowerCase().includes('sent for revision') ||
+                newValue.toLowerCase().includes('sent for review'); // broad catch if needed, but 'revision' is safer
+
+            if ((column.title.toLowerCase().includes('status') || column.type === 'status') && isRevisionStatus) {
+                console.log('[System Logic] Detected "Sent for Revisions" status. Checking for "Amount of Revisions" counter...');
+
+                if (allColumns) {
+                    // Find "Amount of Revisions" column (Numbers) - Prioritize exact match
+                    const revisionsCol = allColumns.find(c =>
+                        c.title.toLowerCase() === 'amount of revisions' && (c.type === 'numeric' || c.type === 'numbers')
+                    ) || allColumns.find(c =>
+                        c.title.toLowerCase().includes('amount of revision') && (c.type === 'numeric' || c.type === 'numbers')
+                    );
+
+                    if (revisionsCol) {
+                        // Get current value
+                        const currentValObj = item.column_values.find(v => v.id === revisionsCol.id);
+                        let currentCount = 0;
+                        if (currentValObj && currentValObj.text) {
+                            currentCount = parseFloat(currentValObj.text) || 0;
+                        }
+
+                        const newCount = currentCount + 1;
+                        console.log(`[System Logic] Incrementing revisions from ${currentCount} to ${newCount}`);
+
+                        // Update Revisions Column
+                        await updateItem({ boardId, itemId: item.id, columnId: revisionsCol.id, value: newCount.toString() });
+                    } else {
+                        console.warn('[System Logic] "Amount of Revisions" numeric column not found on this board.');
+                    }
+                }
+            }
+
             await onUpdate();
         } catch (err) {
             console.error(err);

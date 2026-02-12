@@ -354,6 +354,7 @@ export const ProjectSelectionView = ({
                                                     item={selectedProject}
                                                     column={col}
                                                     boardId={selectedBoardId}
+                                                    allColumns={boardData.columns} // Pass all columns for system logic
                                                     onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
                                                     onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
                                                 />

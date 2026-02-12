@@ -856,7 +856,7 @@ export async function getWorkspaceAnalytics() {
     // 1. Get all Workspace Boards
     const allBoards = await getAllBoards();
     const workspaceBoards = allBoards.filter((b: any) =>
-        b.name.toLowerCase().includes('- workspace') &&
+        (b.name.toLowerCase().includes('- workspace') || b.name.toLowerCase().includes('management')) &&
         !b.type.includes('sub_items') &&
         !b.name.toLowerCase().includes('subitems')
     );
@@ -868,6 +868,8 @@ export async function getWorkspaceAnalytics() {
     // 3. Process Items & Assign Cycles
     const analyticsData: Record<string, Record<string, number>> = {}; // { "Cycle Key": { "Editor Name": Count } }
     const paymentData: Record<string, Record<string, number>> = {}; // { "Cycle Key": { "Editor Name": TotalPrice } }
+    const typeData: Record<string, Record<string, number>> = {}; // { "Cycle Key": { "Type Name": Count } }
+    const revisionsData: Record<string, Record<string, number>> = {}; // { "Cycle Key": { "Editor Name": Count } }
     const cyclesSet = new Set<string>();
 
     console.log(`[Analytics] Processing ${boardsWithItems.length} workspace boards...`);
@@ -880,10 +882,20 @@ export async function getWorkspaceAnalytics() {
         const priceCol = board.columns?.find((c: any) => c.title.toLowerCase().includes('price') || c.title.toLowerCase().includes('php'));
         const priceColId = priceCol?.id;
 
+        // Find Type Column
+        const typeCol = board.columns?.find((c: any) => c.title.toLowerCase() === 'type' || c.title.toLowerCase().includes('type'));
+        const typeColId = typeCol?.id;
+
+        if (typeColId) {
+            console.log(`[Analytics] Found Type column '${typeCol.title}' (${typeCol.id}) for board: ${board.name}`);
+        } else {
+            console.log(`[Analytics] NO Type column found for board: ${board.name}`);
+        }
+
         if (!priceColId) {
             console.warn(`[Analytics] No Price column found for board: ${board.name}`);
             // Log all columns to see what's available
-            console.log(`[Analytics] Available columns for ${board.name}:`, board.columns?.map((c: any) => `${c.title} (${c.id})`));
+            // console.log(`[Analytics] Available columns for ${board.name}:`, board.columns?.map((c: any) => `${c.title} (${c.id})`));
         } else {
             console.log(`[Analytics] Found Price column '${priceCol.title}' (${priceCol.id}) for board: ${board.name}`);
         }
@@ -920,41 +932,120 @@ export async function getWorkspaceAnalytics() {
                 cyclesSet.add(cycleKey);
 
                 // Initialize Data Structures
-                if (!analyticsData[cycleKey]) analyticsData[cycleKey] = {};
-                if (!analyticsData[cycleKey][editorName]) analyticsData[cycleKey][editorName] = 0;
+                // SKIP GENERAL ANALYTICS FOR "Management Dashboard"
+                // It is only here for Revisions data.
+                const isManagementBoard = board.name.includes('Management') || board.name.includes('Manag');
 
-                if (!paymentData[cycleKey]) paymentData[cycleKey] = {};
-                if (!paymentData[cycleKey][editorName]) paymentData[cycleKey][editorName] = 0;
+                if (!isManagementBoard) {
+                    if (!analyticsData[cycleKey]) analyticsData[cycleKey] = {};
+                    if (!analyticsData[cycleKey][editorName]) analyticsData[cycleKey][editorName] = 0;
 
-                // Increment Video Count
-                analyticsData[cycleKey][editorName]++;
+                    if (!paymentData[cycleKey]) paymentData[cycleKey] = {};
+                    if (!paymentData[cycleKey][editorName]) paymentData[cycleKey][editorName] = 0;
 
-                // Add Price
-                if (priceColId) {
-                    const priceVal = item.column_values?.find((cv: any) => cv.id === priceColId);
+                    if (!typeData[cycleKey]) typeData[cycleKey] = {};
 
-                    // DEBUG: Log the first few items' price data
-                    if (debugCount < 3) {
-                        console.log(`[Analytics] Item: ${item.name}, Price Raw:`, priceVal);
-                        debugCount++;
+                    // Increment Video Count
+                    analyticsData[cycleKey][editorName]++;
+
+                    // Add Price
+                    if (priceColId) {
+                        const priceVal = item.column_values?.find((cv: any) => cv.id === priceColId);
+
+                        if (priceVal && (priceVal.text || priceVal.display_value)) {
+                            // Use display_value for Mirror columns if available, otherwise text
+                            const rawText = priceVal.display_value || priceVal.text;
+
+                            // Robust Parse: Remove everything that is NOT a digit, dot, or minus.
+                            const cleanVal = rawText.replace(/[^0-9.-]+/g, '');
+                            const amount = parseFloat(cleanVal);
+
+                            if (!isNaN(amount)) {
+                                paymentData[cycleKey][editorName] += amount;
+                            }
+                        }
                     }
 
-                    if (priceVal && (priceVal.text || priceVal.display_value)) {
-                        // Use display_value for Mirror columns if available, otherwise text
-                        const rawText = priceVal.display_value || priceVal.text;
+                    // Process Type
+                    if (typeColId) {
+                        const typeVal = item.column_values?.find((cv: any) => cv.id === typeColId);
+                        if (typeVal) {
+                            // Handle Mirror Columns (display_value) and Regular Columns (text)
+                            const rawType = typeVal.display_value || typeVal.text;
 
-                        // Robust Parse: Remove everything that is NOT a digit, dot, or minus.
-                        const cleanVal = rawText.replace(/[^0-9.-]+/g, '');
-                        const amount = parseFloat(cleanVal);
+                            if (rawType) {
+                                // Clean up type name (remove extra spaces, handle comma separated if multiple)
+                                const typeName = rawType.split(',')[0].trim();
 
-                        if (!isNaN(amount)) {
-                            paymentData[cycleKey][editorName] += amount;
+                                // EXCLUDE: Ignore "(Unassigned) VE" as it's not a real project type
+                                if (typeName && typeName !== '(Unassigned) VE') {
+                                    if (!typeData[cycleKey][typeName]) typeData[cycleKey][typeName] = 0;
+                                    typeData[cycleKey][typeName]++;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Process Revisions
+                // Prioritize "Amount of Revisions" as per user request
+                const revisionsCol = board.columns?.find((c: any) => c.title.toLowerCase() === 'amount of revisions') ||
+                    board.columns?.find((c: any) => c.title.toLowerCase().includes('amount of revisions')) ||
+                    board.columns?.find((c: any) => c.title.toLowerCase() === 'revisions') ||
+                    board.columns?.find((c: any) => c.title.toLowerCase().includes('revision'));
+
+                // Find Editor Column (People)
+                const editorCol = board.columns?.find((c: any) => c.title.toLowerCase().includes('editor') || c.title.toLowerCase().includes('people'));
+
+                if (revisionsCol) {
+                    // DEBUG: Verify which column we picked
+                    if (debugCount < 1 && board.name.includes('Manag')) {
+                        console.log(`[Analytics] Selected Revision Column: '${revisionsCol.title}' (${revisionsCol.id}) Type: ${revisionsCol.type}`);
+                    }
+                    const revVal = item.column_values?.find((cv: any) => cv.id === revisionsCol.id);
+
+                    // console.log(`[Analytics] Item: ${item.name}, RevCol Type: ${revisionsCol.type}, Val:`, revVal);
+
+                    // Handle Mirror Columns (display_value) or Regular (text)
+                    const rawRev = revVal?.display_value || revVal?.text;
+
+                    if (rawRev) {
+                        const count = parseFloat(rawRev.toString()); // Ensure string
+                        if (!isNaN(count) && count > 0) {
+
+                            // Determine which editor to attribute this to
+                            let currentEditorName = editorName; // Default to board-derived name
+
+                            if (editorCol) {
+                                const editorVal = item.column_values?.find((cv: any) => cv.id === editorCol.id);
+                                // For People column (or mirror of people), display_value usually has names
+                                const rawEditor = editorVal?.display_value || editorVal?.text;
+
+                                if (rawEditor) {
+                                    // People column text often contains names like "John Smith, Jane Doe"
+                                    // We'll take the first one or assume the primary editor is the target
+                                    const peopleNames = rawEditor.split(',').map((s: string) => s.trim());
+                                    if (peopleNames.length > 0) {
+                                        currentEditorName = peopleNames[0];
+                                    }
+                                }
+                            }
+
+                            // Initialize & Accumulate
+                            if (!revisionsData[cycleKey]) revisionsData[cycleKey] = {};
+                            if (!revisionsData[cycleKey][currentEditorName]) revisionsData[cycleKey][currentEditorName] = 0;
+                            revisionsData[cycleKey][currentEditorName] += count;
                         }
                     }
                 }
             }
         });
+
     });
+
+
+    console.log('[Analytics] Type Data:', typeData);
+    console.log('[Analytics] Revisions Data:', revisionsData);
 
     // 4. Sort Cycles
     const sortedCycles = Array.from(cyclesSet).sort((a, b) => {
@@ -971,7 +1062,9 @@ export async function getWorkspaceAnalytics() {
     return {
         cycles: sortedCycles,
         data: analyticsData,
-        payments: paymentData
+        payments: paymentData,
+        types: typeData,
+        revisions: revisionsData
     };
 }
 

@@ -3,6 +3,7 @@ import { AdminPageLayout } from '../../components/layout/AdminPageLayout';
 import { AnalyticCard } from '../../components/analytics/AnalyticCard';
 import { AnalyticAreaChart } from '../../components/analytics/AnalyticAreaChart';
 import { AnalyticBarChart } from '../../components/analytics/AnalyticBarChart';
+import { AnalyticPieChart } from '../../components/analytics/AnalyticPieChart';
 import { AnalyticsFilterModal } from '../../components/analytics/AnalyticsFilterModal';
 import { Play, Filter, Users, Calendar, Settings2 } from 'lucide-react';
 
@@ -14,6 +15,8 @@ export default function AdminAnalytics() {
     // Cycle Analytics State
     const [cycleData, setCycleData] = useState<any>(null); // Video Counts
     const [paymentData, setPaymentData] = useState<any>(null); // Payment Amounts
+    const [typeData, setTypeData] = useState<any>(null); // Project Types
+    const [revisionsData, setRevisionsData] = useState<any>(null); // Revision Counts
     const [selectedCycle, setSelectedCycle] = useState<string>('');
     const [availableCycles, setAvailableCycles] = useState<string[]>([]);
 
@@ -32,11 +35,13 @@ export default function AdminAnalytics() {
         setLoading(true);
         try {
             // Fetch Cycle Based Analytics from Workspace Boards
-            const { cycles, data: cData, payments: pData } = await getWorkspaceAnalytics();
+            const { cycles, data: cData, payments: pData, types: tData, revisions: rData } = await getWorkspaceAnalytics();
 
             setAvailableCycles(cycles);
             setCycleData(cData);
             setPaymentData(pData);
+            setTypeData(tData);
+            setRevisionsData(rData);
 
             // Default to most recent cycle
             if (cycles.length > 0) {
@@ -191,8 +196,68 @@ export default function AdminAnalytics() {
             .sort((a, b) => b.value - a.value);
     };
 
+    // Aggregation: Get Project Type Data (PIE CHART)
+    const getProjectTypeData = () => {
+        if (!typeData) return [];
+
+        // If a specific cycle is selected
+        if (selectedCycle && typeData[selectedCycle]) {
+            return Object.entries(typeData[selectedCycle])
+                .map(([name, value]: [string, any]) => ({ name, value }))
+                .sort((a, b) => b.value - a.value);
+        }
+
+        // Otherwise (All Cycles), aggregate across filtered cycles
+        const totals: Record<string, number> = {};
+
+        filteredCycles.forEach(cycle => {
+            if (typeData[cycle]) {
+                Object.entries(typeData[cycle]).forEach(([type, val]: [string, any]) => {
+                    totals[type] = (totals[type] || 0) + val;
+                });
+            }
+        });
+
+        const result = Object.entries(totals)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value);
+
+        return result;
+    };
+
+    // Aggregation: Get Revisions Data (BAR CHART)
+    const getRevisionsData = () => {
+        if (!revisionsData) return [];
+
+        // If a specific cycle is selected
+        if (selectedCycle && revisionsData[selectedCycle]) {
+            return Object.entries(revisionsData[selectedCycle])
+                .map(([name, value]: [string, any]) => ({ name, value }))
+                .sort((a, b) => b.value - a.value);
+        }
+
+        // Otherwise (All Cycles), aggregate across filtered cycles
+        const totals: Record<string, number> = {};
+
+        filteredCycles.forEach(cycle => {
+            if (revisionsData[cycle]) {
+                Object.entries(revisionsData[cycle]).forEach(([editor, val]: [string, any]) => {
+                    totals[editor] = (totals[editor] || 0) + val;
+                });
+            }
+        });
+
+        const result = Object.entries(totals)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value);
+
+        return result;
+    };
+
     const monthlyTrendData = getMonthlyTrendData();
     const editorBreakdownData = getEditorBreakdownData();
+    const projectTypeData = getProjectTypeData();
+    const revisionsChartData = getRevisionsData();
 
     // Calculate total value for the selected scope (For KPI)
     const getSelectedCycleTotal = () => {
@@ -201,14 +266,14 @@ export default function AdminAnalytics() {
 
         // If specific cycle
         if (selectedCycle && sourceData[selectedCycle]) {
-            return Object.values(sourceData[selectedCycle]).reduce((acc: any, val: any) => acc + val, 0);
+            return Object.values(sourceData[selectedCycle]).reduce((acc: number, val: any) => acc + (val as number), 0);
         }
 
         // If "All Cycles" (Aggregate filtered)
         let total = 0;
         filteredCycles.forEach(cycle => {
             if (sourceData[cycle]) {
-                total += Object.values(sourceData[cycle]).reduce((acc: any, val: any) => acc + val, 0);
+                total += Object.values(sourceData[cycle]).reduce((acc: number, val: any) => acc + (val as number), 0);
             }
         });
         return total;
@@ -318,7 +383,7 @@ export default function AdminAnalytics() {
                     </div>
 
                     {/* Charts Section */}
-                    <div className="flex flex-col gap-16 mt-8">
+                    <div className="flex flex-col gap-8 mt-8">
 
                         {/* 1. Yearly Trend (Area Chart) */}
                         <div className="w-full">
@@ -336,28 +401,60 @@ export default function AdminAnalytics() {
                             />
                         </div>
 
-                        {/* 2. Editor Breakdown (Bar Chart) */}
+                        {/* 2. Breakdown Section: Bar + Pie */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+                            {/* Editor Breakdown (Bar Chart) */}
+                            <div className="w-full">
+                                <AnalyticBarChart
+                                    title={
+                                        selectedCycle
+                                            ? (viewMode === 'productivity' ? `Top Editors: ${selectedCycle}` : `Editor Earnings: ${selectedCycle}`)
+                                            : (dateFilter?.month
+                                                ? (viewMode === 'productivity' ? `Top Editors: ${new Date(2000, dateFilter.month - 1).toLocaleString('default', { month: 'long' })}` : `Editor Earnings: ${new Date(2000, dateFilter.month - 1).toLocaleString('default', { month: 'long' })}`)
+                                                : (viewMode === 'productivity' ? `Editor Breakdown` : `Earnings Breakdown`)
+                                            )
+                                    }
+                                    data={editorBreakdownData}
+                                    dataKey="value"
+                                    xAxisKey="name"
+                                    color={viewMode === 'productivity' ? "#8b5cf6" : "#10b981"}
+                                    delay={0.4}
+                                    layout="vertical"
+                                    height={400}
+                                    valuePrefix={viewMode === 'earnings' ? "₱" : ""}
+                                />
+                            </div>
+
+                            {/* Project Type Distribution (Pie Chart) - NEW */}
+                            <div className="w-full">
+                                <AnalyticPieChart
+                                    title="Project Type Distribution"
+                                    data={projectTypeData}
+                                    delay={0.5}
+                                    height={400}
+                                />
+                            </div>
+                        </div>
+
+
+                        {/* 3. Revisions Chart (Bar Chart) - NEW */}
                         <div className="w-full">
                             <AnalyticBarChart
-                                title={
-                                    selectedCycle
-                                        ? (viewMode === 'productivity' ? `Production: ${selectedCycle}` : `Earnings: ${selectedCycle}`)
-                                        : (dateFilter?.month
-                                            ? (viewMode === 'productivity' ? `Production: ${new Date(2000, dateFilter.month - 1).toLocaleString('default', { month: 'long' })}` : `Earnings: ${new Date(2000, dateFilter.month - 1).toLocaleString('default', { month: 'long' })}`)
-                                            : (viewMode === 'productivity' ? `Production Breakdown` : `Earnings Breakdown`)
-                                        )
-                                }
-                                data={editorBreakdownData}
+                                title="Revision Rates per Editor"
+                                data={revisionsChartData}
                                 dataKey="value"
                                 xAxisKey="name"
-                                color={viewMode === 'productivity' ? "#8b5cf6" : "#10b981"}
-                                delay={0.4}
+                                color="#f59e0b" // Amber/Orange for caution/revisions
+                                delay={0.6}
                                 layout="vertical"
-                                height={300}
-                                valuePrefix={viewMode === 'earnings' ? "₱" : ""}
+                                height={400}
+                                valuePrefix=""
+                                emptyMessage="No revisions found for editors yet"
                             />
                         </div>
                     </div>
+
 
                     <AnalyticsFilterModal
                         isOpen={isFilterModalOpen}
@@ -371,8 +468,9 @@ export default function AdminAnalytics() {
                             cycle: dateFilter?.cycle || ''
                         }}
                     />
-                </div>
-            )}
-        </AdminPageLayout>
+                </div >
+            )
+            }
+        </AdminPageLayout >
     );
 }

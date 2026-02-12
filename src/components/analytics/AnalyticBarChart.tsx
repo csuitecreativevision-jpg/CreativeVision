@@ -11,6 +11,7 @@ interface AnalyticBarChartProps {
     delay?: number;
     layout?: 'horizontal' | 'vertical';
     valuePrefix?: string;
+    emptyMessage?: string;
 }
 
 export const AnalyticBarChart = ({
@@ -22,7 +23,8 @@ export const AnalyticBarChart = ({
     height = 400,
     delay = 0,
     layout = 'vertical',
-    valuePrefix = ""
+    valuePrefix = "",
+    emptyMessage = "No data available"
 }: AnalyticBarChartProps) => {
 
     // Custom Tooltip
@@ -56,55 +58,65 @@ export const AnalyticBarChart = ({
                 </div>
             </div>
 
-            {/* Chart */}
-            <div style={{ height: height, width: '100%' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                        data={data}
-                        layout={layout}
-                        margin={{ top: 0, right: 30, left: 10, bottom: 0 }}
-                    >
-                        <defs>
-                            <linearGradient id={`gradient-${dataKey}`} x1="0" y1="0" x2="1" y2="0">
-                                <stop offset="0%" stopColor={color} stopOpacity={0.6} />
-                                <stop offset="100%" stopColor={color} stopOpacity={1} />
-                            </linearGradient>
-                        </defs>
-
-                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#ffffff10" />
-
-                        <XAxis
-                            type="number"
-                            hide
-                        />
-                        <YAxis
-                            dataKey={xAxisKey}
-                            type="category"
-                            width={180} // Increased width for long names
-                            tick={{ fill: '#94a3b8', fontSize: 13, fontWeight: 500 }}
-                            axisLine={false}
-                            tickLine={false}
-                            interval={0} // Force show all labels
-                        />
-                        <Tooltip
-                            content={<CustomTooltip />}
-                            cursor={{ fill: 'rgba(255,255,255,0.05)', radius: 8 }}
-                        />
-                        <Bar
-                            dataKey={dataKey}
-                            radius={[0, 4, 4, 0]}
-                            barSize={12} // Very sleek bars
-                            animationDuration={1500}
-                            fill={`url(#gradient-${dataKey})`}
+            {/* Empty State */}
+            {data.length === 0 ? (
+                <div style={{ height: height, width: '100%' }} className="flex flex-col items-center justify-center text-center opacity-50">
+                    <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
+                        <div className="w-8 h-8 rounded-full" style={{ backgroundColor: color, opacity: 0.5 }} />
+                    </div>
+                    <p className="text-gray-400 text-sm font-medium">{emptyMessage}</p>
+                </div>
+            ) : (
+                /* Chart */
+                <div style={{ height: height, width: '100%' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                            data={data}
+                            layout={layout}
+                            margin={{ top: 0, right: 30, left: 10, bottom: 0 }}
                         >
-                            {/* Fallback to color if gradient fails, though fill above handles it */}
-                            {data.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={`url(#gradient-${dataKey})`} />
-                            ))}
-                        </Bar>
-                    </BarChart>
-                </ResponsiveContainer>
-            </div>
+                            <defs>
+                                <linearGradient id={`gradient-${dataKey}`} x1="0" y1="0" x2="1" y2="0">
+                                    <stop offset="0%" stopColor={color} stopOpacity={0.6} />
+                                    <stop offset="100%" stopColor={color} stopOpacity={1} />
+                                </linearGradient>
+                            </defs>
+
+                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#ffffff10" />
+
+                            <XAxis
+                                type="number"
+                                hide
+                            />
+                            <YAxis
+                                dataKey={xAxisKey}
+                                type="category"
+                                width={180} // Increased width for long names
+                                tick={{ fill: '#94a3b8', fontSize: 13, fontWeight: 500 }}
+                                axisLine={false}
+                                tickLine={false}
+                                interval={0} // Force show all labels
+                            />
+                            <Tooltip
+                                content={<CustomTooltip />}
+                                cursor={{ fill: 'rgba(255,255,255,0.05)', radius: 8 }}
+                            />
+                            <Bar
+                                dataKey={dataKey}
+                                radius={[0, 4, 4, 0]}
+                                barSize={12} // Very sleek bars
+                                animationDuration={1500}
+                                fill={`url(#gradient-${dataKey})`}
+                            >
+                                {/* Fallback to color if gradient fails, though fill above handles it */}
+                                {data.map((_, index) => (
+                                    <Cell key={`cell-${index}`} fill={`url(#gradient-${dataKey})`} />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            )}
         </motion.div>
     );
 };
