@@ -8,8 +8,9 @@ import {
     Users
 } from 'lucide-react';
 import {
-    getAllBoards, getMultipleBoardItems
+    getAllBoards, getMultipleBoardItems, getWorkspaceAnalytics, getAllFolders
 } from '../../services/mondayService';
+import { getCycleDates, isDateInCycle } from '../../features/performance-dashboard/utils/dateUtils';
 
 // --- Admin Overview Component ---
 export default function AdminOverview() {
@@ -21,7 +22,8 @@ export default function AdminOverview() {
         topEditor: { name: 'N/A', count: 0 },
         systemStatus: 'Stable',
         clientProjectDistribution: [] as { name: string, count: number }[],
-        editorPerformance: [] as { name: string, count: number }[]
+        editorPerformance: [] as { name: string, count: number }[],
+        currentCycleName: ''
     });
     const [overviewLoading, setOverviewLoading] = useState(true);
 
@@ -32,115 +34,115 @@ export default function AdminOverview() {
     const fetchOverviewData = async () => {
         setOverviewLoading(true);
         try {
-            const boardsData = await getAllBoards();
-            const allFetchedBoards = boardsData || [];
-
-            // A) Client/Project Data Source: "Fulfillment Board"
-            const fulfillmentBoard = allFetchedBoards.find((b: any) =>
-                b.name.toLowerCase().includes('fulfillment') ||
-                b.name.toLowerCase().includes('fullfillment')
-            );
-
-            // B) Editor Data Source: Boards with "Workspace" in name
-            const editorBoards = allFetchedBoards.filter((b: any) => {
-                const name = b.name.toLowerCase();
-                return name.includes('workspace') &&
-                    !name.includes('subitem') &&
-                    !name.includes('template');
-            });
-            const editorBoardIds = editorBoards.map((b: any) => String(b.id));
-
-            // 3. Fetch Data
-            const idsToFetch = [];
-            if (fulfillmentBoard) idsToFetch.push(String(fulfillmentBoard.id));
-            editorBoardIds.forEach((id: string) => idsToFetch.push(id));
-
-            const [allFetchedItemsData] = await Promise.all([
-                getMultipleBoardItems(idsToFetch)
+            // 1. Fetch Board List & Analytics in Parallel
+            const [boardsData, analyticsData] = await Promise.all([
+                getAllBoards(),
+                getWorkspaceAnalytics()
             ]);
 
-            const fulfillmentBoardData = fulfillmentBoard ? allFetchedItemsData.find((b: any) => String(b.id) === String(fulfillmentBoard.id)) : null;
-            const editorBoardsData = allFetchedItemsData.filter((b: any) => editorBoardIds.includes(String(b.id)));
+            const allFetchedBoards = boardsData || [];
 
-            // 4. Calculate Metrics
+            // ---------------------------------------------------------
+            // C) Active Editors & Performance (Use getWorkspaceAnalytics)
+            // ---------------------------------------------------------
+            const { cycles, data: cycleData } = analyticsData;
 
-            // A) Active Clients & Projects (From Fulfillment Board)
+            // Get Latest Cycle
+            const currentCycleKey = cycles.length > 0 ? cycles[0] : null;
+
+            // ---------------------------------------------------------
+            // A) Client/Project Data Source: "Active Clients" Folder (Cycle Based)
+            // ---------------------------------------------------------
+            // Fetch Folders to find "Active Clients"
+            const allFolders = await getAllFolders();
+            const activeClientsFolder = allFolders.find((f: any) => f.name.toLowerCase() === 'active clients');
+
             let activeClientsCount = 0;
             let totalActiveProjects = 0;
             const clientProjectDistribution: { name: string, count: number }[] = [];
 
-            if (fulfillmentBoardData) {
-                const groups = fulfillmentBoard.groups || [];
-                const validGroups = groups.filter((g: any) => g.title.toLowerCase() !== 'hidden');
+            if (activeClientsFolder && currentCycleKey) {
+                // Parse Cycle Key to get Date Range
+                // Key format: "MonthName Year - Cycle X" e.g. "February 2026 - Cycle 1"
+                const match = currentCycleKey.match(/(\w+) (\d+) - Cycle (\d)/);
+                let cycleInfo = null;
 
-                activeClientsCount = validGroups.length;
+                if (match) {
+                    const [, monthStr, yearStr, cycleNumStr] = match;
+                    const year = parseInt(yearStr);
+                    const cycle = parseInt(cycleNumStr) as 1 | 2;
+                    const month = new Date(`${monthStr} 1, ${year}`).getMonth() + 1; // 1-indexed
 
-                const activeItems = fulfillmentBoardData.items.filter((i: any) => {
-                    const isDone = i.column_values.some((v: any) => (v.title === 'Status' || v.type === 'status' || v.type === 'color') && (v.text === 'Done' || v.text === 'Completed'));
-                    return !isDone;
-                });
-                totalActiveProjects = activeItems.length;
+                    cycleInfo = getCycleDates(cycle, month, year);
+                }
 
-                // Distribution: Items per Group
-                const groupMap = new Map();
-                groups.forEach((g: any) => groupMap.set(g.id, g.title));
+                // 1. Identify Client Boards
+                const clientBoardIds = activeClientsFolder.children.map((c: any) => String(c.id));
+                const clientBoards = allFetchedBoards.filter((b: any) => clientBoardIds.includes(String(b.id)));
+                const clientBoardMap = new Map(clientBoards.map((b: any) => [String(b.id), b.name]));
 
-                const groupCounts = new Map();
-                activeItems.forEach((item: any) => {
-                    const gId = item.group?.id;
-                    if (gId) {
-                        const current = groupCounts.get(gId) || 0;
-                        groupCounts.set(gId, current + 1);
-                    }
-                });
+                // 2. Fetch Items
+                if (clientBoardIds.length > 0 && cycleInfo) {
+                    const [clientItemsData] = await Promise.all([
+                        getMultipleBoardItems(clientBoardIds)
+                    ]);
 
-                groupCounts.forEach((count, gId) => {
-                    const name = groupMap.get(gId) || 'Unknown Group';
-                    if (name.toLowerCase() !== 'hidden' && count > 0) {
-                        clientProjectDistribution.push({ name, count });
-                    }
-                });
+                    const activeClientIds = new Set();
+
+                    clientItemsData.forEach((board: any) => {
+                        const boardName = clientBoardMap.get(String(board.id)) || board.name;
+
+                        // Count Projects Created in this Cycle
+                        const validItems = (board.items || []).filter((i: any) => {
+                            if (!i.created_at) return false;
+                            const createdDate = new Date(i.created_at);
+                            // Check if created within current cycle
+                            return isDateInCycle(createdDate, cycleInfo!);
+                        });
+
+                        const count = validItems.length;
+                        totalActiveProjects += count;
+
+                        if (count > 0) {
+                            activeClientIds.add(board.id);
+                            clientProjectDistribution.push({ name: boardName, count });
+                        }
+                    });
+
+                    activeClientsCount = activeClientIds.size;
+                }
+            } else {
+                console.warn("Folder 'Active Clients' or Cycle Key not found.");
             }
 
             clientProjectDistribution.sort((a, b) => b.count - a.count);
 
-            // C) Active Editors & Performance
-            const activeEditorsCount = editorBoards.length;
+
+
+
+            let activeEditorsCount = 0;
+            let topEditorName = 'None';
+            let maxDoneCount = 0;
             const editorPerformance: { name: string, count: number }[] = [];
 
-            let maxDoneCount = 0;
-            let topEditorName = 'None';
+            if (currentCycleKey && cycleData[currentCycleKey]) {
+                const currentCycleStats = cycleData[currentCycleKey];
 
-            editorBoards.forEach((b: any) => {
-                const boardData = editorBoardsData.find((bd: any) => String(bd.id) === String(b.id));
-                const items = boardData ? boardData.items : [];
+                // Active editors are those with > 0 videos in this cycle
+                const editorsInCycle = Object.entries(currentCycleStats);
+                activeEditorsCount = editorsInCycle.length;
 
-                const approvedCount = items.length;
+                editorsInCycle.forEach(([name, count]) => {
+                    editorPerformance.push({ name, count });
 
-                let cleanName = b.name.split('(')[0];
-                cleanName = cleanName.replace(/workspace/gi, '')
-                    .replace(/editor/gi, '')
-                    .replace(/-/g, '')
-                    .trim();
-                if (!cleanName || cleanName.length < 2) cleanName = b.name;
-
-                if (approvedCount > 0) {
-                    editorPerformance.push({ name: cleanName, count: approvedCount });
-                } else {
-                    editorPerformance.push({ name: cleanName, count: 0 });
-                }
-
-                if (approvedCount > maxDoneCount) {
-                    maxDoneCount = approvedCount;
-                    topEditorName = cleanName;
-                }
-            });
-
-            if (maxDoneCount === 0 && editorBoardsData.length > 0) {
-                const busiestBoard = editorBoardsData.sort((a: any, b: any) => b.items.length - a.items.length)[0];
-                if (busiestBoard) {
-                    // let cleanName = busiestBoard.name.replace(/workspace/gi, '').replace(/editor/gi, '').replace(/-/g, '').trim();
-                }
+                    if (count > maxDoneCount) {
+                        maxDoneCount = count;
+                        topEditorName = name;
+                    }
+                });
+            } else {
+                // Fallback / Empty State
+                activeEditorsCount = 0;
             }
 
             editorPerformance.sort((a, b) => b.count - a.count);
@@ -152,7 +154,8 @@ export default function AdminOverview() {
                 topEditor: { name: topEditorName, count: maxDoneCount },
                 systemStatus: 'Stable',
                 clientProjectDistribution,
-                editorPerformance
+                editorPerformance,
+                currentCycleName: currentCycleKey || ''
             });
 
         } catch (error) {
@@ -248,11 +251,18 @@ export default function AdminOverview() {
                     <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                     <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-emerald-600/10 rounded-full blur-[80px] pointer-events-none group-hover:bg-emerald-600/20 transition-all duration-700" />
 
-                    <h3 className="text-white font-bold mb-6 flex items-center gap-2 relative z-10">
-                        <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                            <TrendingUp className="w-4 h-4" />
+                    <h3 className="text-white font-bold mb-6 flex items-center gap-2 relative z-10 w-full justify-between">
+                        <div className="flex items-center gap-2">
+                            <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                                <TrendingUp className="w-4 h-4" />
+                            </div>
+                            Editor Workload
                         </div>
-                        Editor Workload
+                        {overviewStats.currentCycleName && (
+                            <span className="text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-full">
+                                {overviewStats.currentCycleName}
+                            </span>
+                        )}
                     </h3>
                     <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar relative z-10">
                         {overviewStats.editorPerformance.length > 0 ? (
