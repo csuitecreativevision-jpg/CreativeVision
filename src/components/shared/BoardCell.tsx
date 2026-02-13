@@ -38,6 +38,32 @@ export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dro
         displayValue = colValueObj.display_value;
     }
 
+    // NEW PRE-PROCESSING: Check for "Filename - URL" pattern in plain text columns
+    // This handles cases where a text column contains "Video.mp4 - https://..."
+    // We only do this if it's likely a text column (no JSON value structure usually)
+    if (displayValue && typeof displayValue === 'string') {
+        // Regex to find "Text - http..."
+        // We use a non-greedy capture for the name
+        const match = displayValue.match(/^(.+?)\s+-\s+(https?:\/\/[^\s]+)/);
+
+        if (match) {
+            const possibleName = match[1].trim();
+            const possibleUrl = match[2].trim();
+
+            // Additional check: valid file extension OR common drive link to reduce false positives
+            const isFileOrDrive = /\.(mp4|mov|webm|ogg|pdf|jpg|png|gif|jpeg|svg|doc|docx|zip)$/i.test(possibleName) ||
+                possibleUrl.includes('drive.google.com') ||
+                possibleUrl.includes('dropbox.com') ||
+                possibleUrl.includes('monday.com');
+
+            if (isFileOrDrive) {
+                fileName = possibleName;
+                linkUrl = possibleUrl;
+                displayValue = fileName; // Show clean name
+            }
+        }
+    }
+
     if (colValueObj && colValueObj.value) {
         try {
             const val = JSON.parse(colValueObj.value);
