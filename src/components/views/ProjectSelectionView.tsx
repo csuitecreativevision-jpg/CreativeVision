@@ -426,6 +426,24 @@ export const ProjectSelectionView = ({
         return val || 'Active';
     };
 
+    // Navigation handlers for Modal Cycling
+    const currentIndex = useMemo(() => {
+        if (!selectedProject) return -1;
+        return filteredItems.findIndex((i: any) => i.id === selectedProject.id);
+    }, [filteredItems, selectedProject]);
+
+    const handleNextProject = () => {
+        if (currentIndex !== -1 && currentIndex < filteredItems.length - 1) {
+            setSelectedProject(filteredItems[currentIndex + 1]);
+        }
+    };
+
+    const handlePrevProject = () => {
+        if (currentIndex !== -1 && currentIndex > 0) {
+            setSelectedProject(filteredItems[currentIndex - 1]);
+        }
+    };
+
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12 relative min-h-[500px]">
             {/* Header / Controls */}
@@ -591,6 +609,10 @@ export const ProjectSelectionView = ({
                     isOpen={!!selectedProject}
                     onClose={() => setSelectedProject(null)}
                     title={selectedProject?.name}
+                    onNext={handleNextProject}
+                    onPrev={handlePrevProject}
+                    hasNext={currentIndex !== -1 && currentIndex < filteredItems.length - 1}
+                    hasPrev={currentIndex !== -1 && currentIndex > 0}
                     mainContent={
                         mainAsset?.url ? (() => {
                             // Extract extension ignoring query strings

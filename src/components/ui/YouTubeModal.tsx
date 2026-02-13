@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 interface YouTubeModalProps {
@@ -9,6 +9,10 @@ interface YouTubeModalProps {
     title?: string;
     mainContent?: React.ReactNode;
     sidebarContent?: React.ReactNode;
+    onNext?: () => void;
+    onPrev?: () => void;
+    hasNext?: boolean;
+    hasPrev?: boolean;
 }
 
 export const YouTubeModal = ({
@@ -16,7 +20,11 @@ export const YouTubeModal = ({
     onClose,
     title,
     mainContent,
-    sidebarContent
+    sidebarContent,
+    onNext,
+    onPrev,
+    hasNext = false,
+    hasPrev = false
 }: YouTubeModalProps) => {
 
     // Lock body scroll when open
@@ -31,14 +39,16 @@ export const YouTubeModal = ({
         };
     }, [isOpen]);
 
-    // Close on Escape key
+    // Handle Keyboard Navigation
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
+            if (e.key === 'ArrowRight' && hasNext && onNext) onNext();
+            if (e.key === 'ArrowLeft' && hasPrev && onPrev) onPrev();
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [onClose]);
+    }, [onClose, onNext, onPrev, hasNext, hasPrev]);
 
     if (!isOpen) return null;
 
@@ -66,15 +76,38 @@ export const YouTubeModal = ({
                         {/* Header - Glassmorphic overlay */}
                         {/* Header - Standard Modal Title Bar */}
                         <div className="relative z-50 flex items-center justify-between px-6 py-4 bg-[#0E0E1A] border-b border-white/10">
-                            <h2 className="text-lg font-bold text-white/90 truncate max-w-2xl">
+                            <h2 className="text-lg font-bold text-white/90 truncate max-w-2xl mr-4">
                                 {title || 'Project Details'}
                             </h2>
-                            <button
-                                onClick={onClose}
-                                className="p-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 text-gray-300 hover:text-white transition-all duration-200 group"
-                            >
-                                <X className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                {(onPrev || onNext) && (
+                                    <div className="flex items-center gap-1 mr-2 bg-white/5 rounded-full p-1 border border-white/5">
+                                        <button
+                                            onClick={onPrev}
+                                            disabled={!hasPrev}
+                                            className={`p-1.5 rounded-full transition-all ${hasPrev ? 'hover:bg-white/10 text-gray-300 hover:text-white' : 'text-gray-600 cursor-not-allowed'}`}
+                                            title="Previous Project (Left Arrow)"
+                                        >
+                                            <ChevronLeft className="w-5 h-5" />
+                                        </button>
+                                        <div className="w-px h-4 bg-white/10" />
+                                        <button
+                                            onClick={onNext}
+                                            disabled={!hasNext}
+                                            className={`p-1.5 rounded-full transition-all ${hasNext ? 'hover:bg-white/10 text-gray-300 hover:text-white' : 'text-gray-600 cursor-not-allowed'}`}
+                                            title="Next Project (Right Arrow)"
+                                        >
+                                            <ChevronRight className="w-5 h-5" />
+                                        </button>
+                                    </div>
+                                )}
+                                <button
+                                    onClick={onClose}
+                                    className="p-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 text-gray-300 hover:text-white transition-all duration-200 group"
+                                >
+                                    <X className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Content Grid */}
