@@ -250,6 +250,7 @@ export default function AdminClients() {
                                     selectedBoardId={selectedBoard.id}
                                     refreshBoardDetails={handleRefresh}
                                     setPreviewFile={setPreviewFile}
+                                    useYouTubeModal={true}
                                 />
                             </div>
                         </div>

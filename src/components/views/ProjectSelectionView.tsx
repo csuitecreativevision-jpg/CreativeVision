@@ -4,21 +4,85 @@ import { Search, X, Calendar, Activity } from 'lucide-react';
 import { ProjectCard } from '../shared/ProjectCard';
 import { BoardCell } from '../shared/BoardCell';
 import { PremiumModal } from '../ui/PremiumModal';
+import { YouTubeModal } from '../ui/YouTubeModal';
 import { getCycleFromDate } from '../../features/performance-dashboard/utils/dateUtils';
-import { getBoardColumns } from '../../services/mondayService';
+import { getBoardColumns, getAssetPublicUrl, normalizeMondayFileUrl } from '../../services/mondayService';
 
 interface ProjectSelectionViewProps {
     boardData: any;
     selectedBoardId: string | null;
     refreshBoardDetails: (boardId: string, silent: boolean) => void;
     setPreviewFile: (file: { url: string, name: string, assetId?: string } | null) => void;
+    useYouTubeModal?: boolean;
 }
+
+// Helper component for video playback with signed URL fetching
+const SubmissionVideoPlayer = ({ url }: { url: string }) => {
+    const [videoSrc, setVideoSrc] = useState<string | null>(null);
+    const [error, setError] = useState(false);
+
+    useEffect(() => {
+        let isMounted = true;
+        const fetchUrl = async () => {
+            // Check if it's a protected Monday URL that needs signing
+            // Format: .../resources/ASSET_ID/...
+            const match = url.match(/\/resources\/(\d+)\//);
+            if (match && match[1]) {
+                try {
+                    const assetId = match[1];
+                    const publicUrl = await getAssetPublicUrl(assetId);
+                    if (isMounted && publicUrl) {
+                        const normalized = normalizeMondayFileUrl(publicUrl);
+                        setVideoSrc(normalized);
+                        return;
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch signed video URL", e);
+                }
+            }
+
+            // Fallback to original URL if not protected or fetch failed
+            if (isMounted) {
+                setVideoSrc(url);
+            }
+        };
+
+        fetchUrl();
+        return () => { isMounted = false; };
+    }, [url]);
+
+    if (error) {
+        return <div className="text-white">Video failed to load. <a href={url} target="_blank" className="underline">Download</a></div>;
+    }
+
+    if (!videoSrc) {
+        return <div className="flex items-center justify-center h-full"><span className="animate-pulse text-gray-400">Loading video...</span></div>;
+    }
+
+    return (
+        <div className="w-full h-full flex items-center justify-center bg-black">
+            <video
+                src={videoSrc}
+                className="w-full h-full object-contain"
+                controls
+                autoPlay
+                playsInline
+                // @ts-ignore
+                referrerPolicy="no-referrer"
+                onError={() => setError(true)}
+            >
+                Your browser does not support the video tag.
+            </video>
+        </div>
+    );
+};
 
 export const ProjectSelectionView = ({
     boardData,
     selectedBoardId,
     refreshBoardDetails,
-    setPreviewFile
+    setPreviewFile,
+    useYouTubeModal = false
 }: ProjectSelectionViewProps) => {
     // State
     const [searchTerm, setSearchTerm] = useState('');
@@ -310,17 +374,17 @@ export const ProjectSelectionView = ({
                                 <div
                                     onClick={() => toggleCycle(cycleKey)}
                                     className={`
-                                        cursor-pointer rounded-2xl border transition-all duration-300 overflow-hidden
-                                        ${isExpanded ? 'bg-[#0E0E1A] border-white/10' : 'bg-transparent border-white/5 hover:bg-white/5'}
-                                    `}
+                                            cursor-pointer rounded-2xl border transition-all duration-300 overflow-hidden
+                                            ${isExpanded ? 'bg-[#0E0E1A] border-white/10' : 'bg-transparent border-white/5 hover:bg-white/5'}
+                                        `}
                                 >
                                     {/* Header */}
                                     <div className="p-6 flex items-center gap-6">
                                         {/* Badge */}
                                         <div className={`
-                                            w-14 h-14 rounded-2xl flex flex-col items-center justify-center border transition-all
-                                            ${isExpanded ? 'bg-violet-500/10 border-violet-500/30 text-violet-400' : 'bg-white/5 border-white/5 text-gray-500 group-hover:bg-white/10'}
-                                        `}>
+                                                w-14 h-14 rounded-2xl flex flex-col items-center justify-center border transition-all
+                                                ${isExpanded ? 'bg-violet-500/10 border-violet-500/30 text-violet-400' : 'bg-white/5 border-white/5 text-gray-500 group-hover:bg-white/10'}
+                                            `}>
                                             <span className="text-[9px] uppercase font-bold tracking-wider opacity-60">Cycle</span>
                                             <span className="text-xl font-bold">{cycleNum}</span>
                                         </div>
@@ -378,62 +442,179 @@ export const ProjectSelectionView = ({
             )}
 
             {/* Detail Modal */}
-            <PremiumModal
-                isOpen={!!selectedProject}
-                onClose={() => setSelectedProject(null)}
-            >
-                {selectedProject && (
-                    <>
-                        {/* Modal Header containing Status & Title */}
-                        <div className="p-8 border-b border-white/5 bg-[#131322] relative">
-                            {/* Ambient Glow */}
-                            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-[80px] pointer-events-none" />
+            {useYouTubeModal ? (
+                <YouTubeModal
+                    isOpen={!!selectedProject}
+                    onClose={() => setSelectedProject(null)}
+                    title={selectedProject?.name}
+                    mainContent={
+                        selectedProject && (() => {
+                            // 1. Logic to find the "Main Asset"
+                            // Priority: "Submission Preview" Column -> File Column (Video > Image) -> Link Column (Video URL)
+                            let mainAssetUrl: string | null = null;
+                            let mainAssetName: string = selectedProject.name;
 
-                            <div className="relative z-10 flex items-start justify-between gap-4">
-                                <div className="space-y-4">
-                                    {/* Status Badge */}
-                                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
-                                        <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: getStatusColor(selectedProject) }} />
-                                        <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest leading-none pt-0.5">
-                                            {getStatusText(selectedProject)}
-                                        </span>
+                            // A. Check for "Submission Preview" specifically (File or Link)
+                            const submissionCol = boardData.columns?.find((c: any) => c.title.toLowerCase().includes('submission preview'));
+
+                            if (submissionCol) {
+                                const val = selectedProject.column_values.find((v: any) => v.id === submissionCol.id);
+                                if (val) {
+                                    // 1. Try Standard File/Link Parsing (JSON value)
+                                    if (val.value) {
+                                        try {
+                                            const fileData = JSON.parse(val.value);
+                                            if (fileData.files && fileData.files.length > 0) {
+                                                const f = fileData.files[0];
+                                                mainAssetUrl = f.public_url || f.url || f.urlThumbnail;
+                                                mainAssetName = f.name || "Submission Preview";
+                                            }
+                                            else if (fileData.url) {
+                                                mainAssetUrl = fileData.url;
+                                                mainAssetName = fileData.text || "Submission Preview";
+                                            }
+                                        } catch (e) { }
+                                    }
+
+                                    // 2. Fallback: Check display_value (Mirror columns often return direct text/url here)
+                                    if (!mainAssetUrl && val.display_value) {
+                                        // Simple check if it looks like a URL
+                                        if (val.display_value.startsWith('http')) {
+                                            mainAssetUrl = val.display_value;
+                                            mainAssetName = "Submission Preview";
+                                        }
+                                    }
+                                }
+                            }
+
+                            // B. Check File Columns
+                            if (!mainAssetUrl) {
+                                const fileCols = boardData.columns?.filter((c: any) => c.type === 'file') || [];
+                                for (const col of fileCols) {
+                                    const val = selectedProject.column_values.find((v: any) => v.id === col.id);
+                                    if (val && val.value) {
+                                        try {
+                                            const fileData = JSON.parse(val.value);
+                                            if (fileData.files && fileData.files.length > 0) {
+                                                const f = fileData.files[0];
+                                                const url = f.public_url || f.url || f.urlThumbnail; // Prioritize public
+                                                if (url) {
+                                                    // Prefer video
+                                                    if (/\.(mp4|mov|webm|ogg)$/i.test(f.name) || /\.(mp4|mov|webm|ogg)$/i.test(url)) {
+                                                        mainAssetUrl = url;
+                                                        mainAssetName = f.name;
+                                                        break; // Found video, stop
+                                                    }
+                                                    // Fallback to image if no video found yet
+                                                    if (!mainAssetUrl && /\.(jpg|png|jpeg|webp|gif)$/i.test(f.name)) {
+                                                        mainAssetUrl = url;
+                                                        mainAssetName = f.name;
+                                                    }
+                                                }
+                                            }
+                                        } catch (e) { }
+                                    }
+                                }
+                            }
+
+                            // Check Link Columns (if no file found)
+                            if (!mainAssetUrl) {
+                                const linkCols = boardData.columns?.filter((c: any) => c.type === 'link') || [];
+                                for (const col of linkCols) {
+                                    const val = selectedProject.column_values.find((v: any) => v.id === col.id);
+                                    if (val && val.value) {
+                                        try {
+                                            const linkData = JSON.parse(val.value);
+                                            if (linkData.url) {
+                                                mainAssetUrl = linkData.url;
+                                                mainAssetName = linkData.text || selectedProject.name;
+                                                break;
+                                            }
+                                        } catch (e) { }
+                                    }
+                                }
+                            }
+
+                            // If still no asset, check text columns for "Filename - URL" pattern
+                            if (!mainAssetUrl) {
+                                const textCols = boardData.columns?.filter((c: any) => c.type === 'text') || [];
+                                for (const col of textCols) {
+                                    const val = selectedProject.column_values.find((v: any) => v.id === col.id);
+                                    // Check display value directly
+                                    const displayValue = val?.text || val?.display_value;
+                                    if (displayValue && typeof displayValue === 'string') {
+                                        const match = displayValue.match(/^(.+?)\s+-\s+(https?:\/\/[^\s]+)/);
+                                        if (match) {
+                                            mainAssetName = match[1].trim();
+                                            mainAssetUrl = match[2].trim();
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (mainAssetUrl) {
+                                // Extract extension ignoring query strings
+                                const cleanUrl = mainAssetUrl.split('?')[0];
+                                const ext = cleanUrl.split('.').pop()?.toLowerCase() || '';
+                                const isVideo = ['mp4', 'mov', 'webm', 'ogg', 'avi', 'mkv'].includes(ext);
+
+                                console.log('DEBUG: Video Detection', { mainAssetUrl, cleanUrl, ext, isVideo });
+
+                                if (isVideo) {
+                                    return <SubmissionVideoPlayer url={mainAssetUrl} />;
+                                }
+
+                                return (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                        <iframe
+                                            src={mainAssetUrl}
+                                            className="w-full h-full border-0"
+                                            title={mainAssetName}
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                        />
                                     </div>
+                                );
+                            }
 
-                                    {/* Title */}
-                                    <h2 className="text-3xl font-black text-white leading-tight tracking-tight">
+                            // Fallback: Project Cover / Start Screen
+                            return (
+                                <div className="flex flex-col items-center justify-center text-center p-10">
+                                    <div className="w-32 h-32 rounded-3xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 flex items-center justify-center mb-6 border border-white/10 shadow-2xl shadow-violet-500/10">
+                                        <Activity className="w-16 h-16 text-violet-400" />
+                                    </div>
+                                    <h3 className="text-3xl font-bold text-white mb-2">
                                         {selectedProject.name}
-                                    </h2>
+                                    </h3>
+                                    <p className="text-gray-400 max-w-md">
+                                        Select a file from the sidebar to preview, or view project details.
+                                    </p>
                                 </div>
-
-                                <button
-                                    onClick={() => setSelectedProject(null)}
-                                    className="p-2.5 rounded-xl hover:bg-white/10 text-gray-500 hover:text-white transition-all duration-200"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Modal Content - Scrollable */}
-                        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-8 bg-[#0E0E1A]">
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-2 pb-2 border-b border-white/5">
+                            );
+                        })()
+                    }
+                    sidebarContent={
+                        selectedProject && (
+                            <>
+                                <div className="flex items-center gap-2 pb-4 border-b border-white/5 mb-6">
                                     <Activity className="w-4 h-4 text-violet-400" />
                                     <h3 className="text-xs font-bold text-white uppercase tracking-widest">Project Details</h3>
                                 </div>
 
-                                <div className="grid grid-cols-1 gap-5">
-                                    {boardData.columns?.filter((col: any) => col.type !== 'name' && !col.title.startsWith('C-F-')).map((col: any) => (
-                                        <div key={col.id} className="group bg-[#131322]/50 border border-white/5 rounded-2xl p-5 hover:border-white/10 transition-all duration-300 hover:bg-[#131322]">
-                                            <div className="flex items-center gap-2 mb-3">
+                                <div className="space-y-4">
+                                    {boardData.columns?.filter((col: any) =>
+                                        col.type !== 'name' &&
+                                        !col.title.startsWith('C-F-') &&
+                                        col.title.toLowerCase() !== 'submission preview' // Exclude Submission Preview from sidebar
+                                    ).map((col: any) => (
+                                        <div key={col.id} className="group bg-[#1a1a2e]/50 border border-white/5 rounded-2xl p-4 hover:border-white/10 transition-all duration-300">
+                                            <div className="flex items-center gap-2 mb-2">
                                                 <div className="w-1 h-3 rounded-full bg-violet-500/20 group-hover:bg-violet-500 transition-colors" />
                                                 <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold group-hover:text-gray-300 transition-colors">
                                                     {col.title}
                                                 </span>
                                             </div>
-
-
-
 
                                             <div className="pl-3">
                                                 <BoardCell
@@ -447,7 +628,7 @@ export const ProjectSelectionView = ({
                                                             return val?.display_value || val?.text;
                                                         }).filter(Boolean) as string[]
                                                     ))}
-                                                    dropdownOptions={mirrorOptions[col.id]} // Pass fetched options
+                                                    dropdownOptions={mirrorOptions[col.id]}
                                                     onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
                                                     onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
                                                 />
@@ -455,18 +636,105 @@ export const ProjectSelectionView = ({
                                         </div>
                                     ))}
                                 </div>
-                            </div>
-                        </div>
 
-                        {/* Modal Footer */}
-                        <div className="p-4 border-t border-white/5 bg-[#0a0a12] text-center">
-                            <span className="text-[10px] font-mono text-gray-600">
-                                Project ID: {selectedProject.id}
-                            </span>
-                        </div>
-                    </>
-                )}
-            </PremiumModal>
+                                {/* Metadata Footer */}
+                                <div className="pt-6 mt-8 border-t border-white/5 text-center">
+                                    <span className="text-[10px] font-mono text-gray-600">
+                                        Project ID: {selectedProject.id}
+                                    </span>
+                                </div>
+                            </>
+                        )
+                    }
+                />
+            ) : (
+                <PremiumModal
+                    isOpen={!!selectedProject}
+                    onClose={() => setSelectedProject(null)}
+                >
+                    {selectedProject && (
+                        <>
+                            {/* Modal Header containing Status & Title */}
+                            <div className="p-8 border-b border-white/5 bg-[#131322] relative">
+                                {/* Ambient Glow */}
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-[80px] pointer-events-none" />
+
+                                <div className="relative z-10 flex items-start justify-between gap-4">
+                                    <div className="space-y-4">
+                                        {/* Status Badge */}
+                                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
+                                            <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: getStatusColor(selectedProject) }} />
+                                            <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest leading-none pt-0.5">
+                                                {getStatusText(selectedProject)}
+                                            </span>
+                                        </div>
+
+                                        {/* Title */}
+                                        <h2 className="text-3xl font-black text-white leading-tight tracking-tight">
+                                            {selectedProject.name}
+                                        </h2>
+                                    </div>
+
+                                    <button
+                                        onClick={() => setSelectedProject(null)}
+                                        className="p-2.5 rounded-xl hover:bg-white/10 text-gray-500 hover:text-white transition-all duration-200"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Modal Content - Scrollable */}
+                            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-8 bg-[#0E0E1A]">
+                                <div className="space-y-6">
+                                    <div className="flex items-center gap-2 pb-2 border-b border-white/5">
+                                        <Activity className="w-4 h-4 text-violet-400" />
+                                        <h3 className="text-xs font-bold text-white uppercase tracking-widest">Project Details</h3>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 gap-5">
+                                        {boardData.columns?.filter((col: any) => col.type !== 'name' && !col.title.startsWith('C-F-')).map((col: any) => (
+                                            <div key={col.id} className="group bg-[#131322]/50 border border-white/5 rounded-2xl p-5 hover:border-white/10 transition-all duration-300 hover:bg-[#131322]">
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <div className="w-1 h-3 rounded-full bg-violet-500/20 group-hover:bg-violet-500 transition-colors" />
+                                                    <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold group-hover:text-gray-300 transition-colors">
+                                                        {col.title}
+                                                    </span>
+                                                </div>
+
+                                                <div className="pl-3">
+                                                    <BoardCell
+                                                        item={selectedProject}
+                                                        column={col}
+                                                        boardId={selectedBoardId}
+                                                        allColumns={boardData.columns}
+                                                        uniqueValues={Array.from(new Set(
+                                                            boardData.items?.map((i: any) => {
+                                                                const val = i.column_values.find((cv: any) => cv.id === col.id);
+                                                                return val?.display_value || val?.text;
+                                                            }).filter(Boolean) as string[]
+                                                        ))}
+                                                        dropdownOptions={mirrorOptions[col.id]}
+                                                        onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
+                                                        onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Modal Footer */}
+                            <div className="p-4 border-t border-white/5 bg-[#0a0a12] text-center">
+                                <span className="text-[10px] font-mono text-gray-600">
+                                    Project ID: {selectedProject.id}
+                                </span>
+                            </div>
+                        </>
+                    )}
+                </PremiumModal>
+            )}
         </div>
     );
 };
