@@ -317,6 +317,7 @@ function ClientPortalContent() {
                                             selectedBoardId={selectedBoard.id}
                                             refreshBoardDetails={handleRefresh}
                                             setPreviewFile={setPreviewFile}
+                                            useYouTubeModal={true}
                                         />
                                     </div>
                                 </div>

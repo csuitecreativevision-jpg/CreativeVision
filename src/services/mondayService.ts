@@ -716,13 +716,19 @@ export async function getMultipleBoardActivityLogs(boardIds: string[], fromDate:
     return allBoardsWithLogs;
 }
 
-export function normalizeMondayFileUrl(url: string | null | undefined): string | null {
-    if (!url) return null;
+export function normalizeMondayFileUrl(url: string | null | undefined): string {
+    if (!url) return '';
 
     // Simple string replacement is safer and sufficient here
     if (url.startsWith("https://files-monday-com.s3.amazonaws.com")) {
         return url.replace("https://files-monday-com.s3.amazonaws.com", "https://files.monday.com/use1");
     }
+
+    // Basic normalization: Ensure HTTPS if missing scheme (though usually fine)
+    if (url.startsWith('//')) {
+        return `https:${url}`;
+    }
+
     return url;
 }
 
@@ -1300,3 +1306,6 @@ export async function getBoardItemsByView(boardId: string, viewName: string) {
         return boardData;
     }, false);
 }
+
+
+

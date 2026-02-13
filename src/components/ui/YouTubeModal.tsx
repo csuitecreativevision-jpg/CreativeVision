@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Maximize2, Minimize2, ExternalLink, Download, FileText, Loader2, AlertCircle } from 'lucide-react';
+import { X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 interface YouTubeModalProps {
@@ -63,37 +63,33 @@ export const YouTubeModal = ({
                         transition={{ type: "spring", duration: 0.5, bounce: 0.1 }}
                         className="relative w-full max-w-[95vw] h-[90vh] bg-[#0E0E1A] rounded-3xl overflow-hidden shadow-2xl flex flex-col border border-white/10"
                     >
-                        {/* Header */}
-                        <div className="flex flex-shrink-0 items-center justify-between px-6 py-4 border-b border-white/5 bg-[#0E0E1A] z-20">
-                            <h2 className="text-lg font-bold text-white truncate max-w-2xl">
+                        {/* Header - Glassmorphic overlay */}
+                        {/* Header - Standard Modal Title Bar */}
+                        <div className="relative z-50 flex items-center justify-between px-6 py-4 bg-[#0E0E1A] border-b border-white/10">
+                            <h2 className="text-lg font-bold text-white/90 truncate max-w-2xl">
                                 {title || 'Project Details'}
                             </h2>
                             <button
                                 onClick={onClose}
-                                className="p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                                className="p-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 text-gray-300 hover:text-white transition-all duration-200 group"
                             >
-                                <X className="w-5 h-5" />
+                                <X className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
                             </button>
                         </div>
 
                         {/* Content Grid */}
-                        <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
-                            {/* Main Stage (Left/Top) */}
-                            <div className="flex-1 bg-black/50 relative overflow-hidden flex flex-col">
-                                <div className="flex-1 flex items-center justify-center p-4 md:p-8 overflow-y-auto custom-scrollbar">
-                                    {/* Centered Content Container */}
-                                    <div className="w-full h-full flex flex-col items-center justify-center relative">
-                                        {mainContent}
-                                    </div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col bg-[#0b0b15]">
+                            {/* Main Stage (Top for Video) */}
+                            <div className="w-full bg-black relative flex-shrink-0 min-h-[50vh] xl:min-h-[65vh] flex flex-col items-center justify-center shadow-2xl z-10">
+                                <div className="w-full h-full absolute inset-0 flex items-center justify-center">
+                                    {mainContent}
                                 </div>
                             </div>
 
-                            {/* Sidebar (Right/Bottom) */}
+                            {/* Details (Bottom) */}
                             {sidebarContent && (
-                                <div className="w-full lg:w-[400px] xl:w-[450px] bg-[#131322] border-t lg:border-t-0 lg:border-l border-white/5 flex flex-col h-[50vh] lg:h-full lg:flex-shrink-0 z-10">
-                                    <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
-                                        {sidebarContent}
-                                    </div>
+                                <div className="w-full max-w-[1600px] mx-auto p-6 md:p-10 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    {sidebarContent}
                                 </div>
                             )}
                         </div>

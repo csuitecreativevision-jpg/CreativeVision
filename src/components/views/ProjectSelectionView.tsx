@@ -60,19 +60,31 @@ const SubmissionVideoPlayer = ({ url }: { url: string }) => {
     }
 
     return (
-        <div className="w-full h-full flex items-center justify-center bg-black">
+        <div className="w-full h-full flex items-center justify-center bg-black relative group">
             <video
                 src={videoSrc}
                 className="w-full h-full object-contain"
                 controls
                 autoPlay
+                muted
+                loop
+                preload="auto"
                 playsInline
                 // @ts-ignore
                 referrerPolicy="no-referrer"
-                onError={() => setError(true)}
+                onError={(e) => {
+                    console.error("DEBUG: Video Playback Error", e);
+                    setError(true);
+                }}
             >
                 Your browser does not support the video tag.
             </video>
+
+            {/* Fallback Link Overlay (Visible on Error or Hover) */}
+            <div className={`absolute bottom-4 right-4 bg-black/80 px-4 py-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 pointer-events-none`}>
+                <span className="text-xs text-white">Video not playing?</span>
+            </div>
+            {/* Invisible clickable layer for debugging/fallback if needed? No, native controls cover most. */}
         </div>
     );
 };
@@ -91,6 +103,138 @@ export const ProjectSelectionView = ({
     const [viewMode, setViewMode] = useState<'all' | 'cycles'>('all'); // NEW: View Mode
     const [expandedCycles, setExpandedCycles] = useState<Set<string>>(new Set()); // NEW: Expanded Cycles
     const [mirrorOptions, setMirrorOptions] = useState<Record<string, any[]>>({});
+
+    // Derived main asset for download & preview
+    const mainAsset = useMemo(() => {
+        if (!selectedProject || !boardData.columns) return null;
+
+        let mainAssetUrl: string | null = null;
+        let mainAssetName: string = selectedProject.name;
+
+        // A. Check for "Submission Preview" specifically (File or Link)
+        const submissionCol = boardData.columns?.find((c: any) => c.title.toLowerCase().includes('submission preview'));
+
+        if (submissionCol) {
+            const val = selectedProject.column_values.find((v: any) => v.id === submissionCol.id);
+            if (val) {
+                // 1. Try Standard File/Link Parsing (JSON value)
+                if (val.value) {
+                    try {
+                        const fileData = JSON.parse(val.value);
+                        if (fileData.files && fileData.files.length > 0) {
+                            const f = fileData.files[0];
+                            mainAssetUrl = f.public_url || f.url || f.urlThumbnail;
+                            mainAssetName = f.name || "Submission Preview";
+                        }
+                        else if (fileData.url) {
+                            mainAssetUrl = fileData.url;
+                            mainAssetName = fileData.text || "Submission Preview";
+                        }
+                    } catch (e) { }
+                }
+
+                // 2. Fallback: Check display_value (Mirror columns often return direct text/url here)
+                if (!mainAssetUrl && val.display_value) {
+                    if (val.display_value.startsWith('http')) {
+                        mainAssetUrl = val.display_value;
+                        mainAssetName = "Submission Preview";
+                    }
+                }
+            }
+        }
+
+        // B. Check File Columns
+        if (!mainAssetUrl) {
+            const fileCols = boardData.columns?.filter((c: any) => c.type === 'file') || [];
+            for (const col of fileCols) {
+                const val = selectedProject.column_values.find((v: any) => v.id === col.id);
+                if (val && val.value) {
+                    try {
+                        const fileData = JSON.parse(val.value);
+                        if (fileData.files && fileData.files.length > 0) {
+                            const f = fileData.files[0];
+                            const url = f.public_url || f.url || f.urlThumbnail; // Prioritize public
+                            if (url) {
+                                // Prefer video
+                                if (/\.(mp4|mov|webm|ogg)$/i.test(f.name) || /\.(mp4|mov|webm|ogg)$/i.test(url)) {
+                                    mainAssetUrl = url;
+                                    mainAssetName = f.name;
+                                    break; // Found video, stop
+                                }
+                                // Fallback to image if no video found yet
+                                if (!mainAssetUrl && /\.(jpg|png|jpeg|webp|gif)$/i.test(f.name)) {
+                                    mainAssetUrl = url;
+                                    mainAssetName = f.name;
+                                }
+                            }
+                        }
+                    } catch (e) { }
+                }
+            }
+        }
+
+        // Check Link Columns (if no file found)
+        if (!mainAssetUrl) {
+            const linkCols = boardData.columns?.filter((c: any) => c.type === 'link') || [];
+            for (const col of linkCols) {
+                const val = selectedProject.column_values.find((v: any) => v.id === col.id);
+                if (val && val.value) {
+                    try {
+                        const linkData = JSON.parse(val.value);
+                        if (linkData.url) {
+                            mainAssetUrl = linkData.url;
+                            mainAssetName = linkData.text || selectedProject.name;
+                            break;
+                        }
+                    } catch (e) { }
+                }
+            }
+        }
+
+        // If still no asset, check text columns for "Filename - URL" pattern
+        if (!mainAssetUrl) {
+            const textCols = boardData.columns?.filter((c: any) => c.type === 'text') || [];
+            for (const col of textCols) {
+                const val = selectedProject.column_values.find((v: any) => v.id === col.id);
+                const displayValue = val?.text || val?.display_value;
+                if (displayValue && typeof displayValue === 'string') {
+                    const match = displayValue.match(/^(.+?)\s+-\s+(https?:\/\/[^\s]+)/);
+                    if (match) {
+                        mainAssetName = match[1].trim();
+                        mainAssetUrl = match[2].trim();
+                        break;
+                    }
+                }
+            }
+        }
+
+        return { url: mainAssetUrl, name: mainAssetName };
+    }, [selectedProject, boardData]);
+
+    const handleDownload = async () => {
+        if (!mainAsset?.url) return;
+
+        let downloadUrl = mainAsset.url as string;
+
+        // Check for Monday protected resource
+        const match = downloadUrl.match(/\/resources\/(\d+)\//);
+        if (match && match[1]) {
+            try {
+                const publicUrl = await getAssetPublicUrl(match[1]);
+                if (publicUrl) {
+                    downloadUrl = normalizeMondayFileUrl(publicUrl);
+                }
+            } catch (e) { console.error("Failed to sign URL for download", e); }
+        }
+
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = mainAsset.name || 'download';
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
 
     // Effect to fetch source columns for Mirror fields (Status/Priority)
     useEffect(() => {
@@ -448,199 +592,124 @@ export const ProjectSelectionView = ({
                     onClose={() => setSelectedProject(null)}
                     title={selectedProject?.name}
                     mainContent={
-                        selectedProject && (() => {
-                            // 1. Logic to find the "Main Asset"
-                            // Priority: "Submission Preview" Column -> File Column (Video > Image) -> Link Column (Video URL)
-                            let mainAssetUrl: string | null = null;
-                            let mainAssetName: string = selectedProject.name;
+                        mainAsset?.url ? (() => {
+                            // Extract extension ignoring query strings
+                            const cleanUrl = mainAsset.url.split('?')[0];
+                            const ext = cleanUrl.split('.').pop()?.toLowerCase() || '';
+                            const isVideo = ['mp4', 'mov', 'webm', 'ogg', 'avi', 'mkv'].includes(ext);
 
-                            // A. Check for "Submission Preview" specifically (File or Link)
-                            const submissionCol = boardData.columns?.find((c: any) => c.title.toLowerCase().includes('submission preview'));
+                            console.log('DEBUG: Video Detection', { url: mainAsset.url, cleanUrl, ext, isVideo });
 
-                            if (submissionCol) {
-                                const val = selectedProject.column_values.find((v: any) => v.id === submissionCol.id);
-                                if (val) {
-                                    // 1. Try Standard File/Link Parsing (JSON value)
-                                    if (val.value) {
-                                        try {
-                                            const fileData = JSON.parse(val.value);
-                                            if (fileData.files && fileData.files.length > 0) {
-                                                const f = fileData.files[0];
-                                                mainAssetUrl = f.public_url || f.url || f.urlThumbnail;
-                                                mainAssetName = f.name || "Submission Preview";
-                                            }
-                                            else if (fileData.url) {
-                                                mainAssetUrl = fileData.url;
-                                                mainAssetName = fileData.text || "Submission Preview";
-                                            }
-                                        } catch (e) { }
-                                    }
-
-                                    // 2. Fallback: Check display_value (Mirror columns often return direct text/url here)
-                                    if (!mainAssetUrl && val.display_value) {
-                                        // Simple check if it looks like a URL
-                                        if (val.display_value.startsWith('http')) {
-                                            mainAssetUrl = val.display_value;
-                                            mainAssetName = "Submission Preview";
-                                        }
-                                    }
-                                }
+                            if (isVideo) {
+                                return <SubmissionVideoPlayer url={mainAsset.url} />;
                             }
 
-                            // B. Check File Columns
-                            if (!mainAssetUrl) {
-                                const fileCols = boardData.columns?.filter((c: any) => c.type === 'file') || [];
-                                for (const col of fileCols) {
-                                    const val = selectedProject.column_values.find((v: any) => v.id === col.id);
-                                    if (val && val.value) {
-                                        try {
-                                            const fileData = JSON.parse(val.value);
-                                            if (fileData.files && fileData.files.length > 0) {
-                                                const f = fileData.files[0];
-                                                const url = f.public_url || f.url || f.urlThumbnail; // Prioritize public
-                                                if (url) {
-                                                    // Prefer video
-                                                    if (/\.(mp4|mov|webm|ogg)$/i.test(f.name) || /\.(mp4|mov|webm|ogg)$/i.test(url)) {
-                                                        mainAssetUrl = url;
-                                                        mainAssetName = f.name;
-                                                        break; // Found video, stop
-                                                    }
-                                                    // Fallback to image if no video found yet
-                                                    if (!mainAssetUrl && /\.(jpg|png|jpeg|webp|gif)$/i.test(f.name)) {
-                                                        mainAssetUrl = url;
-                                                        mainAssetName = f.name;
-                                                    }
-                                                }
-                                            }
-                                        } catch (e) { }
-                                    }
-                                }
-                            }
-
-                            // Check Link Columns (if no file found)
-                            if (!mainAssetUrl) {
-                                const linkCols = boardData.columns?.filter((c: any) => c.type === 'link') || [];
-                                for (const col of linkCols) {
-                                    const val = selectedProject.column_values.find((v: any) => v.id === col.id);
-                                    if (val && val.value) {
-                                        try {
-                                            const linkData = JSON.parse(val.value);
-                                            if (linkData.url) {
-                                                mainAssetUrl = linkData.url;
-                                                mainAssetName = linkData.text || selectedProject.name;
-                                                break;
-                                            }
-                                        } catch (e) { }
-                                    }
-                                }
-                            }
-
-                            // If still no asset, check text columns for "Filename - URL" pattern
-                            if (!mainAssetUrl) {
-                                const textCols = boardData.columns?.filter((c: any) => c.type === 'text') || [];
-                                for (const col of textCols) {
-                                    const val = selectedProject.column_values.find((v: any) => v.id === col.id);
-                                    // Check display value directly
-                                    const displayValue = val?.text || val?.display_value;
-                                    if (displayValue && typeof displayValue === 'string') {
-                                        const match = displayValue.match(/^(.+?)\s+-\s+(https?:\/\/[^\s]+)/);
-                                        if (match) {
-                                            mainAssetName = match[1].trim();
-                                            mainAssetUrl = match[2].trim();
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (mainAssetUrl) {
-                                // Extract extension ignoring query strings
-                                const cleanUrl = mainAssetUrl.split('?')[0];
-                                const ext = cleanUrl.split('.').pop()?.toLowerCase() || '';
-                                const isVideo = ['mp4', 'mov', 'webm', 'ogg', 'avi', 'mkv'].includes(ext);
-
-                                console.log('DEBUG: Video Detection', { mainAssetUrl, cleanUrl, ext, isVideo });
-
-                                if (isVideo) {
-                                    return <SubmissionVideoPlayer url={mainAssetUrl} />;
-                                }
-
-                                return (
-                                    <div className="w-full h-full flex items-center justify-center">
-                                        <iframe
-                                            src={mainAssetUrl}
-                                            className="w-full h-full border-0"
-                                            title={mainAssetName}
-                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                            allowFullScreen
-                                        />
-                                    </div>
-                                );
-                            }
-
-                            // Fallback: Project Cover / Start Screen
                             return (
-                                <div className="flex flex-col items-center justify-center text-center p-10">
-                                    <div className="w-32 h-32 rounded-3xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 flex items-center justify-center mb-6 border border-white/10 shadow-2xl shadow-violet-500/10">
-                                        <Activity className="w-16 h-16 text-violet-400" />
-                                    </div>
-                                    <h3 className="text-3xl font-bold text-white mb-2">
-                                        {selectedProject.name}
-                                    </h3>
-                                    <p className="text-gray-400 max-w-md">
-                                        Select a file from the sidebar to preview, or view project details.
-                                    </p>
+                                <div className="w-full h-full flex items-center justify-center">
+                                    <iframe
+                                        src={mainAsset.url}
+                                        className="w-full h-full border-0"
+                                        title={mainAsset.name}
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                        allowFullScreen
+                                    />
                                 </div>
                             );
-                        })()
+                        })() : (
+                            <div className="flex flex-col items-center justify-center text-center p-10">
+                                <div className="w-32 h-32 rounded-3xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 flex items-center justify-center mb-6 border border-white/10 shadow-2xl shadow-violet-500/10">
+                                    <Activity className="w-16 h-16 text-violet-400" />
+                                </div>
+                                <h3 className="text-3xl font-bold text-white mb-2">
+                                    {selectedProject ? selectedProject.name : 'Select a Project'}
+                                </h3>
+                                <p className="text-gray-400 max-w-md">
+                                    Select a file from the sidebar to preview, or view project details.
+                                </p>
+                            </div>
+                        )
                     }
                     sidebarContent={
                         selectedProject && (
                             <>
-                                <div className="flex items-center gap-2 pb-4 border-b border-white/5 mb-6">
-                                    <Activity className="w-4 h-4 text-violet-400" />
-                                    <h3 className="text-xs font-bold text-white uppercase tracking-widest">Project Details</h3>
+                                {/* --- YouTube Style Layout --- */}
+
+                                {/* 1. Video Title & Primary Info */}
+                                <div className="flex flex-col md:flex-row gap-6 items-start justify-between border-b border-white/5 pb-6">
+                                    <div className="space-y-3 flex-1">
+
+                                        <div className="flex items-center gap-4 text-sm text-gray-400">
+                                            <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/5">
+                                                Project ID: <span className="text-gray-200 font-mono">{selectedProject.id}</span>
+                                            </span>
+                                            <span>•</span>
+                                            <span>Updated {new Date().toLocaleDateString()}</span>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div className="space-y-4">
-                                    {boardData.columns?.filter((col: any) =>
-                                        col.type !== 'name' &&
-                                        !col.title.startsWith('C-F-') &&
-                                        col.title.toLowerCase() !== 'submission preview' // Exclude Submission Preview from sidebar
-                                    ).map((col: any) => (
-                                        <div key={col.id} className="group bg-[#1a1a2e]/50 border border-white/5 rounded-2xl p-4 hover:border-white/10 transition-all duration-300">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <div className="w-1 h-3 rounded-full bg-violet-500/20 group-hover:bg-violet-500 transition-colors" />
-                                                <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold group-hover:text-gray-300 transition-colors">
-                                                    {col.title}
-                                                </span>
-                                            </div>
+                                {/* 2. Metadata Grid (The Description) */}
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                    {/* Left Column: Description/Main Details */}
+                                    <div className="lg:col-span-2 space-y-6">
+                                        <div className="bg-[#13131f] rounded-2xl p-6 border border-white/5">
+                                            <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                                                <div className="w-1 h-4 rounded-full bg-violet-500" />
+                                                PROJECT DETAILS
+                                            </h3>
 
-                                            <div className="pl-3">
-                                                <BoardCell
-                                                    item={selectedProject}
-                                                    column={col}
-                                                    boardId={selectedBoardId}
-                                                    allColumns={boardData.columns}
-                                                    uniqueValues={Array.from(new Set(
-                                                        boardData.items?.map((i: any) => {
-                                                            const val = i.column_values.find((cv: any) => cv.id === col.id);
-                                                            return val?.display_value || val?.text;
-                                                        }).filter(Boolean) as string[]
-                                                    ))}
-                                                    dropdownOptions={mirrorOptions[col.id]}
-                                                    onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
-                                                    onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
-                                                />
+                                            <div className="flex flex-col gap-1">
+                                                {boardData.columns?.filter((col: any) =>
+                                                    col.type !== 'name' &&
+                                                    !col.title.startsWith('C-F-') &&
+                                                    col.title.toLowerCase() !== 'submission preview'
+                                                ).map((col: any) => (
+                                                    <div key={col.id} className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl hover:bg-white/[0.03] transition-colors border-b border-white/[0.02] last:border-0 gap-2">
+                                                        <span className="text-sm font-medium text-gray-500 group-hover:text-gray-400 transition-colors uppercase tracking-wider min-w-[150px]">
+                                                            {col.title}
+                                                        </span>
+                                                        <div className="flex-1 flex justify-start sm:justify-end">
+                                                            <BoardCell
+                                                                item={selectedProject}
+                                                                column={col}
+                                                                boardId={selectedBoardId}
+                                                                allColumns={boardData.columns}
+                                                                uniqueValues={Array.from(new Set(
+                                                                    boardData.items?.map((i: any) => {
+                                                                        const val = i.column_values.find((cv: any) => cv.id === col.id);
+                                                                        return val?.display_value || val?.text;
+                                                                    }).filter(Boolean) as string[]
+                                                                ))}
+                                                                dropdownOptions={mirrorOptions[col.id]}
+                                                                onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
+                                                                onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
-                                    ))}
+                                    </div>
+
+                                    {/* Right Column: Quick Actions */}
+                                    <div className="space-y-4">
+                                        <div className="bg-[#13131f] rounded-2xl p-6 border border-white/5">
+                                            <p className="text-xs text-gray-500 uppercase tracking-widest font-bold mb-4">Quick Actions</p>
+                                            <div className="space-y-2">
+                                                <button
+                                                    onClick={handleDownload}
+                                                    className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors text-sm font-medium flex items-center justify-between group"
+                                                >
+                                                    Download <span className="opacity-0 group-hover:opacity-100 transition-opacity">↓</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {/* Metadata Footer */}
                                 <div className="pt-6 mt-8 border-t border-white/5 text-center">
                                     <span className="text-[10px] font-mono text-gray-600">
-                                        Project ID: {selectedProject.id}
                                     </span>
                                 </div>
                             </>
@@ -735,6 +804,6 @@ export const ProjectSelectionView = ({
                     )}
                 </PremiumModal>
             )}
-        </div>
+        </div >
     );
 };
