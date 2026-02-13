@@ -16,6 +16,7 @@ export default function AdminAnalytics() {
     const [cycleData, setCycleData] = useState<any>(null); // Video Counts
     const [paymentData, setPaymentData] = useState<any>(null); // Payment Amounts
     const [typeData, setTypeData] = useState<any>(null); // Project Types
+    const [statusData, setStatusData] = useState<any>(null); // Project Statuses
     const [revisionsData, setRevisionsData] = useState<any>(null); // Revision Counts
     const [selectedCycle, setSelectedCycle] = useState<string>('');
     const [availableCycles, setAvailableCycles] = useState<string[]>([]);
@@ -35,12 +36,13 @@ export default function AdminAnalytics() {
         setLoading(true);
         try {
             // Fetch Cycle Based Analytics from Workspace Boards
-            const { cycles, data: cData, payments: pData, types: tData, revisions: rData } = await getWorkspaceAnalytics();
+            const { cycles, data: cData, payments: pData, types: tData, statuses: sData, revisions: rData } = await getWorkspaceAnalytics();
 
             setAvailableCycles(cycles);
             setCycleData(cData);
             setPaymentData(pData);
             setTypeData(tData);
+            setStatusData(sData);
             setRevisionsData(rData);
 
             // Default to most recent cycle
@@ -122,7 +124,7 @@ export default function AdminAnalytics() {
                 let previousTotal = 0;
                 Object.keys(sourceData).forEach(key => {
                     if (key.includes(`${longMonth} ${previousYear}`)) {
-                        const cycleTotal = Object.values(sourceData[key]).reduce((acc: any, val: any) => acc + val, 0);
+                        const cycleTotal = Object.values(sourceData[key]).reduce((acc: number, val: any) => acc + (val as number), 0);
                         previousTotal += cycleTotal;
                     }
                 });
@@ -152,13 +154,13 @@ export default function AdminAnalytics() {
 
                     // Current Year Match
                     if (isSameMonth && cycleYear === targetYear) {
-                        const cycleTotal = Object.values(sourceData[key]).reduce((acc: any, val: any) => acc + val, 0);
+                        const cycleTotal = Object.values(sourceData[key]).reduce((acc: number, val: any) => acc + (val as number), 0);
                         currentTotal += cycleTotal;
                     }
 
                     // Previous Year Match
                     if (isSameMonth && cycleYear === previousYear) {
-                        const cycleTotal = Object.values(sourceData[key]).reduce((acc: any, val: any) => acc + val, 0);
+                        const cycleTotal = Object.values(sourceData[key]).reduce((acc: number, val: any) => acc + (val as number), 0);
                         previousTotal += cycleTotal;
                     }
                 }
@@ -196,7 +198,6 @@ export default function AdminAnalytics() {
             .sort((a, b) => b.value - a.value);
     };
 
-    // Aggregation: Get Project Type Data (PIE CHART)
     const getProjectTypeData = () => {
         if (!typeData) return [];
 
@@ -223,6 +224,54 @@ export default function AdminAnalytics() {
             .sort((a, b) => b.value - a.value);
 
         return result;
+    };
+
+    // Aggregation: Get Project Status Data (PIE CHART)
+    const getProjectStatusData = () => {
+        if (!statusData) return { data: [], colors: [] };
+
+        let rawData: { name: string; value: number }[] = [];
+
+        // If a specific cycle is selected
+        if (selectedCycle && statusData[selectedCycle]) {
+            rawData = Object.entries(statusData[selectedCycle])
+                .map(([name, value]: [string, any]) => ({ name, value }))
+                .sort((a, b) => b.value - a.value);
+        } else {
+            // Otherwise (All Cycles), aggregate across filtered cycles
+            const totals: Record<string, number> = {};
+
+            filteredCycles.forEach(cycle => {
+                if (statusData[cycle]) {
+                    Object.entries(statusData[cycle]).forEach(([status, val]: [string, any]) => {
+                        totals[status] = (totals[status] || 0) + val;
+                    });
+                }
+            });
+
+            rawData = Object.entries(totals)
+                .map(([name, value]) => ({ name, value }))
+                .sort((a, b) => b.value - a.value);
+        }
+
+        // Color Mapping Logic
+        const getColorForStatus = (status: string) => {
+            const s = status.toLowerCase();
+            if (s.includes('approved') || s.includes('done') || s.includes('complete')) return '#10b981'; // Emerald (Green)
+            if (s.includes('assigned') || s.includes('progress') || s.includes('working')) return '#3b82f6'; // Blue
+            if (s.includes('revision') || s.includes('change')) return '#ef4444'; // Red
+            if (s.includes('client') && (s.includes('waiting') || s.includes('review'))) return '#f59e0b'; // Amber (Waiting)
+            if (s.includes('approval') || s.includes('review')) return '#8b5cf6'; // Violet (Internal Review)
+            if (s.includes('new') || s.includes('open')) return '#06b6d4'; // Cyan
+            if (s.includes('stuck') || s.includes('hold')) return '#64748b'; // Slate (Gray)
+
+            // Fallback palette
+            return '#6366f1'; // Indigo
+        };
+
+        const colors = rawData.map(item => getColorForStatus(item.name));
+
+        return { data: rawData, colors };
     };
 
     // Aggregation: Get Revisions Data (BAR CHART)
@@ -257,6 +306,7 @@ export default function AdminAnalytics() {
     const monthlyTrendData = getMonthlyTrendData();
     const editorBreakdownData = getEditorBreakdownData();
     const projectTypeData = getProjectTypeData();
+    const projectStatusData = getProjectStatusData();
     const revisionsChartData = getRevisionsData();
 
     // Calculate total value for the selected scope (For KPI)
@@ -401,32 +451,31 @@ export default function AdminAnalytics() {
                             />
                         </div>
 
-                        {/* 2. Breakdown Section: Bar + Pie */}
+                        {/* 2. Editor Breakdown (Bar Chart) - Full Width */}
+                        <div className="w-full">
+                            <AnalyticBarChart
+                                title={
+                                    selectedCycle
+                                        ? (viewMode === 'productivity' ? `Top Editors: ${selectedCycle}` : `Editor Earnings: ${selectedCycle}`)
+                                        : (dateFilter?.month
+                                            ? (viewMode === 'productivity' ? `Top Editors: ${new Date(2000, dateFilter.month - 1).toLocaleString('default', { month: 'long' })}` : `Editor Earnings: ${new Date(2000, dateFilter.month - 1).toLocaleString('default', { month: 'long' })}`)
+                                            : (viewMode === 'productivity' ? `Editor Breakdown` : `Earnings Breakdown`)
+                                        )
+                                }
+                                data={editorBreakdownData}
+                                dataKey="value"
+                                xAxisKey="name"
+                                color={viewMode === 'productivity' ? "#8b5cf6" : "#10b981"}
+                                delay={0.4}
+                                layout="vertical"
+                                height={400}
+                                valuePrefix={viewMode === 'earnings' ? "₱" : ""}
+                            />
+                        </div>
+
+                        {/* 3. Distributions: Type + Status (Side by Side) */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-
-                            {/* Editor Breakdown (Bar Chart) */}
-                            <div className="w-full">
-                                <AnalyticBarChart
-                                    title={
-                                        selectedCycle
-                                            ? (viewMode === 'productivity' ? `Top Editors: ${selectedCycle}` : `Editor Earnings: ${selectedCycle}`)
-                                            : (dateFilter?.month
-                                                ? (viewMode === 'productivity' ? `Top Editors: ${new Date(2000, dateFilter.month - 1).toLocaleString('default', { month: 'long' })}` : `Editor Earnings: ${new Date(2000, dateFilter.month - 1).toLocaleString('default', { month: 'long' })}`)
-                                                : (viewMode === 'productivity' ? `Editor Breakdown` : `Earnings Breakdown`)
-                                            )
-                                    }
-                                    data={editorBreakdownData}
-                                    dataKey="value"
-                                    xAxisKey="name"
-                                    color={viewMode === 'productivity' ? "#8b5cf6" : "#10b981"}
-                                    delay={0.4}
-                                    layout="vertical"
-                                    height={400}
-                                    valuePrefix={viewMode === 'earnings' ? "₱" : ""}
-                                />
-                            </div>
-
-                            {/* Project Type Distribution (Pie Chart) - NEW */}
+                            {/* Project Type Distribution (Pie Chart) */}
                             <div className="w-full">
                                 <AnalyticPieChart
                                     title="Project Type Distribution"
@@ -435,10 +484,20 @@ export default function AdminAnalytics() {
                                     height={400}
                                 />
                             </div>
+
+                            {/* Project Status Distribution (Pie Chart) */}
+                            <div className="w-full">
+                                <AnalyticPieChart
+                                    title="Project Status Distribution"
+                                    data={projectStatusData.data}
+                                    delay={0.55}
+                                    height={400}
+                                    colors={projectStatusData.colors} // Custom mapped colors
+                                />
+                            </div>
                         </div>
 
-
-                        {/* 3. Revisions Chart (Bar Chart) - NEW */}
+                        {/* 4. Revisions Chart (Bar Chart) */}
                         <div className="w-full">
                             <AnalyticBarChart
                                 title="Revision Rates per Editor"

@@ -112,8 +112,9 @@ export const AnalyticPieChart = ({
                             <defs>
                                 {data.map((_, index) => {
                                     const color = colors[index % colors.length];
+                                    const gradientId = `pieGradient-${title.replace(/\s+/g, '')}-${index}`;
                                     return (
-                                        <linearGradient id={`pieGradient-${index}`} x1="0" y1="0" x2="0" y2="1" key={`grad-${index}`}>
+                                        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1" key={`grad-${index}`}>
                                             <stop offset="0%" stopColor={color} stopOpacity={1} />
                                             <stop offset="100%" stopColor={color} stopOpacity={0.5} />
                                         </linearGradient>
@@ -136,7 +137,7 @@ export const AnalyticPieChart = ({
                                 {data.map((_, index) => (
                                     <Cell
                                         key={`cell-${index}`}
-                                        fill={`url(#pieGradient-${index})`}
+                                        fill={`url(#pieGradient-${title.replace(/\s+/g, '')}-${index})`}
                                         stroke="rgba(0,0,0,0)"
                                     />
                                 ))}

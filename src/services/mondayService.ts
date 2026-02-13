@@ -869,6 +869,7 @@ export async function getWorkspaceAnalytics() {
     const analyticsData: Record<string, Record<string, number>> = {}; // { "Cycle Key": { "Editor Name": Count } }
     const paymentData: Record<string, Record<string, number>> = {}; // { "Cycle Key": { "Editor Name": TotalPrice } }
     const typeData: Record<string, Record<string, number>> = {}; // { "Cycle Key": { "Type Name": Count } }
+    const statusData: Record<string, Record<string, number>> = {}; // { "Cycle Key": { "Status Name": Count } }
     const revisionsData: Record<string, Record<string, number>> = {}; // { "Cycle Key": { "Editor Name": Count } }
     const cyclesSet = new Set<string>();
 
@@ -885,6 +886,14 @@ export async function getWorkspaceAnalytics() {
         // Find Type Column
         const typeCol = board.columns?.find((c: any) => c.title.toLowerCase() === 'type' || c.title.toLowerCase().includes('type'));
         const typeColId = typeCol?.id;
+
+        // Find Status Column (Status, Project Status, or simply a status column if unthemed)
+        const statusCol = board.columns?.find((c: any) =>
+            c.title.toLowerCase() === 'status' ||
+            c.title.toLowerCase() === 'project status' ||
+            (c.type === 'color' && !c.title.toLowerCase().includes('priority') && !c.title.toLowerCase().includes('label'))
+        );
+        const statusColId = statusCol?.id;
 
         if (typeColId) {
             console.log(`[Analytics] Found Type column '${typeCol.title}' (${typeCol.id}) for board: ${board.name}`);
@@ -944,6 +953,7 @@ export async function getWorkspaceAnalytics() {
                     if (!paymentData[cycleKey][editorName]) paymentData[cycleKey][editorName] = 0;
 
                     if (!typeData[cycleKey]) typeData[cycleKey] = {};
+                    if (!statusData[cycleKey]) statusData[cycleKey] = {};
 
                     // Increment Video Count
                     analyticsData[cycleKey][editorName]++;
@@ -982,6 +992,20 @@ export async function getWorkspaceAnalytics() {
                                     if (!typeData[cycleKey][typeName]) typeData[cycleKey][typeName] = 0;
                                     typeData[cycleKey][typeName]++;
                                 }
+                            }
+                        }
+                    }
+
+                    // Process Status
+                    if (statusColId) {
+                        const statusVal = item.column_values?.find((cv: any) => cv.id === statusColId);
+                        if (statusVal) {
+                            // Handle Mirror Columns (display_value) and Regular Columns (text/label)
+                            const rawStatus = statusVal.display_value || statusVal.text;
+
+                            if (rawStatus) {
+                                if (!statusData[cycleKey][rawStatus]) statusData[cycleKey][rawStatus] = 0;
+                                statusData[cycleKey][rawStatus]++;
                             }
                         }
                     }
@@ -1064,6 +1088,7 @@ export async function getWorkspaceAnalytics() {
         data: analyticsData,
         payments: paymentData,
         types: typeData,
+        statuses: statusData,
         revisions: revisionsData
     };
 }
