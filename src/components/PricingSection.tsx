@@ -44,7 +44,13 @@ export default function PricingSection({ id, className, onShortFormSelect }: Pri
             <SelectionModal
                 isOpen={showSelectionModal}
                 onClose={() => setShowSelectionModal(false)}
-                onSelect={handleSelection}
+                title="Select Content Type"
+                options={['Long Form', 'Short Form', 'Mixed']}
+                selected=""
+                onSelect={(val) => {
+                    const mapped = val.toLowerCase().replace(' form', '') as 'long' | 'short' | 'mixed';
+                    handleSelection(mapped);
+                }}
             />
 
             <div className="max-w-[1600px] w-full mx-auto relative z-10 h-full flex flex-col justify-center py-[clamp(1rem,4vh,3rem)]">

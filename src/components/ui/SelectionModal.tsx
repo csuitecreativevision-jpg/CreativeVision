@@ -30,7 +30,7 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
         if (isOpen) setSearchTerm('');
     }, [isOpen]);
 
-    const filteredOptions = options.filter(opt =>
+    const filteredOptions = (options ?? []).filter(opt =>
         opt.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
