@@ -5,7 +5,7 @@ export const Preloader = () => {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        // Simple 2.5s logo lockup, no external image loading
+        // Simple 2.5s logo lockup, no external image loading ......
         const endTimer = setTimeout(() => {
             setIsLoading(false);
         }, 2500);
