@@ -64,6 +64,8 @@ export default function App() {
             src="/Untitled design (3).png"
             alt="CV"
             className="w-10 h-10 object-contain cursor-pointer"
+            width="40"
+            height="40"
             onClick={handleSecretClick}
           />
         </div>

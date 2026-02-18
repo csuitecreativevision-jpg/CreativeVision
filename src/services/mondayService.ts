@@ -1,7 +1,7 @@
 const MONDAY_API_URL = "https://api.monday.com/v2";
 const MONDAY_API_TOKEN = import.meta.env.VITE_MONDAY_API_TOKEN;
 import { supabase } from '../lib/supabaseClient';
-import { getCycleFromDate, getCycleDates, isDateInCycle } from '../features/performance-dashboard/utils/dateUtils';
+import { getCycleDates, isDateInCycle } from '../features/performance-dashboard/utils/dateUtils';
 
 export interface ApplicationData {
     fullName: string;
@@ -31,6 +31,37 @@ async function delay(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Global Rate Limiter
+class RateLimiter {
+    private queue: Array<() => void> = [];
+    private activeCount = 0;
+    private maxConcurrent: number;
+
+    constructor(maxConcurrent: number) {
+        this.maxConcurrent = maxConcurrent;
+    }
+
+    async add<T>(fn: () => Promise<T>): Promise<T> {
+        if (this.activeCount >= this.maxConcurrent) {
+            await new Promise<void>(resolve => this.queue.push(resolve));
+        }
+
+        this.activeCount++;
+        try {
+            return await fn();
+        } finally {
+            this.activeCount--;
+            if (this.queue.length > 0) {
+                const next = this.queue.shift();
+                next?.();
+            }
+        }
+    }
+}
+
+// Limit to 3 concurrent requests to be safe
+const limiter = new RateLimiter(3);
+
 export async function getUsers() {
     const query = `query {
         users (limit: 500) {
@@ -50,16 +81,16 @@ export async function getUsers() {
     return response.users;
 }
 
-export async function mondayRequest(query: string, variables: any = {}, retries = 3, backoff = 1000) {
+export async function mondayRequest(query: string, variables: any = {}, retries = 5, backoff = 1000) {
     try {
-        const response = await fetch(MONDAY_API_URL, {
+        const response = await limiter.add(() => fetch(MONDAY_API_URL, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 "Authorization": MONDAY_API_TOKEN,
             },
             body: JSON.stringify({ query, variables }),
-        });
+        }));
 
         // Handle HTTP errors (like 429 Too Many Requests, 500 Server Error)
         if (!response.ok) {
@@ -448,7 +479,6 @@ export async function getBoardItems(boardId: string) {
     return getCachedOrFetch(boardId, async () => {
         let allItems: any[] = [];
         let cursor: string | null = null;
-        let hasMore = true;
 
         // Initial Fetch
         const query = `query {
@@ -668,8 +698,8 @@ export async function getMultipleBoardItems(boardIds: string[]) {
             console.error("Failed to fetch chunk", chunk, e);
         }
 
-        // Wait 200ms between chunks to respect API limits (reduced from 1000ms)
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // Wait 500ms between chunks to respect API limits
+        await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     return allBoards;
@@ -678,7 +708,7 @@ export async function getMultipleBoardItems(boardIds: string[]) {
 export async function getMultipleBoardActivityLogs(boardIds: string[], fromDate: string, columnId?: string) {
     if (boardIds.length === 0) return [];
 
-    const chunkSize = 20;
+    const chunkSize = 5;
     const chunks = [];
     for (let i = 0; i < boardIds.length; i += chunkSize) {
         chunks.push(boardIds.slice(i, i + chunkSize));
@@ -711,6 +741,9 @@ export async function getMultipleBoardActivityLogs(boardIds: string[], fromDate:
         } catch (e) {
             console.error("Failed to fetch activity logs chunk", chunk, e);
         }
+
+        // Wait 500ms between chunks to respect API limits
+        await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     return allBoardsWithLogs;

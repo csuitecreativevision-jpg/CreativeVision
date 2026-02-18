@@ -163,7 +163,7 @@ function EditorPortalContent() {
                     <div className="absolute top-4 left-4 z-50 lg:hidden">
                         <button
                             onClick={() => setIsMobileSidebarOpen(true)}
-                            className="p-2 rounded-lg bg-black/40 backdrop-blur-md border border-white/10 text-white hover:bg-white/10 transition-colors"
+                            className="p-2 rounded-lg bg-[#13141f] border border-white/10 text-white hover:bg-white/10 transition-colors"
                         >
                             <Menu className="w-6 h-6" />
                         </button>
@@ -266,7 +266,7 @@ function EditorPortalContent() {
                                 className="flex-1 flex flex-col h-full z-10"
                             >
                                 {/* Detail Header */}
-                                <div className="h-24 px-8 flex items-center gap-6 border-b border-white/5 bg-black/20 backdrop-blur-xl flex-shrink-0">
+                                <div className="h-24 px-8 flex items-center gap-6 border-b border-white/5 bg-[#0a0a16] flex-shrink-0">
                                     <button
                                         onClick={() => setSelectedBoard(null)}
                                         className="p-3 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-all group"

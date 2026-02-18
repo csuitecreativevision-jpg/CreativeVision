@@ -180,7 +180,7 @@ export async function loginUser(email: string, password: string): Promise<{ succ
             .select('*')
             .eq('email', email.toLowerCase())
             .eq('password_hash', password_hash)
-            .single();
+            .maybeSingle();
 
         if (error || !data) {
             console.error('Login failed:', error);

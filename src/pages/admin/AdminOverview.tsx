@@ -34,10 +34,11 @@ export default function AdminOverview() {
     const fetchOverviewData = async () => {
         setOverviewLoading(true);
         try {
-            // 1. Fetch Board List & Analytics in Parallel
-            const [boardsData, analyticsData] = await Promise.all([
+            // 1. Fetch Board List, Analytics & Folders in Parallel
+            const [boardsData, analyticsData, allFolders] = await Promise.all([
                 getAllBoards(),
-                getWorkspaceAnalytics()
+                getWorkspaceAnalytics(),
+                getAllFolders()
             ]);
 
             const allFetchedBoards = boardsData || [];
@@ -53,8 +54,7 @@ export default function AdminOverview() {
             // ---------------------------------------------------------
             // A) Client/Project Data Source: "Active Clients" Folder (Cycle Based)
             // ---------------------------------------------------------
-            // Fetch Folders to find "Active Clients"
-            const allFolders = await getAllFolders();
+            // Fetch Folders (already fetched above)
             const activeClientsFolder = allFolders.find((f: any) => f.name.toLowerCase() === 'active clients');
 
             let activeClientsCount = 0;
@@ -205,10 +205,8 @@ export default function AdminOverview() {
             {/* Charts Section */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Client Distribution */}
-                <div className="bg-[#0E0E1A]/80 backdrop-blur-md border border-white/5 rounded-3xl p-8 shadow-xl relative overflow-hidden group hover:border-white/10 transition-colors">
-                    {/* Glossy Effect */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                    <div className="absolute -right-20 -top-20 w-64 h-64 bg-purple-600/10 rounded-full blur-[80px] pointer-events-none group-hover:bg-purple-600/20 transition-all duration-700" />
+                <div className="bg-[#13141f] border border-white/5 rounded-2xl p-8 relative overflow-hidden">
+
 
                     <h3 className="text-white font-bold mb-6 flex items-center gap-2 relative z-10">
                         <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400">
@@ -230,7 +228,7 @@ export default function AdminOverview() {
                                         </div>
                                         <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
                                             <div
-                                                className="h-full bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full"
+                                                className="h-full bg-purple-600 rounded-full"
                                                 style={{ width: `${(client.count / Math.max(1, overviewStats.activeProjectsCount)) * 100}%` }}
                                             />
                                         </div>
@@ -246,10 +244,8 @@ export default function AdminOverview() {
                 </div>
 
                 {/* Editor Performance */}
-                <div className="bg-[#0E0E1A]/80 backdrop-blur-md border border-white/5 rounded-3xl p-8 shadow-xl relative overflow-hidden group hover:border-white/10 transition-colors">
-                    {/* Glossy Effect */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                    <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-emerald-600/10 rounded-full blur-[80px] pointer-events-none group-hover:bg-emerald-600/20 transition-all duration-700" />
+                <div className="bg-[#13141f] border border-white/5 rounded-2xl p-8 relative overflow-hidden">
+
 
                     <h3 className="text-white font-bold mb-6 flex items-center gap-2 relative z-10 w-full justify-between">
                         <div className="flex items-center gap-2">
@@ -278,7 +274,7 @@ export default function AdminOverview() {
                                         </div>
                                         <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
                                             <div
-                                                className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full"
+                                                className="h-full bg-emerald-500 rounded-full"
                                                 style={{ width: `${(editor.count / Math.max(1, overviewStats.topEditor.count || 10)) * 100}%` }}
                                             />
                                         </div>

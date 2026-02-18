@@ -1,6 +1,4 @@
 import { ReactNode } from 'react';
-import { BackgroundLayout } from '../layout/BackgroundLayout';
-import { CinematicOverlay } from '../ui/CinematicOverlay';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 
@@ -49,8 +47,7 @@ export const PortalLayout = ({
     );
 
     return (
-        <BackgroundLayout>
-            <CinematicOverlay />
+        <div className="relative min-h-screen bg-[#050511]">
             <div className="flex h-screen relative z-10 overflow-hidden">
 
                 {/* Desktop Sidebar */}
@@ -68,7 +65,7 @@ export const PortalLayout = ({
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 onClick={onMobileSidebarClose}
-                                className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 lg:hidden"
+                                className="fixed inset-0 bg-black/80 z-40 lg:hidden"
                             />
 
                             {/* Drawer */}
@@ -94,10 +91,10 @@ export const PortalLayout = ({
                 </AnimatePresence>
 
                 {/* Main Content */}
-                <div className="flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-black/20 to-custom-purple/5 relative z-30">
+                <div className="flex-1 flex flex-col overflow-hidden bg-[#050511] relative z-30">
                     {mainContent}
                 </div>
             </div>
-        </BackgroundLayout>
+        </div>
     );
 };

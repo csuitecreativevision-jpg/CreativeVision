@@ -68,8 +68,7 @@ export default function AdminSettings() {
                     {activeTab === 'general' && (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl">
                             {/* Profile Card */}
-                            <div className="bg-[#0E0E1A]/80 backdrop-blur-md border border-white/5 rounded-3xl p-8 shadow-xl relative overflow-hidden group">
-                                <div className="absolute top-0 right-0 w-64 h-64 bg-violet-600/10 blur-[80px] rounded-full pointer-events-none -mr-16 -mt-16 group-hover:bg-violet-600/20 transition-colors duration-500" />
+                            <div className="bg-[#13141f] border border-white/5 rounded-2xl p-8 relative overflow-hidden">
 
                                 <div className="relative z-10 flex items-start gap-6">
                                     <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 p-[1px] shadow-lg shadow-violet-500/20">
@@ -94,7 +93,7 @@ export default function AdminSettings() {
 
                             {/* Appearance & Notifications */}
                             <div className="space-y-6">
-                                <div className="bg-[#0E0E1A]/80 backdrop-blur-md border border-white/5 rounded-3xl p-6 shadow-xl space-y-6">
+                                <div className="bg-[#13141f] border border-white/5 rounded-2xl p-6 space-y-6">
                                     <div className="flex items-center gap-3 mb-2">
                                         <Palette className="w-5 h-5 text-pink-400" />
                                         <h3 className="font-bold text-white">Appearance</h3>
@@ -116,7 +115,7 @@ export default function AdminSettings() {
                                     </div>
                                 </div>
 
-                                <div className="bg-[#0E0E1A]/80 backdrop-blur-md border border-white/5 rounded-3xl p-6 shadow-xl space-y-6">
+                                <div className="bg-[#13141f] border border-white/5 rounded-2xl p-6 space-y-6">
                                     <div className="flex items-center gap-3 mb-2">
                                         <Bell className="w-5 h-5 text-amber-400" />
                                         <h3 className="font-bold text-white">Notifications</h3>

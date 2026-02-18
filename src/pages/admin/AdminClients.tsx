@@ -113,9 +113,7 @@ export default function AdminClients() {
     return (
         <div className="flex-1 flex flex-col h-full bg-[#050511] overflow-hidden relative">
 
-            {/* Background Texture */}
-            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none mix-blend-overlay" />
-            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[100px] pointer-events-none" />
+            {/* Background Texture - Removed for performance */}
 
             <AnimatePresence mode="wait">
                 {!selectedBoard ? (
@@ -226,7 +224,7 @@ export default function AdminClients() {
                         className="flex-1 flex flex-col h-full bg-[#050511]"
                     >
                         {/* Detail Header */}
-                        <div className="h-24 px-8 flex items-center gap-6 border-b border-white/5 bg-black/20 backdrop-blur-xl flex-shrink-0 z-20">
+                        <div className="h-24 px-8 flex items-center gap-6 border-b border-white/5 bg-[#0a0a16] flex-shrink-0 z-20">
                             <button
                                 onClick={() => setSelectedBoard(null)}
                                 className="p-3 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-all group"

@@ -249,7 +249,7 @@ export default function AdminBoards() {
     return (
         <div className="flex h-full w-full overflow-hidden bg-[#050511] relative animate-in fade-in duration-500">
             {/* Left Sidebar - Board List */}
-            <div className="w-80 border-r border-white/5 bg-[#0a0a16]/50 backdrop-blur-md flex flex-col flex-shrink-0">
+            <div className="w-80 border-r border-white/5 bg-[#0a0a16] flex flex-col flex-shrink-0">
                 <div className="p-4 border-b border-white/5 space-y-4">
                     {/* Workspace Selector */}
                     {workspaces.length > 0 && (
@@ -498,7 +498,7 @@ export default function AdminBoards() {
                                     <div key={group.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                         {/* Group Header */}
                                         <div
-                                            className="flex items-center gap-3 mb-3 group/header cursor-pointer select-none sticky top-0 bg-[#050511]/95 backdrop-blur-sm z-10 py-2 border-b border-transparent hover:border-white/5 transition-colors"
+                                            className="flex items-center gap-3 mb-3 group/header cursor-pointer select-none sticky top-0 bg-[#050511] z-10 py-2 border-b border-transparent hover:border-white/5 transition-colors"
                                             onClick={() => toggleGroup(group.id)}
                                         >
                                             <div
@@ -584,7 +584,7 @@ export default function AdminBoards() {
 
             {/* Modals */}
             {isCreateBoardOpen && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center animate-in fade-in duration-200">
+                <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center animate-in fade-in duration-200">
                     <div className="bg-[#1a1a2e] p-6 rounded-2xl border border-white/10 w-full max-w-md shadow-2xl">
                         <h3 className="text-xl font-bold text-white mb-4">Create New Board</h3>
                         <input
@@ -612,7 +612,7 @@ export default function AdminBoards() {
 
             {/* Create Group Modal */}
             {isCreateGroupOpen && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center animate-in fade-in duration-200">
+                <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center animate-in fade-in duration-200">
                     <div className="bg-[#1a1a2e] p-6 rounded-2xl border border-white/10 w-full max-w-md shadow-2xl">
                         <h3 className="text-xl font-bold text-white mb-4">Create New Group</h3>
                         <input
