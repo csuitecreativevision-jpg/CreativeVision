@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { RefreshProvider, useRefresh } from '../contexts/RefreshContext';
+import { getAllBoards, getAllFolders, getWorkspaceAnalytics } from '../services/mondayService';
 
 function AdminPortalContent() {
     const navigate = useNavigate();
@@ -27,6 +28,14 @@ function AdminPortalContent() {
             navigate('/portal');
         }
     }, [navigate]);
+
+    // Prefetch admin data as soon as portal mounts — runs in background
+    // so Overview/Analytics pages load instantly from cache
+    useEffect(() => {
+        getAllBoards().catch(() => { });
+        getAllFolders().catch(() => { });
+        getWorkspaceAnalytics().catch(() => { });
+    }, []);
 
     const handleLogout = () => {
         localStorage.removeItem('portal_user_email');

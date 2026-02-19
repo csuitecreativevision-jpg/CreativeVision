@@ -42,7 +42,9 @@ export default function AdminOverview() {
     }, []);
 
     const fetchOverviewData = async () => {
-        setOverviewLoading(true);
+        // Only show spinner if there's no cached data already displayed
+        const hasCachedData = !!getCache(OVERVIEW_CACHE_KEY);
+        if (!hasCachedData) setOverviewLoading(true);
         try {
             // 1. Fetch Board List, Analytics & Folders in Parallel
             const [boardsData, analyticsData, allFolders] = await Promise.all([

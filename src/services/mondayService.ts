@@ -662,9 +662,9 @@ export async function updateItemValue(boardId: string, itemId: string, columnId:
 export async function getMultipleBoardItems(boardIds: string[]) {
     if (boardIds.length === 0) return [];
 
-    // Chunking to avoid query length limits (e.g., 20 boards at a time)
-    // REDUCED to 2 for maximum stability
-    const chunkSize = 2;
+    // Chunking to avoid query length limits
+    // Increased from 2 to 5 for faster fetching
+    const chunkSize = 5;
     const chunks = [];
     for (let i = 0; i < boardIds.length; i += chunkSize) {
         chunks.push(boardIds.slice(i, i + chunkSize));
@@ -718,8 +718,8 @@ export async function getMultipleBoardItems(boardIds: string[]) {
             console.error("Failed to fetch chunk", chunk, e);
         }
 
-        // Wait 500ms between chunks to respect API limits
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Wait 300ms between chunks to respect API limits
+        await new Promise(resolve => setTimeout(resolve, 300));
     }
 
     return allBoards;
