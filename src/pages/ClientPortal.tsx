@@ -65,10 +65,10 @@ function ClientPortalContent() {
                 }
             }
 
-            // Fetch Data in Parallel (force fresh data on load)
+            // Fetch Data in Parallel (uses cache, background refresh if stale)
             const [allBoards, allFolders] = await Promise.all([
-                getAllBoards(true),
-                getAllFolders(true)
+                getAllBoards(),
+                getAllFolders()
             ]);
 
             // Process Folders for Active/Inactive parity

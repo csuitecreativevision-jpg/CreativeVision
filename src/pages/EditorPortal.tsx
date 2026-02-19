@@ -62,8 +62,8 @@ function EditorPortalContent() {
                 }
             }
 
-            // 2. Fetch All Boards (force fresh data on load)
-            const allBoards = await getAllBoards(true);
+            // 2. Fetch All Boards (uses cache, background refresh if stale)
+            const allBoards = await getAllBoards();
 
             // 3. Filter for Workspace Boards
             const workspaceBoards = (allBoards || []).filter((b: any) => {

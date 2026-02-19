@@ -60,8 +60,8 @@ class RateLimiter {
     }
 }
 
-// Limit to 3 concurrent requests to be safe
-const limiter = new RateLimiter(3);
+// Limit to 2 concurrent requests to respect Monday.com rate limits
+const limiter = new RateLimiter(2);
 
 export async function getUsers() {
     const query = `query {
@@ -671,8 +671,8 @@ export async function getMultipleBoardItems(boardIds: string[]) {
     if (boardIds.length === 0) return [];
 
     // Chunking to avoid query length limits
-    // Increased from 2 to 5 for faster fetching
-    const chunkSize = 5;
+    // Keep chunk size small to respect Monday.com rate limits
+    const chunkSize = 3;
     const chunks = [];
     for (let i = 0; i < boardIds.length; i += chunkSize) {
         chunks.push(boardIds.slice(i, i + chunkSize));
@@ -726,8 +726,8 @@ export async function getMultipleBoardItems(boardIds: string[]) {
             console.error("Failed to fetch chunk", chunk, e);
         }
 
-        // Wait 300ms between chunks to respect API limits
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Wait 500ms between chunks to respect API limits
+        await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     return allBoards;
@@ -736,7 +736,7 @@ export async function getMultipleBoardItems(boardIds: string[]) {
 export async function getMultipleBoardActivityLogs(boardIds: string[], fromDate: string, columnId?: string) {
     if (boardIds.length === 0) return [];
 
-    const chunkSize = 5;
+    const chunkSize = 3;
     const chunks = [];
     for (let i = 0; i < boardIds.length; i += chunkSize) {
         chunks.push(boardIds.slice(i, i + chunkSize));

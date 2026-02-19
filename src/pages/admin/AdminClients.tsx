@@ -40,10 +40,10 @@ export default function AdminClients() {
                 }
             }
 
-            // 2. Fetch Data in Parallel (force fresh data on tab load)
+            // 2. Fetch Data in Parallel (uses cache, background refresh if stale)
             const [allBoards, allFolders] = await Promise.all([
-                getAllBoards(true),
-                getAllFolders(true)
+                getAllBoards(),
+                getAllFolders()
             ]);
 
             // 3. Process Folders to find Active/Inactive Sets
