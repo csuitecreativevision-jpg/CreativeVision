@@ -137,62 +137,82 @@ export async function mondayRequest(query: string, variables: any = {}, retries 
 // --- Caching Helper ---
 const CACHE_TTL_MS = 1000 * 60 * 5; // 5 Minutes
 
+// Request Coalescing Map to prevent duplicate in-flight requests
+const pendingRequests = new Map<string, Promise<any>>();
+
 async function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>, meta: boolean = true, forceSync: boolean = false): Promise<T> {
     const table = meta ? 'cache_monday_meta' : 'cache_monday_board_items';
     const idColumn = meta ? 'key' : 'board_id';
 
-    // --- forceSync: Skip ALL caches, fetch fresh from API ---
-    if (forceSync) {
-        const freshData = await fetcher();
-        setCache(key, freshData);
-        supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
-        return freshData;
+    // Check if a request for this key is already in flight
+    if (pendingRequests.has(key)) {
+        return pendingRequests.get(key) as Promise<T>;
     }
 
-    // --- Layer 1: localStorage (instant, synchronous) ---
-    const localCache = getCache<T>(key);
-    if (localCache) {
-        if (!localCache.isStale) {
-            // Fresh local cache — return immediately, no network at all
-            return localCache.data;
-        }
-        // Stale local cache — return it now, background refresh
-        fetcher().then(freshData => {
-            setCache(key, freshData);
-            supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
-        }).catch(err => console.error("Background sync failed", err));
-        return localCache.data;
-    }
+    const promise = (async () => {
+        try {
+            // --- forceSync: Skip ALL caches, fetch fresh from API ---
+            if (forceSync) {
+                const freshData = await fetcher();
+                setCache(key, freshData);
+                supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
+                return freshData;
+            }
 
-    // --- Layer 2: Supabase (network, but faster than Monday API) ---
-    try {
-        const { data } = await supabase.from(table).select('data, updated_at').eq(idColumn, key).maybeSingle();
-        if (data?.data) {
-            // Store in localStorage for next time
-            setCache(key, data.data);
-
-            const age = Date.now() - new Date(data.updated_at).getTime();
-            const isStale = age > CACHE_TTL_MS;
-
-            if (isStale) {
-                // Background Sync
+            // --- Layer 1: localStorage (instant, synchronous) ---
+            const localCache = getCache<T>(key);
+            if (localCache) {
+                if (!localCache.isStale) {
+                    return localCache.data;
+                }
+                // Stale local cache — return it now, background refresh
                 fetcher().then(freshData => {
                     setCache(key, freshData);
                     supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
                 }).catch(err => console.error("Background sync failed", err));
+                return localCache.data;
             }
-            return data.data;
-        }
-    } catch (e) {
-        // Continue to fetch if Supabase fails
-    }
 
-    // --- Layer 3: Monday.com API (slowest, authoritative) ---
-    const freshData = await fetcher();
-    // Update both caches
-    setCache(key, freshData);
-    supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
-    return freshData;
+            // --- Layer 2: Supabase (network, but faster than Monday API) ---
+            try {
+                const { data } = await supabase.from(table).select('data, updated_at').eq(idColumn, key).maybeSingle();
+                if (data?.data) {
+                    // Store in localStorage for next time
+                    setCache(key, data.data);
+
+                    const age = Date.now() - new Date(data.updated_at).getTime();
+                    const isStale = age > CACHE_TTL_MS;
+
+                    if (isStale) {
+                        // Background Sync
+                        fetcher().then(freshData => {
+                            setCache(key, freshData);
+                            supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
+                        }).catch(err => console.error("Background sync failed", err));
+                    }
+                    return data.data;
+                }
+            } catch (e) {
+                // Continue to fetch if Supabase fails
+            }
+
+            // --- Layer 3: Monday.com API (slowest, authoritative) ---
+            const freshData = await fetcher();
+            // Update both caches
+            setCache(key, freshData);
+            supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
+            return freshData;
+
+        } finally {
+            // Remove from pending map when done
+            pendingRequests.delete(key);
+        }
+    })();
+
+    // Store the promise in map
+    pendingRequests.set(key, promise);
+
+    return promise;
 }
 
 async function getOrCreateBoard(): Promise<string> {
@@ -677,84 +697,53 @@ export async function updateItemValue(boardId: string, itemId: string, columnId:
     return data;
 }
 
-// Global Request Queue to prevent "Concurrency limit exceeded" errors
-let globalApiQueue = Promise.resolve();
 
+
+// Refactored to use getBoardItems which provides Caching & Pagination
+// and uses the global RateLimiter (limit=2) to prevent concurrency issues.
 export async function getMultipleBoardItems(boardIds: string[]) {
     if (boardIds.length === 0) return [];
 
-    // Chunking to avoid query length limits
-    // Keep chunk size small to respect Monday.com rate limits
-    const chunkSize = 1;
-    const chunks = [];
-    for (let i = 0; i < boardIds.length; i += chunkSize) {
-        chunks.push(boardIds.slice(i, i + chunkSize));
-    }
+    // Use Promise.all to fetch concurrently (limited by RateLimiter)
+    // This leverages the 'cache_monday_board_items' automatically
+    const results = await Promise.all(
+        boardIds.map(id => getBoardItems(id).catch(err => {
+            console.error(`Failed to fetch board ${id}:`, err);
+            return null;
+        }))
+    );
 
-    let allBoards: any[] = [];
+    return results.filter(b => b !== null);
+}
 
-    for (const chunk of chunks) {
-        const query = `query {
-            boards (ids: [${chunk.join(',')}]) {
-                id
-                name
-                columns {
-                    id
-                    title
-                    type
-                }
-                items_page (limit: 500) {
-                    items {
-                        id
-                        name
-                        created_at
-                        group {
-                            id
-                        }
-                        column_values {
-                            id
-                            text
-                            value
-                            type
-                            ... on MirrorValue {
-                                display_value
-                            }
-                        }
-                    }
-                }
-            }
-        }`;
+export async function prefetchOverviewData() {
+    try {
+        // 1. Get All Folders to find "Active Clients" / "Active Projects"
+        const folders = await getAllFolders();
 
-        // Serialize requests using global queue
-        // This ensures NO parallel items_page requests happen, even across different function calls
-        const fetchTask = globalApiQueue.then(async () => {
-            try {
-                const data = await mondayRequest(query);
-                // Enforce 1000ms delay inside the queue to respect rate limits
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                return data;
-            } catch (e) {
-                console.error("Failed to fetch chunk", chunk, e);
-                return null;
-            }
+        // 2. Identify relevant folders
+        // Overview page uses 'Active Clients' and 'Active Projects'
+        const targetFolders = folders.filter((f: any) =>
+            f.name.toLowerCase().includes('active client') ||
+            f.name.toLowerCase() === 'active projects'
+        );
+
+        const boardIdsToPrefetch = new Set<string>();
+
+        targetFolders.forEach((f: any) => {
+            f.children?.forEach((c: any) => boardIdsToPrefetch.add(String(c.id)));
         });
 
-        // Update queue pointer, catching errors to keep queue alive
-        globalApiQueue = fetchTask.catch(() => { });
-
-        // Wait for THIS specific task to finish and get result
-        const data = await fetchTask;
-
-        if (data && data.boards) {
-            const processedBoards = data.boards.map((b: any) => ({
-                ...b,
-                items: b.items_page?.items || []
-            }));
-            allBoards = [...allBoards, ...processedBoards];
+        // 3. Prefetch items for these boards
+        // This will populate the cache so AdminOverview loads instantly
+        if (boardIdsToPrefetch.size > 0) {
+            console.log(`[Prefetch] Pre-loading ${boardIdsToPrefetch.size} overview boards...`);
+            await getMultipleBoardItems(Array.from(boardIdsToPrefetch));
         }
-    }
 
-    return allBoards;
+    } catch (err) {
+        console.error("[Prefetch] Failed to prefetch overview data", err);
+    }
 }
 
 export async function getMultipleBoardActivityLogs(boardIds: string[], fromDate: string, columnId?: string) {

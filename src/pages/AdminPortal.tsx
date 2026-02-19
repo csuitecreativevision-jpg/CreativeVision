@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { RefreshProvider, useRefresh } from '../contexts/RefreshContext';
-import { getAllBoards, getAllFolders, getWorkspaceAnalytics } from '../services/mondayService';
+import { getAllBoards, getAllFolders, getWorkspaceAnalytics, prefetchOverviewData } from '../services/mondayService';
 
 function AdminPortalContent() {
     const navigate = useNavigate();
@@ -30,10 +30,22 @@ function AdminPortalContent() {
 
     // Prefetch admin data as soon as portal mounts — runs in background
     // so Overview/Analytics pages load instantly from cache
+    // Prefetch admin data as soon as portal mounts — runs in background
+    // Serialized to prevent API overload (503/429)
     useEffect(() => {
-        getAllBoards().catch(() => { });
-        getAllFolders().catch(() => { });
-        getWorkspaceAnalytics().catch(() => { });
+        (async () => {
+            try {
+                await getAllBoards();
+                await getAllFolders();
+                // Then fetch heavier data
+                await Promise.all([
+                    getWorkspaceAnalytics().catch(e => console.error("Analytics prefetch failed", e)),
+                    prefetchOverviewData().catch(e => console.error("Overview prefetch failed", e))
+                ]);
+            } catch (e) {
+                console.error("Prefetch chain failed", e);
+            }
+        })();
     }, []);
 
     const handleLogout = () => {

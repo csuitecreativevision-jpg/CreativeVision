@@ -42,16 +42,51 @@ export function setCache<T>(key: string, data: T): void {
     try {
         const entry: CacheEntry<T> = { data, timestamp: Date.now() };
         localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(entry));
-    } catch (e) {
-        // localStorage full — evict oldest cache entries and retry once
-        try {
-            evictOldestEntries(3);
-            const entry: CacheEntry<T> = { data, timestamp: Date.now() };
-            localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(entry));
-        } catch {
-            console.warn('[CacheService] localStorage full, could not cache:', key);
+    } catch (e: any) {
+        // Handle QuotaExceededError
+        if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+            try {
+                // Tier 1: Evict 30% of oldest entries
+                const totalKeys = getKeyCount();
+                evictOldestEntries(Math.max(5, Math.floor(totalKeys * 0.3)));
+
+                const entry: CacheEntry<T> = { data, timestamp: Date.now() };
+                localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(entry));
+            } catch (retryErr) {
+                try {
+                    // Tier 2: Evict 80% (Aggressive)
+                    const totalKeys = getKeyCount();
+                    evictOldestEntries(Math.max(5, Math.floor(totalKeys * 0.8)));
+
+                    const entry: CacheEntry<T> = { data, timestamp: Date.now() };
+                    localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(entry));
+                } catch (finalErr) {
+                    // Tier 3: Nuclear option - Clear entirely
+                    clearCache();
+                    try {
+                        const entry: CacheEntry<T> = { data, timestamp: Date.now() };
+                        localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(entry));
+                    } catch (fatal) {
+                        console.warn('[CacheService] Data too large for localStorage even after clear:', key);
+                    }
+                }
+            }
+        } else {
+            console.warn('[CacheService] Storage Error:', e);
         }
     }
+}
+
+/**
+ * Helper: Count relevant keys
+ */
+function getKeyCount(): number {
+    let count = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k?.startsWith(CACHE_PREFIX)) count++;
+    }
+    return count;
 }
 
 /**
