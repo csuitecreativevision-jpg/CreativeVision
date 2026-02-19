@@ -677,12 +677,15 @@ export async function updateItemValue(boardId: string, itemId: string, columnId:
     return data;
 }
 
+// Global Request Queue to prevent "Concurrency limit exceeded" errors
+let globalApiQueue = Promise.resolve();
+
 export async function getMultipleBoardItems(boardIds: string[]) {
     if (boardIds.length === 0) return [];
 
     // Chunking to avoid query length limits
     // Keep chunk size small to respect Monday.com rate limits
-    const chunkSize = 3;
+    const chunkSize = 1;
     const chunks = [];
     for (let i = 0; i < boardIds.length; i += chunkSize) {
         chunks.push(boardIds.slice(i, i + chunkSize));
@@ -700,12 +703,11 @@ export async function getMultipleBoardItems(boardIds: string[]) {
                     title
                     type
                 }
-                items_page (limit: 50) {
+                items_page (limit: 500) {
                     items {
                         id
                         name
                         created_at
-                        updated_at
                         group {
                             id
                         }
@@ -723,21 +725,33 @@ export async function getMultipleBoardItems(boardIds: string[]) {
             }
         }`;
 
-        try {
-            const data = await mondayRequest(query);
-            if (data && data.boards) {
-                const processedBoards = data.boards.map((b: any) => ({
-                    ...b,
-                    items: b.items_page?.items || []
-                }));
-                allBoards = [...allBoards, ...processedBoards];
+        // Serialize requests using global queue
+        // This ensures NO parallel items_page requests happen, even across different function calls
+        const fetchTask = globalApiQueue.then(async () => {
+            try {
+                const data = await mondayRequest(query);
+                // Enforce 1000ms delay inside the queue to respect rate limits
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                return data;
+            } catch (e) {
+                console.error("Failed to fetch chunk", chunk, e);
+                return null;
             }
-        } catch (e) {
-            console.error("Failed to fetch chunk", chunk, e);
-        }
+        });
 
-        // Wait 500ms between chunks to respect API limits
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Update queue pointer, catching errors to keep queue alive
+        globalApiQueue = fetchTask.catch(() => { });
+
+        // Wait for THIS specific task to finish and get result
+        const data = await fetchTask;
+
+        if (data && data.boards) {
+            const processedBoards = data.boards.map((b: any) => ({
+                ...b,
+                items: b.items_page?.items || []
+            }));
+            allBoards = [...allBoards, ...processedBoards];
+        }
     }
 
     return allBoards;
@@ -746,7 +760,7 @@ export async function getMultipleBoardItems(boardIds: string[]) {
 export async function getMultipleBoardActivityLogs(boardIds: string[], fromDate: string, columnId?: string) {
     if (boardIds.length === 0) return [];
 
-    const chunkSize = 3;
+    const chunkSize = 1;
     const chunks = [];
     for (let i = 0; i < boardIds.length; i += chunkSize) {
         chunks.push(boardIds.slice(i, i + chunkSize));
@@ -1418,12 +1432,17 @@ async function getApprovalItemsFresh(forceSync: boolean = false) {
     const approvalItems: any[] = [];
 
     boardsWithItems.forEach((board: any) => {
-        // Find relevant columns
-        const statusCol = board.columns?.find((c: any) =>
-            c.title.toLowerCase() === 'status' ||
-            c.title.toLowerCase() === 'project status' ||
-            (c.type === 'color' && !c.title.toLowerCase().includes('priority') && !c.title.toLowerCase().includes('label'))
-        );
+        // Find ALL relevant status columns to check
+        // (Use filter instead of find to catch both "Status", "Project Status", "Phase", etc.)
+        const statusCols = board.columns?.filter((c: any) => {
+            const title = c.title.toLowerCase();
+            return (
+                title.includes('status') ||
+                title.includes('phase') ||
+                title.includes('stage') ||
+                (c.type === 'color' && !title.includes('priority') && !title.includes('label'))
+            );
+        });
 
         const videoCol = board.columns?.find((c: any) =>
             c.title.toLowerCase().includes('video') ||
@@ -1433,51 +1452,57 @@ async function getApprovalItemsFresh(forceSync: boolean = false) {
 
         const editorCol = board.columns?.find((c: any) =>
             c.title.toLowerCase().includes('editor') ||
+            c.title.toLowerCase().includes('owner') ||
             c.type === 'people'
         );
 
-        if (!statusCol) return;
+        board.items?.forEach((item: any) => {
+            // Check if ANY status column has an "Approval" or "Review" status
+            let matchingStatusText = '';
 
-        board.items.forEach((item: any) => {
-            const statusVal = item.column_values?.find((cv: any) => cv.id === statusCol.id);
-            // Handle Mirror Columns and regular Status columns
-            const statusText = statusVal?.text || statusVal?.display_value || statusVal?.label || '';
+            const hasApprovalStatus = statusCols?.some((col: any) => {
+                const statusVal = item.column_values.find((cv: any) => cv.id === col.id);
+                const text = (statusVal?.text || statusVal?.display_value || statusVal?.label || '').toLowerCase();
+                if (text.includes('approval') || text.includes('review') || text.includes('q&a')) {
+                    matchingStatusText = statusVal?.text || statusVal?.display_value || statusVal?.label || '';
+                    return true;
+                }
+                return false;
+            });
 
-            // Check for "For Approval" - loosely match to catch variations
-            if (statusText && statusText.toLowerCase().includes('approval')) {
+            if (hasApprovalStatus) {
+                const videoVal = item.column_values.find((cv: any) => cv.id === videoCol?.id);
 
-                // Extract Video Link
+                // Extract clean URL
                 let videoLink = '';
-                if (videoCol) {
-                    const videoVal = item.column_values?.find((cv: any) => cv.id === videoCol.id);
-                    if (videoVal) {
-                        // Link type value is usually "url text" or json
-                        if (videoVal.text && videoVal.text.startsWith('http')) {
-                            videoLink = videoVal.text.split(' ')[0]; // Simple extraction
-                        } else if (videoVal.value) {
-                            try {
-                                const parsed = JSON.parse(videoVal.value);
-                                if (parsed && parsed.url) videoLink = parsed.url;
-                            } catch (e) { }
-                        }
+                if (videoVal) {
+                    if (videoVal.text && videoVal.text.startsWith('http')) {
+                        videoLink = videoVal.text.split(' ')[0];
+                    } else if (videoVal.value) {
+                        try {
+                            const linkObj = JSON.parse(videoVal.value);
+                            if (linkObj && linkObj.url) videoLink = linkObj.url;
+                        } catch (e) { }
                     }
                 }
 
-                // Extract Editor Name
+                // Determine Editor Name
                 let editorName = 'Unknown';
                 if (editorCol) {
-                    const editorVal = item.column_values?.find((cv: any) => cv.id === editorCol.id);
-                    if (editorVal) {
-                        const rawEditor = editorVal.display_value || editorVal.text;
-                        if (rawEditor) {
-                            editorName = rawEditor.split(',')[0].trim();
-                        }
+                    const editorVal = item.column_values.find((cv: any) => cv.id === editorCol.id);
+                    const rawEditor = editorVal?.display_value || editorVal?.text;
+                    if (rawEditor) {
+                        editorName = rawEditor.split(',')[0].trim();
                     }
                 }
 
                 // Fallback: Parse from Board Name if column missing or empty
                 if (editorName === 'Unknown') {
-                    editorName = board.name.replace(/- Workspace/i, '').replace(/\(c-w-[\w-]+\)/i, '').trim();
+                    editorName = board.name
+                        .replace(/- Workspace/gi, '')
+                        .replace(/\(c-w-[\w-]+\)/gi, '')
+                        .replace(/\((Active|On Hold|Inactive|Done)\)/gi, '')
+                        .trim();
                 }
 
                 approvalItems.push({
@@ -1485,7 +1510,7 @@ async function getApprovalItemsFresh(forceSync: boolean = false) {
                     name: item.name,
                     boardId: board.id,
                     boardName: board.name,
-                    status: statusText,
+                    status: matchingStatusText,
                     editor: editorName,
                     videoLink: videoLink,
                     createdAt: item.created_at,
