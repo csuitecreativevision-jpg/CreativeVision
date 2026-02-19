@@ -40,10 +40,10 @@ export default function AdminClients() {
                 }
             }
 
-            // 2. Fetch Data in Parallel
+            // 2. Fetch Data in Parallel (force fresh data on tab load)
             const [allBoards, allFolders] = await Promise.all([
-                getAllBoards(),
-                getAllFolders()
+                getAllBoards(true),
+                getAllFolders(true)
             ]);
 
             // 3. Process Folders to find Active/Inactive Sets
@@ -196,7 +196,7 @@ export default function AdminClients() {
                                             ][index % 5]}
                                             onClick={async () => {
                                                 try {
-                                                    const fullBoardData = await getBoardItems(board.id);
+                                                    const fullBoardData = await getBoardItems(board.id, true);
                                                     setSelectedBoard(fullBoardData);
                                                 } catch (e) {
                                                     console.error("Failed to fetch board items", e);

@@ -141,9 +141,17 @@ async function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>, meta:
     const table = meta ? 'cache_monday_meta' : 'cache_monday_board_items';
     const idColumn = meta ? 'key' : 'board_id';
 
+    // --- forceSync: Skip ALL caches, fetch fresh from API ---
+    if (forceSync) {
+        const freshData = await fetcher();
+        setCache(key, freshData);
+        supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
+        return freshData;
+    }
+
     // --- Layer 1: localStorage (instant, synchronous) ---
     const localCache = getCache<T>(key);
-    if (localCache && !forceSync) {
+    if (localCache) {
         if (!localCache.isStale) {
             // Fresh local cache — return immediately, no network at all
             return localCache.data;
@@ -166,7 +174,7 @@ async function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>, meta:
             const age = Date.now() - new Date(data.updated_at).getTime();
             const isStale = age > CACHE_TTL_MS;
 
-            if (isStale || forceSync) {
+            if (isStale) {
                 // Background Sync
                 fetcher().then(freshData => {
                     setCache(key, freshData);
@@ -442,7 +450,7 @@ export async function submitApplicationToMonday(data: ApplicationData) {
 
 // --- New Dashboard Integration Functions ---
 
-export async function getAllBoards() {
+export async function getAllBoards(forceSync: boolean = false) {
     return getCachedOrFetch('all_boards', async () => {
         const query = `query {
         boards (limit: 500) {
@@ -457,10 +465,10 @@ export async function getAllBoards() {
     }`;
         const data = await mondayRequest(query);
         return data.boards;
-    }, true);
+    }, true, forceSync);
 }
 
-export async function getAllFolders() {
+export async function getAllFolders(forceSync: boolean = false) {
     return getCachedOrFetch('all_folders', async () => {
         const query = `query {
         folders (limit: 100) {
@@ -477,7 +485,7 @@ export async function getAllFolders() {
     }`;
         const data = await mondayRequest(query);
         return data.folders;
-    }, true);
+    }, true, forceSync);
 }
 
 export async function getAllWorkspaces() {
@@ -495,7 +503,7 @@ export async function getAllWorkspaces() {
     }, true);
 }
 
-export async function getBoardItems(boardId: string) {
+export async function getBoardItems(boardId: string, forceSync: boolean = false) {
     return getCachedOrFetch(boardId, async () => {
         let allItems: any[] = [];
         let cursor: string | null = null;
@@ -607,7 +615,7 @@ export async function getBoardItems(boardId: string) {
             board.items = allItems;
         }
         return board;
-    }, false); // meta=false -> cache_monday_board_items
+    }, false, forceSync); // meta=false -> cache_monday_board_items
 }
 
 export async function getBoardColumns(boardId: string) {

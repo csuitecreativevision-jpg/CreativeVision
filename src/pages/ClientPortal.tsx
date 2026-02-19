@@ -65,10 +65,10 @@ function ClientPortalContent() {
                 }
             }
 
-            // Fetch Data in Parallel
+            // Fetch Data in Parallel (force fresh data on load)
             const [allBoards, allFolders] = await Promise.all([
-                getAllBoards(),
-                getAllFolders()
+                getAllBoards(true),
+                getAllFolders(true)
             ]);
 
             // Process Folders for Active/Inactive parity
@@ -262,7 +262,7 @@ function ClientPortalContent() {
                                                     onClick={async () => {
                                                         setLoading(true);
                                                         try {
-                                                            const fullBoardData = await getBoardItems(board.id);
+                                                            const fullBoardData = await getBoardItems(board.id, true);
                                                             setSelectedBoard(fullBoardData);
                                                         } catch (e) {
                                                             setSelectedBoard(board);

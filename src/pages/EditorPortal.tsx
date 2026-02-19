@@ -62,8 +62,8 @@ function EditorPortalContent() {
                 }
             }
 
-            // 2. Fetch All Boards
-            const allBoards = await getAllBoards();
+            // 2. Fetch All Boards (force fresh data on load)
+            const allBoards = await getAllBoards(true);
 
             // 3. Filter for Workspace Boards
             const workspaceBoards = (allBoards || []).filter((b: any) => {
@@ -236,7 +236,7 @@ function EditorPortalContent() {
                                                     onClick={async () => {
                                                         setLoading(true);
                                                         try {
-                                                            const fullBoardData = await getBoardItems(board.id);
+                                                            const fullBoardData = await getBoardItems(board.id, true);
                                                             setSelectedBoard(fullBoardData);
                                                         } catch (e) {
                                                             setSelectedBoard(board);

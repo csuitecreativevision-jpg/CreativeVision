@@ -39,8 +39,8 @@ export default function AdminTeam() {
                 }
             }
 
-            // 2. Fetch All Boards
-            const allBoards = await getAllBoards();
+            // 2. Fetch All Boards (force fresh data on tab load)
+            const allBoards = await getAllBoards(true);
 
             // 3. Filter for Workspace Boards
             const workspaceBoards = (allBoards || []).filter((b: any) => {
@@ -148,7 +148,7 @@ export default function AdminTeam() {
                                             ][index % 5]}
                                             onClick={async () => {
                                                 try {
-                                                    const fullBoardData = await getBoardItems(board.id);
+                                                    const fullBoardData = await getBoardItems(board.id, true);
                                                     setSelectedBoard(fullBoardData);
                                                 } catch (e) {
                                                     console.error("Failed to fetch board items", e);
