@@ -8,22 +8,28 @@ import { AnalyticsFilterModal } from '../../components/analytics/AnalyticsFilter
 import { Play, Filter, Users, Calendar, Settings2 } from 'lucide-react';
 
 import { getWorkspaceAnalytics } from '../../services/mondayService';
+import { getCache, setCache } from '../../services/cacheService';
+
+const ANALYTICS_CACHE_KEY = 'admin_analytics_page';
 
 export default function AdminAnalytics() {
-    const [loading, setLoading] = useState(true);
+    // Try to hydrate from cache instantly
+    const cachedPage = getCache<any>(ANALYTICS_CACHE_KEY)?.data;
+
+    const [loading, setLoading] = useState(!cachedPage);
 
     // Cycle Analytics State
-    const [cycleData, setCycleData] = useState<any>(null); // Video Counts
-    const [paymentData, setPaymentData] = useState<any>(null); // Payment Amounts
-    const [typeData, setTypeData] = useState<any>(null); // Project Types
-    const [statusData, setStatusData] = useState<any>(null); // Project Statuses
-    const [revisionsData, setRevisionsData] = useState<any>(null); // Revision Counts
-    const [selectedCycle, setSelectedCycle] = useState<string>('');
-    const [availableCycles, setAvailableCycles] = useState<string[]>([]);
+    const [cycleData, setCycleData] = useState<any>(cachedPage?.cycleData || null);
+    const [paymentData, setPaymentData] = useState<any>(cachedPage?.paymentData || null);
+    const [typeData, setTypeData] = useState<any>(cachedPage?.typeData || null);
+    const [statusData, setStatusData] = useState<any>(cachedPage?.statusData || null);
+    const [revisionsData, setRevisionsData] = useState<any>(cachedPage?.revisionsData || null);
+    const [selectedCycle, setSelectedCycle] = useState<string>(cachedPage?.selectedCycle || '');
+    const [availableCycles, setAvailableCycles] = useState<string[]>(cachedPage?.availableCycles || []);
 
     // Filter State
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
-    const [dateFilter, setDateFilter] = useState<{ year: number, month: number | null, cycle: string } | null>(null);
+    const [dateFilter, setDateFilter] = useState<{ year: number, month: number | null, cycle: string } | null>(cachedPage?.dateFilter || null);
 
     // View Mode: 'productivity' (Videos) or 'earnings' (Payments)
     const [viewMode, setViewMode] = useState<'productivity' | 'earnings'>('productivity');
@@ -33,7 +39,8 @@ export default function AdminAnalytics() {
     }, []);
 
     const loadData = async () => {
-        setLoading(true);
+        // Only show spinner if there's no cached data at all
+        if (!cachedPage) setLoading(true);
         try {
             // Fetch Cycle Based Analytics from Workspace Boards
             const { cycles, data: cData, payments: pData, types: tData, statuses: sData, revisions: rData } = await getWorkspaceAnalytics();
@@ -46,7 +53,9 @@ export default function AdminAnalytics() {
             setRevisionsData(rData);
 
             // Default to most recent cycle
-            if (cycles.length > 0) {
+            let newDateFilter = dateFilter;
+            let newSelectedCycle = selectedCycle;
+            if (cycles.length > 0 && !dateFilter) {
                 // Initialize filter to most recent cycle's date
                 const latest = cycles[0];
                 const parts = latest.match(/(\w+) (\d+)/); // Match "February 2026"
@@ -55,11 +64,24 @@ export default function AdminAnalytics() {
                     const year = parseInt(parts[2]);
                     const month = new Date(`${monthName} 1, 2000`).getMonth() + 1;
 
-                    // Default to Specific Month & Cycle
-                    setDateFilter({ year, month, cycle: latest });
-                    setSelectedCycle(latest);
+                    newDateFilter = { year, month, cycle: latest };
+                    newSelectedCycle = latest;
+                    setDateFilter(newDateFilter);
+                    setSelectedCycle(newSelectedCycle);
                 }
             }
+
+            // Save to localStorage cache
+            setCache(ANALYTICS_CACHE_KEY, {
+                cycleData: cData,
+                paymentData: pData,
+                typeData: tData,
+                statusData: sData,
+                revisionsData: rData,
+                selectedCycle: newSelectedCycle,
+                availableCycles: cycles,
+                dateFilter: newDateFilter
+            });
         } catch (error) {
             console.error("Failed to load analytics:", error);
         } finally {

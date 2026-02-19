@@ -2,6 +2,7 @@ const MONDAY_API_URL = "https://api.monday.com/v2";
 const MONDAY_API_TOKEN = import.meta.env.VITE_MONDAY_API_TOKEN;
 import { supabase } from '../lib/supabaseClient';
 import { getCycleDates, isDateInCycle } from '../features/performance-dashboard/utils/dateUtils';
+import { getCache, setCache } from './cacheService';
 
 export interface ApplicationData {
     fullName: string;
@@ -140,29 +141,48 @@ async function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>, meta:
     const table = meta ? 'cache_monday_meta' : 'cache_monday_board_items';
     const idColumn = meta ? 'key' : 'board_id';
 
+    // --- Layer 1: localStorage (instant, synchronous) ---
+    const localCache = getCache<T>(key);
+    if (localCache && !forceSync) {
+        if (!localCache.isStale) {
+            // Fresh local cache — return immediately, no network at all
+            return localCache.data;
+        }
+        // Stale local cache — return it now, background refresh
+        fetcher().then(freshData => {
+            setCache(key, freshData);
+            supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
+        }).catch(err => console.error("Background sync failed", err));
+        return localCache.data;
+    }
+
+    // --- Layer 2: Supabase (network, but faster than Monday API) ---
     try {
-        // Try Cache
         const { data } = await supabase.from(table).select('data, updated_at').eq(idColumn, key).maybeSingle();
         if (data?.data) {
-            // Check TTL
+            // Store in localStorage for next time
+            setCache(key, data.data);
+
             const age = Date.now() - new Date(data.updated_at).getTime();
             const isStale = age > CACHE_TTL_MS;
 
             if (isStale || forceSync) {
                 // Background Sync
                 fetcher().then(freshData => {
+                    setCache(key, freshData);
                     supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
                 }).catch(err => console.error("Background sync failed", err));
             }
             return data.data;
         }
     } catch (e) {
-        // Continue to fetch if cache fails
+        // Continue to fetch if Supabase fails
     }
 
-    // Cache Miss -> Fetch & Wait
+    // --- Layer 3: Monday.com API (slowest, authoritative) ---
     const freshData = await fetcher();
-    // Update Cache
+    // Update both caches
+    setCache(key, freshData);
     supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
     return freshData;
 }
@@ -892,6 +912,30 @@ export async function getAggregatedAnalytics() {
 }
 
 export async function getWorkspaceAnalytics() {
+    // --- Check localStorage for cached analytics result ---
+    const ANALYTICS_CACHE_KEY = 'workspace_analytics';
+    const cached = getCache<any>(ANALYTICS_CACHE_KEY);
+    if (cached && !cached.isStale) {
+        return cached.data;
+    }
+
+    // If stale cache exists, return it immediately and refresh in background
+    if (cached && cached.isStale) {
+        // Fire off background refresh (don't await)
+        getWorkspaceAnalyticsFresh().then(freshResult => {
+            setCache(ANALYTICS_CACHE_KEY, freshResult);
+        }).catch(err => console.error('[Analytics] Background refresh failed', err));
+        return cached.data;
+    }
+
+    // No cache at all — fetch and wait
+    const result = await getWorkspaceAnalyticsFresh();
+    setCache(ANALYTICS_CACHE_KEY, result);
+    return result;
+}
+
+/** Internal: Actually fetch workspace analytics from Monday.com API */
+async function getWorkspaceAnalyticsFresh() {
     // 1. Get all Workspace Boards
     const allBoards = await getAllBoards();
     const workspaceBoards = allBoards.filter((b: any) =>

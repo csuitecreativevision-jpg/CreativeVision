@@ -11,21 +11,31 @@ import {
     getAllBoards, getMultipleBoardItems, getWorkspaceAnalytics, getAllFolders
 } from '../../services/mondayService';
 import { getCycleDates, isDateInCycle } from '../../features/performance-dashboard/utils/dateUtils';
+import { getCache, setCache } from '../../services/cacheService';
+
+const OVERVIEW_CACHE_KEY = 'admin_overview_stats';
 
 // --- Admin Overview Component ---
 export default function AdminOverview() {
     // Overview Stats State
-    const [overviewStats, setOverviewStats] = useState({
-        activeClientsCount: 0,
-        activeProjectsCount: 0,
-        activeEditorsCount: 0,
-        topEditor: { name: 'N/A', count: 0 },
-        systemStatus: 'Stable',
-        clientProjectDistribution: [] as { name: string, count: number }[],
-        editorPerformance: [] as { name: string, count: number }[],
-        currentCycleName: ''
+    const [overviewStats, setOverviewStats] = useState(() => {
+        // Try to hydrate from localStorage cache instantly
+        const cached = getCache<any>(OVERVIEW_CACHE_KEY);
+        return cached?.data || {
+            activeClientsCount: 0,
+            activeProjectsCount: 0,
+            activeEditorsCount: 0,
+            topEditor: { name: 'N/A', count: 0 },
+            systemStatus: 'Stable',
+            clientProjectDistribution: [] as { name: string, count: number }[],
+            editorPerformance: [] as { name: string, count: number }[],
+            currentCycleName: ''
+        };
     });
-    const [overviewLoading, setOverviewLoading] = useState(true);
+    const [overviewLoading, setOverviewLoading] = useState(() => {
+        // Only show spinner if there's NO cached data at all
+        return !getCache(OVERVIEW_CACHE_KEY);
+    });
 
     useEffect(() => {
         fetchOverviewData();
@@ -133,10 +143,11 @@ export default function AdminOverview() {
                 activeEditorsCount = editorsInCycle.length;
 
                 editorsInCycle.forEach(([name, count]) => {
-                    editorPerformance.push({ name, count });
+                    const c = count as number;
+                    editorPerformance.push({ name, count: c });
 
-                    if (count > maxDoneCount) {
-                        maxDoneCount = count;
+                    if (c > maxDoneCount) {
+                        maxDoneCount = c;
                         topEditorName = name;
                     }
                 });
@@ -147,7 +158,7 @@ export default function AdminOverview() {
 
             editorPerformance.sort((a, b) => b.count - a.count);
 
-            setOverviewStats({
+            const newStats = {
                 activeClientsCount,
                 activeProjectsCount: totalActiveProjects,
                 activeEditorsCount,
@@ -156,7 +167,9 @@ export default function AdminOverview() {
                 clientProjectDistribution,
                 editorPerformance,
                 currentCycleName: currentCycleKey || ''
-            });
+            };
+            setOverviewStats(newStats);
+            setCache(OVERVIEW_CACHE_KEY, newStats);
 
         } catch (error) {
             console.error("Failed to load overview data", error);
@@ -164,6 +177,7 @@ export default function AdminOverview() {
             setOverviewLoading(false);
         }
     };
+
 
     return (
         <AdminPageLayout
