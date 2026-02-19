@@ -12,7 +12,11 @@ import { getCache, setCache } from '../../services/cacheService';
 
 const ANALYTICS_CACHE_KEY = 'admin_analytics_page';
 
-export default function AdminAnalytics() {
+interface AdminAnalyticsProps {
+    embedded?: boolean;
+}
+
+export default function AdminAnalytics({ embedded = false }: AdminAnalyticsProps) {
     // Try to hydrate from cache instantly
     const cachedPage = getCache<any>(ANALYTICS_CACHE_KEY)?.data;
 
@@ -367,191 +371,218 @@ export default function AdminAnalytics() {
         return `${year} (Full Year)`;
     };
 
+    const Controls = (
+        <div className="flex items-center gap-3">
+            {/* View Toggle */}
+            <div className="bg-[#0e0e1a] p-1 rounded-xl border border-white/10 flex items-center">
+                <button
+                    onClick={() => setViewMode('productivity')}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'productivity'
+                        ? 'bg-violet-500 text-white shadow-lg'
+                        : 'text-gray-400 hover:text-white'}`}
+                >
+                    Production
+                </button>
+                <button
+                    onClick={() => setViewMode('earnings')}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'earnings'
+                        ? 'bg-emerald-500 text-white shadow-lg'
+                        : 'text-gray-400 hover:text-white'}`}
+                >
+                    Earnings
+                </button>
+            </div>
+
+            <button
+                onClick={loadData}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white text-sm font-bold transition-all"
+            >
+                <Filter className="w-4 h-4" />
+                Refresh
+            </button>
+        </div>
+    );
+
+    const Content = (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+            {/* Controls & KPIs */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                {/* Configuration Button (Unified) */}
+                <div className="bg-[#0e0e1a] p-6 rounded-2xl border border-white/5 flex flex-col justify-center space-y-3 relative group hover:border-violet-500/30 transition-colors cursor-pointer" onClick={() => setIsFilterModalOpen(true)}>
+                    <label className="text-gray-400 text-sm font-bold flex items-center gap-2 mb-2 group-hover:text-violet-400 transition-colors">
+                        <Settings2 className="w-4 h-4" />
+                        Analytics Configuration
+                    </label>
+
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <div className="text-white font-bold text-lg truncate pr-4">
+                                {getFilterLabel()}
+                            </div>
+                            <div className="text-xs text-gray-500 font-medium mt-1">
+                                Click to change Year, Month, or Cycle
+                            </div>
+                        </div>
+                        <div className="p-2 rounded-xl bg-white/5 group-hover:bg-violet-500/10 transition-colors">
+                            <Calendar className="w-5 h-5 text-gray-400 group-hover:text-violet-400 transition-colors" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* KPI: Primary Metric */}
+                <AnalyticCard
+                    title={viewMode === 'productivity' ? "Total Videos Produced" : "Total Payout"}
+                    value={viewMode === 'productivity' ? totalValueInCycle : formatCurrency(totalValueInCycle)}
+                    icon={viewMode === 'productivity' ? <Play className="w-5 h-5" /> : <span className="font-bold text-emerald-400">₱</span>}
+                    trend={{ value: 0, label: selectedCycle || "Monthly Total", isPositive: true }}
+                    delay={0.1}
+                />
+
+                {/* KPI: Active Editors */}
+                <AnalyticCard
+                    title="Active Editors"
+                    value={activeEditorsCount}
+                    icon={<Users className="w-5 h-5" />}
+                    trend={{ value: 0, label: 'contributing this cycle', isPositive: true }}
+                    delay={0.2}
+                />
+            </div>
+
+            {/* Charts Section */}
+            <div className="flex flex-col gap-8 mt-8">
+
+                {/* 1. Yearly Trend (Area Chart) */}
+                <div className="w-full">
+                    <AnalyticAreaChart
+                        title={viewMode === 'productivity' ? `Yearly Production: ${dateFilter?.year || new Date().getFullYear()} vs ${dateFilter?.year ? dateFilter.year - 1 : new Date().getFullYear() - 1}` : `Yearly Income: ${dateFilter?.year || new Date().getFullYear()} vs ${dateFilter?.year ? dateFilter.year - 1 : new Date().getFullYear() - 1}`}
+                        data={monthlyTrendData}
+                        dataKey="value"
+                        compareDataKey="previousValue"
+                        xAxisKey="name"
+                        color={viewMode === 'productivity' ? "#8b5cf6" : "#10b981"}
+                        compareColor="#64748b"
+                        delay={0.3}
+                        height={300}
+                        valuePrefix={viewMode === 'earnings' ? "₱" : ""}
+                    />
+                </div>
+
+                {/* 2. Editor Breakdown (Bar Chart) - Full Width */}
+                <div className="w-full">
+                    <AnalyticBarChart
+                        title={
+                            selectedCycle
+                                ? (viewMode === 'productivity' ? `Top Editors: ${selectedCycle}` : `Editor Earnings: ${selectedCycle}`)
+                                : (dateFilter?.month
+                                    ? (viewMode === 'productivity' ? `Top Editors: ${new Date(2000, dateFilter.month - 1).toLocaleString('default', { month: 'long' })}` : `Editor Earnings: ${new Date(2000, dateFilter.month - 1).toLocaleString('default', { month: 'long' })}`)
+                                    : (viewMode === 'productivity' ? `Editor Breakdown` : `Earnings Breakdown`)
+                                )
+                        }
+                        data={editorBreakdownData}
+                        dataKey="value"
+                        xAxisKey="name"
+                        color={viewMode === 'productivity' ? "#8b5cf6" : "#10b981"}
+                        delay={0.4}
+                        layout="vertical"
+                        height={400}
+                        valuePrefix={viewMode === 'earnings' ? "₱" : ""}
+                    />
+                </div>
+
+                {/* 3. Distributions: Type + Status (Side by Side) */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Project Type Distribution (Pie Chart) */}
+                    <div className="w-full">
+                        <AnalyticPieChart
+                            title="Project Type Distribution"
+                            data={projectTypeData}
+                            delay={0.5}
+                            height={400}
+                        />
+                    </div>
+
+                    {/* Project Status Distribution (Pie Chart) */}
+                    <div className="w-full">
+                        <AnalyticPieChart
+                            title="Project Status Distribution"
+                            data={projectStatusData.data}
+                            delay={0.55}
+                            height={400}
+                            colors={projectStatusData.colors} // Custom mapped colors
+                        />
+                    </div>
+                </div>
+
+                {/* 4. Revisions Chart (Bar Chart) */}
+                <div className="w-full">
+                    <AnalyticBarChart
+                        title="Revision Rates per Editor"
+                        data={revisionsChartData}
+                        dataKey="value"
+                        xAxisKey="name"
+                        color="#f59e0b" // Amber/Orange for caution/revisions
+                        delay={0.6}
+                        layout="vertical"
+                        height={400}
+                        valuePrefix=""
+                        emptyMessage="No revisions found for editors yet"
+                    />
+                </div>
+            </div>
+
+
+            <AnalyticsFilterModal
+                isOpen={isFilterModalOpen}
+                onClose={() => setIsFilterModalOpen(false)}
+                onApply={handleFilterApply}
+                availableYears={availableYears}
+                availableCycles={availableCycles}
+                initialFilter={{
+                    year: dateFilter?.year || new Date().getFullYear(),
+                    month: dateFilter?.month || null,
+                    cycle: dateFilter?.cycle || ''
+                }}
+            />
+        </div >
+    );
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-96">
+                <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
+
+    if (embedded) {
+        return (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {/* Replicate AdminPageLayout Header Styling */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight mb-2">
+                            {viewMode === 'productivity' ? "Editor Performance" : "Editor Earnings"}
+                        </h1>
+                        <p className="text-gray-400 max-w-2xl">
+                            {viewMode === 'productivity' ? "Videos produced per editor per cycle." : "Total earnings per editor per cycle."}
+                        </p>
+                    </div>
+                    <div>{Controls}</div>
+                </div>
+                {Content}
+            </div>
+        );
+    }
+
     return (
         <AdminPageLayout
             title={viewMode === 'productivity' ? "Editor Performance" : "Editor Earnings"}
             subtitle={viewMode === 'productivity' ? "Videos produced per editor per cycle." : "Total earnings per editor per cycle."}
-            action={
-                <div className="flex items-center gap-3">
-                    {/* View Toggle */}
-                    <div className="bg-[#0e0e1a] p-1 rounded-xl border border-white/10 flex items-center">
-                        <button
-                            onClick={() => setViewMode('productivity')}
-                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'productivity'
-                                ? 'bg-violet-500 text-white shadow-lg'
-                                : 'text-gray-400 hover:text-white'}`}
-                        >
-                            Production
-                        </button>
-                        <button
-                            onClick={() => setViewMode('earnings')}
-                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'earnings'
-                                ? 'bg-emerald-500 text-white shadow-lg'
-                                : 'text-gray-400 hover:text-white'}`}
-                        >
-                            Earnings
-                        </button>
-                    </div>
-
-                    <button
-                        onClick={loadData}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white text-sm font-bold transition-all"
-                    >
-                        <Filter className="w-4 h-4" />
-                        Refresh
-                    </button>
-                </div>
-            }
+            action={Controls}
         >
-            {loading ? (
-                <div className="flex items-center justify-center h-96">
-                    <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
-                </div>
-            ) : (
-                <div className="space-y-6">
-
-                    {/* Controls & KPIs */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-                        {/* Configuration Button (Unified) */}
-                        <div className="bg-[#0e0e1a] p-6 rounded-2xl border border-white/5 flex flex-col justify-center space-y-3 relative group hover:border-violet-500/30 transition-colors cursor-pointer" onClick={() => setIsFilterModalOpen(true)}>
-                            <label className="text-gray-400 text-sm font-bold flex items-center gap-2 mb-2 group-hover:text-violet-400 transition-colors">
-                                <Settings2 className="w-4 h-4" />
-                                Analytics Configuration
-                            </label>
-
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <div className="text-white font-bold text-lg truncate pr-4">
-                                        {getFilterLabel()}
-                                    </div>
-                                    <div className="text-xs text-gray-500 font-medium mt-1">
-                                        Click to change Year, Month, or Cycle
-                                    </div>
-                                </div>
-                                <div className="p-2 rounded-xl bg-white/5 group-hover:bg-violet-500/10 transition-colors">
-                                    <Calendar className="w-5 h-5 text-gray-400 group-hover:text-violet-400 transition-colors" />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* KPI: Primary Metric */}
-                        <AnalyticCard
-                            title={viewMode === 'productivity' ? "Total Videos Produced" : "Total Payout"}
-                            value={viewMode === 'productivity' ? totalValueInCycle : formatCurrency(totalValueInCycle)}
-                            icon={viewMode === 'productivity' ? <Play className="w-5 h-5" /> : <span className="font-bold text-emerald-400">₱</span>}
-                            trend={{ value: 0, label: selectedCycle || "Monthly Total", isPositive: true }}
-                            delay={0.1}
-                        />
-
-                        {/* KPI: Active Editors */}
-                        <AnalyticCard
-                            title="Active Editors"
-                            value={activeEditorsCount}
-                            icon={<Users className="w-5 h-5" />}
-                            trend={{ value: 0, label: 'contributing this cycle', isPositive: true }}
-                            delay={0.2}
-                        />
-                    </div>
-
-                    {/* Charts Section */}
-                    <div className="flex flex-col gap-8 mt-8">
-
-                        {/* 1. Yearly Trend (Area Chart) */}
-                        <div className="w-full">
-                            <AnalyticAreaChart
-                                title={viewMode === 'productivity' ? `Yearly Production: ${dateFilter?.year || new Date().getFullYear()} vs ${dateFilter?.year ? dateFilter.year - 1 : new Date().getFullYear() - 1}` : `Yearly Income: ${dateFilter?.year || new Date().getFullYear()} vs ${dateFilter?.year ? dateFilter.year - 1 : new Date().getFullYear() - 1}`}
-                                data={monthlyTrendData}
-                                dataKey="value"
-                                compareDataKey="previousValue"
-                                xAxisKey="name"
-                                color={viewMode === 'productivity' ? "#8b5cf6" : "#10b981"}
-                                compareColor="#64748b"
-                                delay={0.3}
-                                height={300}
-                                valuePrefix={viewMode === 'earnings' ? "₱" : ""}
-                            />
-                        </div>
-
-                        {/* 2. Editor Breakdown (Bar Chart) - Full Width */}
-                        <div className="w-full">
-                            <AnalyticBarChart
-                                title={
-                                    selectedCycle
-                                        ? (viewMode === 'productivity' ? `Top Editors: ${selectedCycle}` : `Editor Earnings: ${selectedCycle}`)
-                                        : (dateFilter?.month
-                                            ? (viewMode === 'productivity' ? `Top Editors: ${new Date(2000, dateFilter.month - 1).toLocaleString('default', { month: 'long' })}` : `Editor Earnings: ${new Date(2000, dateFilter.month - 1).toLocaleString('default', { month: 'long' })}`)
-                                            : (viewMode === 'productivity' ? `Editor Breakdown` : `Earnings Breakdown`)
-                                        )
-                                }
-                                data={editorBreakdownData}
-                                dataKey="value"
-                                xAxisKey="name"
-                                color={viewMode === 'productivity' ? "#8b5cf6" : "#10b981"}
-                                delay={0.4}
-                                layout="vertical"
-                                height={400}
-                                valuePrefix={viewMode === 'earnings' ? "₱" : ""}
-                            />
-                        </div>
-
-                        {/* 3. Distributions: Type + Status (Side by Side) */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                            {/* Project Type Distribution (Pie Chart) */}
-                            <div className="w-full">
-                                <AnalyticPieChart
-                                    title="Project Type Distribution"
-                                    data={projectTypeData}
-                                    delay={0.5}
-                                    height={400}
-                                />
-                            </div>
-
-                            {/* Project Status Distribution (Pie Chart) */}
-                            <div className="w-full">
-                                <AnalyticPieChart
-                                    title="Project Status Distribution"
-                                    data={projectStatusData.data}
-                                    delay={0.55}
-                                    height={400}
-                                    colors={projectStatusData.colors} // Custom mapped colors
-                                />
-                            </div>
-                        </div>
-
-                        {/* 4. Revisions Chart (Bar Chart) */}
-                        <div className="w-full">
-                            <AnalyticBarChart
-                                title="Revision Rates per Editor"
-                                data={revisionsChartData}
-                                dataKey="value"
-                                xAxisKey="name"
-                                color="#f59e0b" // Amber/Orange for caution/revisions
-                                delay={0.6}
-                                layout="vertical"
-                                height={400}
-                                valuePrefix=""
-                                emptyMessage="No revisions found for editors yet"
-                            />
-                        </div>
-                    </div>
-
-
-                    <AnalyticsFilterModal
-                        isOpen={isFilterModalOpen}
-                        onClose={() => setIsFilterModalOpen(false)}
-                        onApply={handleFilterApply}
-                        availableYears={availableYears}
-                        availableCycles={availableCycles}
-                        initialFilter={{
-                            year: dateFilter?.year || new Date().getFullYear(),
-                            month: dateFilter?.month || null,
-                            cycle: dateFilter?.cycle || ''
-                        }}
-                    />
-                </div >
-            )
-            }
-        </AdminPageLayout >
+            {Content}
+        </AdminPageLayout>
     );
 }

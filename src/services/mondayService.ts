@@ -468,6 +468,15 @@ export async function getAllBoards(forceSync: boolean = false) {
     }, true, forceSync);
 }
 
+export async function getWorkspaceBoards(forceSync: boolean = false) {
+    const allBoards = await getAllBoards(forceSync);
+    return allBoards.filter((b: any) =>
+        (b.name.toLowerCase().includes('- workspace') || b.name.toLowerCase().includes('management')) &&
+        !b.type.includes('sub_items') &&
+        !b.name.toLowerCase().includes('subitems')
+    );
+}
+
 export async function getAllFolders(forceSync: boolean = false) {
     return getCachedOrFetch('all_folders', async () => {
         const query = `query {
@@ -946,12 +955,7 @@ export async function getWorkspaceAnalytics() {
 /** Internal: Actually fetch workspace analytics from Monday.com API */
 async function getWorkspaceAnalyticsFresh() {
     // 1. Get all Workspace Boards
-    const allBoards = await getAllBoards();
-    const workspaceBoards = allBoards.filter((b: any) =>
-        (b.name.toLowerCase().includes('- workspace') || b.name.toLowerCase().includes('management')) &&
-        !b.type.includes('sub_items') &&
-        !b.name.toLowerCase().includes('subitems')
-    );
+    const workspaceBoards = await getWorkspaceBoards();
 
     // 2. Fetch Items
     const boardIds = workspaceBoards.map((b: any) => b.id);
@@ -1391,6 +1395,107 @@ export async function getBoardItemsByView(boardId: string, viewName: string) {
         // The view is more of a UI concept in Monday.com
         return boardData;
     }, false);
+}
+
+export async function getApprovalItems(forceSync: boolean = false) {
+    return getCachedOrFetch('approval_items', async () => {
+        return getApprovalItemsFresh(forceSync);
+    }, true, forceSync);
+}
+
+async function getApprovalItemsFresh(forceSync: boolean = false) {
+    // 1. Get all Workspace Boards
+    const allWorkspaceBoards = await getWorkspaceBoards(forceSync);
+    // User Request: Only fetch ' - Workspace' boards, exclude generic Management boards for Approvals
+    const workspaceBoards = allWorkspaceBoards.filter((b: any) =>
+        b.name.toLowerCase().includes('- workspace')
+    );
+
+    // 2. Fetch Items
+    const boardIds = workspaceBoards.map((b: any) => b.id);
+    const boardsWithItems = await getMultipleBoardItems(boardIds);
+
+    const approvalItems: any[] = [];
+
+    boardsWithItems.forEach((board: any) => {
+        // Find relevant columns
+        const statusCol = board.columns?.find((c: any) =>
+            c.title.toLowerCase() === 'status' ||
+            c.title.toLowerCase() === 'project status' ||
+            (c.type === 'color' && !c.title.toLowerCase().includes('priority') && !c.title.toLowerCase().includes('label'))
+        );
+
+        const videoCol = board.columns?.find((c: any) =>
+            c.title.toLowerCase().includes('video') ||
+            c.title.toLowerCase().includes('link') ||
+            c.title.toLowerCase().includes('portfolio') // Fallback
+        );
+
+        const editorCol = board.columns?.find((c: any) =>
+            c.title.toLowerCase().includes('editor') ||
+            c.type === 'people'
+        );
+
+        if (!statusCol) return;
+
+        board.items.forEach((item: any) => {
+            const statusVal = item.column_values?.find((cv: any) => cv.id === statusCol.id);
+            // Handle Mirror Columns and regular Status columns
+            const statusText = statusVal?.text || statusVal?.display_value || statusVal?.label || '';
+
+            // Check for "For Approval" - loosely match to catch variations
+            if (statusText && statusText.toLowerCase().includes('approval')) {
+
+                // Extract Video Link
+                let videoLink = '';
+                if (videoCol) {
+                    const videoVal = item.column_values?.find((cv: any) => cv.id === videoCol.id);
+                    if (videoVal) {
+                        // Link type value is usually "url text" or json
+                        if (videoVal.text && videoVal.text.startsWith('http')) {
+                            videoLink = videoVal.text.split(' ')[0]; // Simple extraction
+                        } else if (videoVal.value) {
+                            try {
+                                const parsed = JSON.parse(videoVal.value);
+                                if (parsed && parsed.url) videoLink = parsed.url;
+                            } catch (e) { }
+                        }
+                    }
+                }
+
+                // Extract Editor Name
+                let editorName = 'Unknown';
+                if (editorCol) {
+                    const editorVal = item.column_values?.find((cv: any) => cv.id === editorCol.id);
+                    if (editorVal) {
+                        const rawEditor = editorVal.display_value || editorVal.text;
+                        if (rawEditor) {
+                            editorName = rawEditor.split(',')[0].trim();
+                        }
+                    }
+                }
+
+                // Fallback: Parse from Board Name if column missing or empty
+                if (editorName === 'Unknown') {
+                    editorName = board.name.replace(/- Workspace/i, '').replace(/\(c-w-[\w-]+\)/i, '').trim();
+                }
+
+                approvalItems.push({
+                    id: item.id,
+                    name: item.name,
+                    boardId: board.id,
+                    boardName: board.name,
+                    status: statusText,
+                    editor: editorName,
+                    videoLink: videoLink,
+                    createdAt: item.created_at,
+                    group: item.group
+                });
+            }
+        });
+    });
+
+    return approvalItems;
 }
 
 

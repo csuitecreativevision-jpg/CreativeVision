@@ -5,7 +5,6 @@ import {
     LayoutDashboard,
     Users,
     Settings,
-    Activity,
     Menu,
     LogOut,
     Briefcase,
@@ -89,7 +88,6 @@ function AdminPortalContent() {
                                     navigate('/admin-portal/clients');
                                 }}
                             />
-                            <SidebarItem icon={<Activity className="w-5 h-5" />} label="Analytics" active={activeTab === 'Analytics'} onClick={() => navigate('/admin-portal/analytics')} />
                             <SidebarItem
                                 icon={<Users className="w-5 h-5" />}
                                 label="Team"
