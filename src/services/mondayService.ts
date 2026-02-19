@@ -511,6 +511,7 @@ export async function getBoardItems(boardId: string, forceSync: boolean = false)
         // Initial Fetch
         const query = `query {
             boards (ids: [${boardId}]) {
+                id
                 name
                 columns {
                     id

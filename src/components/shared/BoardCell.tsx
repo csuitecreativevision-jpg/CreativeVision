@@ -146,16 +146,9 @@ export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dro
         }
     }
 
-    // DEBUG: temporary log to inspect settings for "Project Status"
-    if (column.title.toLowerCase().includes('status')) {
-        console.log(`[BoardCell] ${column.title} (${column.type}) Settings:`, column.settings_str);
-        console.log(`[BoardCell] Display Value:`, displayValue);
-    }
 
-    // DEBUG: Log "Priority" and "Client" column details to diagnose label issues
-    if (column.title === 'Priority' || column.title === 'Client') {
-        console.log(`[BoardCell Debug] Column: ${column.title}, Type: ${column.type}, Detail:`, column);
-    }
+
+
 
     const handleSave = async (newValue: string) => {
         if (newValue === displayValue) {
@@ -316,6 +309,19 @@ export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dro
 
                 return { label: val, color, id: val };
             });
+        }
+
+        // Mirror/lookup columns are read-only — can't be updated via the Monday API
+        if (isMirrorStatus) {
+            return (
+                <span
+                    className={`px-4 py-1.5 rounded-full text-white text-[11px] font-bold text-center min-w-[90px] inline-block shadow-lg shadow-black/20`}
+                    style={currentOption && currentOption.label ? { backgroundColor: currentOption.color || '#7c3aed' } : { backgroundColor: '#2d2d3d', color: '#9ca3af' }}
+                    title="Mirror column — edit on source board"
+                >
+                    {currentOption ? currentOption.label : (displayValue || 'Empty')}
+                </span>
+            );
         }
 
         if (isEditing) {
