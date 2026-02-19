@@ -145,7 +145,8 @@ async function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>, meta:
     const idColumn = meta ? 'key' : 'board_id';
 
     // Check if a request for this key is already in flight
-    if (pendingRequests.has(key)) {
+    // BUT only if we are not forcing a fresh sync. Forced syncs must bypass expectation.
+    if (!forceSync && pendingRequests.has(key)) {
         return pendingRequests.get(key) as Promise<T>;
     }
 

@@ -15,14 +15,15 @@ export default function AdminClients() {
     const [selectedBoard, setSelectedBoard] = useState<any | null>(null);
     const [showInactive, setShowInactive] = useState(false); // Reverted to Toggle
     const { previewFile, isLoading: isPreviewLoading, setPreviewFile, closePreview } = useProtectedPreview();
-    const { refreshKey, triggerRefresh } = useRefresh();
+    const { refreshKey } = useRefresh();
 
     // Fetch Data on mount and when refreshKey changes
     useEffect(() => {
-        loadData();
+        // Force refresh if refreshKey > 0 (meaning user triggered it)
+        loadData(refreshKey > 0);
     }, [refreshKey]);
 
-    const loadData = async () => {
+    const loadData = async (force: boolean = false) => {
         setLoading(true);
         try {
             // 1. Get User Permissions
@@ -40,10 +41,10 @@ export default function AdminClients() {
                 }
             }
 
-            // 2. Fetch Data in Parallel (uses cache, background refresh if stale)
+            // 2. Fetch Data in Parallel (force sync if requested)
             const [allBoards, allFolders] = await Promise.all([
-                getAllBoards(),
-                getAllFolders()
+                getAllBoards(force),
+                getAllFolders(force)
             ]);
 
             // 3. Process Folders to find Active/Inactive Sets
@@ -90,7 +91,7 @@ export default function AdminClients() {
 
     const handleRefresh = async (_: string, silent: boolean) => {
         if (!silent) setLoading(true);
-        await loadData();
+        await loadData(true); // Force sync on manual refresh
         if (!silent) setLoading(false);
     };
 
