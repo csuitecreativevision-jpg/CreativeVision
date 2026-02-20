@@ -43,3 +43,34 @@ CREATE POLICY "Allow all access to users" ON users
     FOR ALL USING (true) WITH CHECK (true);
 
 COMMENT ON TABLE users IS 'Test users for role-based dashboard access';
+
+-- ============================================
+-- Cache Tables for Monday.com Integration
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS cache_monday_board_items (
+    board_id TEXT PRIMARY KEY,
+    data JSONB NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS cache_monday_meta (
+    key TEXT PRIMARY KEY,
+    data JSONB NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Indexes for cache tables
+CREATE INDEX IF NOT EXISTS idx_cache_monday_board_items_updated_at ON cache_monday_board_items(updated_at);
+CREATE INDEX IF NOT EXISTS idx_cache_monday_meta_updated_at ON cache_monday_meta(updated_at);
+
+-- RLS Policies for Cache Tables
+ALTER TABLE cache_monday_board_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cache_monday_meta ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all access to cache_monday_board_items" ON cache_monday_board_items
+    FOR ALL USING (true) WITH CHECK (true);
+
+CREATE POLICY "Allow all access to cache_monday_meta" ON cache_monday_meta
+    FOR ALL USING (true) WITH CHECK (true);
+ 

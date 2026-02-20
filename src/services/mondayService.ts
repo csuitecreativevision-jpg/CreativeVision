@@ -2,7 +2,8 @@ const MONDAY_API_URL = "https://api.monday.com/v2";
 const MONDAY_API_TOKEN = import.meta.env.VITE_MONDAY_API_TOKEN;
 import { supabase } from '../lib/supabaseClient';
 import { getCycleDates, isDateInCycle } from '../features/performance-dashboard/utils/dateUtils';
-import { getCache, setCache } from './cacheService';
+import { idbGet, idbSet } from './idbService';
+
 
 export interface ApplicationData {
     fullName: string;
@@ -134,8 +135,9 @@ export async function mondayRequest(query: string, variables: any = {}, retries 
 }
 
 
-// --- Caching Helper ---
+// --- Caching Helper (IndexedDB + Supabase) ---
 const CACHE_TTL_MS = 1000 * 60 * 5; // 5 Minutes
+
 
 // Request Coalescing Map to prevent duplicate in-flight requests
 const pendingRequests = new Map<string, Promise<any>>();
@@ -145,7 +147,6 @@ async function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>, meta:
     const idColumn = meta ? 'key' : 'board_id';
 
     // Check if a request for this key is already in flight
-    // BUT only if we are not forcing a fresh sync. Forced syncs must bypass expectation.
     if (!forceSync && pendingRequests.has(key)) {
         return pendingRequests.get(key) as Promise<T>;
     }
@@ -155,39 +156,53 @@ async function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>, meta:
             // --- forceSync: Skip ALL caches, fetch fresh from API ---
             if (forceSync) {
                 const freshData = await fetcher();
-                setCache(key, freshData);
+                // Store in IDB (async) - don't await strictly to speed up response
+                idbSet(key, { data: freshData, timestamp: Date.now() }).catch(e => console.error("IDB Set Error", e));
+
+                // Store in Supabase
                 supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
                 return freshData;
             }
 
-            // --- Layer 1: localStorage (instant, synchronous) ---
-            const localCache = getCache<T>(key);
-            if (localCache) {
-                if (!localCache.isStale) {
+            // --- Layer 1: IndexedDB (Async, High Capacity) ---
+            try {
+                const localCache = await idbGet<{ data: T, timestamp: number }>(key);
+                if (localCache && localCache.data) {
+                    const age = Date.now() - (localCache.timestamp || 0);
+                    const isStale = age > CACHE_TTL_MS;
+
+                    if (!isStale) {
+                        return localCache.data;
+                    }
+
+                    // Stale IDB cache — return it now, background refresh
+                    console.log(`[Cache] IDB Stale for ${key}, refreshing in background...`);
+                    fetcher().then(freshData => {
+                        idbSet(key, { data: freshData, timestamp: Date.now() });
+                        supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
+                    }).catch(err => console.error("Background sync failed", err));
+
                     return localCache.data;
                 }
-                // Stale local cache — return it now, background refresh
-                fetcher().then(freshData => {
-                    setCache(key, freshData);
-                    supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
-                }).catch(err => console.error("Background sync failed", err));
-                return localCache.data;
+            } catch (err) {
+                console.warn("[Cache] IDB Read Error", err);
             }
 
-            // --- Layer 2: Supabase (network, but faster than Monday API) ---
+            // --- Layer 2: Supabase (Network, Persistent) ---
             try {
                 const { data } = await supabase.from(table).select('data, updated_at').eq(idColumn, key).maybeSingle();
                 if (data?.data) {
-                    // Store in localStorage for next time
-                    setCache(key, data.data);
+                    // Update IDB for next time (Local Rehydration)
+                    idbSet(key, { data: data.data, timestamp: new Date(data.updated_at).getTime() });
 
                     const age = Date.now() - new Date(data.updated_at).getTime();
                     const isStale = age > CACHE_TTL_MS;
 
                     if (isStale) {
                         // Background Sync
+                        console.log(`[Cache] Supabase Stale for ${key}, refreshing...`);
                         fetcher().then(freshData => {
-                            setCache(key, freshData);
+                            idbSet(key, { data: freshData, timestamp: Date.now() });
                             supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
                         }).catch(err => console.error("Background sync failed", err));
                     }
@@ -197,11 +212,14 @@ async function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>, meta:
                 // Continue to fetch if Supabase fails
             }
 
-            // --- Layer 3: Monday.com API (slowest, authoritative) ---
+            // --- Layer 3: Monday.com API (Authoritative) ---
+            console.log(`[Cache] Cache Miss for ${key}, fetching from API...`);
             const freshData = await fetcher();
+
             // Update both caches
-            setCache(key, freshData);
+            idbSet(key, { data: freshData, timestamp: Date.now() });
             supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
+
             return freshData;
 
         } finally {
@@ -215,6 +233,7 @@ async function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>, meta:
 
     return promise;
 }
+
 
 async function getOrCreateBoard(): Promise<string> {
     // 1. Check if board exists
@@ -934,25 +953,38 @@ export async function getAggregatedAnalytics() {
 }
 
 export async function getWorkspaceAnalytics() {
-    // --- Check localStorage for cached analytics result ---
+    // --- Check IndexedDB for cached analytics result ---
     const ANALYTICS_CACHE_KEY = 'workspace_analytics';
-    const cached = getCache<any>(ANALYTICS_CACHE_KEY);
-    if (cached && !cached.isStale) {
-        return cached.data;
-    }
+    const CACHE_TTL_MS = 1000 * 60 * 5; // 5 Minutes
 
-    // If stale cache exists, return it immediately and refresh in background
-    if (cached && cached.isStale) {
-        // Fire off background refresh (don't await)
-        getWorkspaceAnalyticsFresh().then(freshResult => {
-            setCache(ANALYTICS_CACHE_KEY, freshResult);
-        }).catch(err => console.error('[Analytics] Background refresh failed', err));
-        return cached.data;
+    try {
+        // Retrieve from IDB
+        const cached = await idbGet<any>(ANALYTICS_CACHE_KEY);
+
+        if (cached && cached.timestamp) {
+            const age = Date.now() - cached.timestamp;
+            const isStale = age > CACHE_TTL_MS;
+
+            if (!isStale) {
+                return cached.data;
+            }
+
+            // If stale cache exists, return it immediately and refresh in background
+            console.log('[Analytics] Cache stale, refreshing in background...');
+            getWorkspaceAnalyticsFresh().then(freshResult => {
+                idbSet(ANALYTICS_CACHE_KEY, { data: freshResult, timestamp: Date.now() });
+            }).catch(err => console.error('[Analytics] Background refresh failed', err));
+
+            return cached.data;
+        }
+    } catch (e) {
+        console.warn('Failed to read analytics from cache', e);
     }
 
     // No cache at all — fetch and wait
+    console.log('[Analytics] No cache, fetching fresh...');
     const result = await getWorkspaceAnalyticsFresh();
-    setCache(ANALYTICS_CACHE_KEY, result);
+    idbSet(ANALYTICS_CACHE_KEY, { data: result, timestamp: Date.now() });
     return result;
 }
 
