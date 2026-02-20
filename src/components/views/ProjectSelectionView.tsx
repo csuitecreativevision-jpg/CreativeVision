@@ -14,6 +14,7 @@ interface ProjectSelectionViewProps {
     refreshBoardDetails: (boardId: string, silent: boolean) => void;
     setPreviewFile: (file: { url: string, name: string, assetId?: string } | null) => void;
     useYouTubeModal?: boolean;
+    initialItemId?: string; // NEW: Allow auto-selection of an item
 }
 
 // Helper component for video playback with signed URL fetching
@@ -94,11 +95,22 @@ export const ProjectSelectionView = ({
     selectedBoardId,
     refreshBoardDetails,
     setPreviewFile,
-    useYouTubeModal = false
+    useYouTubeModal = false,
+    initialItemId
 }: ProjectSelectionViewProps) => {
     // State
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedProject, setSelectedProject] = useState<any | null>(null);
+
+    // Effect: Auto-select item if initialItemId is provided
+    useEffect(() => {
+        if (initialItemId && boardData?.items) {
+            const item = boardData.items.find((i: any) => i.id === initialItemId);
+            if (item) {
+                setSelectedProject(item);
+            }
+        }
+    }, [initialItemId, boardData]);
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
     const [viewMode, setViewMode] = useState<'all' | 'cycles'>('all'); // NEW: View Mode
     const [expandedCycles, setExpandedCycles] = useState<Set<string>>(new Set()); // NEW: Expanded Cycles
