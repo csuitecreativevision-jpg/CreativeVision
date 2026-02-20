@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { getApprovalItems, getBoardItems } from '../../services/mondayService';
 import { GlassCard } from '../../components/ui/GlassCard';
-import { Video, RefreshCw, Layers, ArrowLeft, X } from 'lucide-react';
+import { Video, RefreshCw, Layers } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ProjectSelectionView } from '../../components/views/ProjectSelectionView';
+import { AdminApprovalModal } from '../../components/views/AdminApprovalModal';
 import { FilePreviewModal } from '../../components/ui/FilePreviewModal';
 
 export default function AdminApprovalCenter() {
@@ -142,49 +142,25 @@ export default function AdminApprovalCenter() {
                 </div>
             )}
 
-            {/* Project Selection / Review Modal Overlay */}
+            {/* Project Selection / Review Modal */}
             <AnimatePresence>
                 {selectedApprovalItem && approvalBoardData && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 bg-[#0E0E1A] flex flex-col"
-                    >
-                        {/* Custom Header for Context */}
-                        <div className="h-16 border-b border-white/10 flex items-center justify-between px-6 bg-[#0E0E1A] z-50 relative">
-                            <div className="flex items-center gap-4">
-                                <button
-                                    onClick={closeReview}
-                                    className="p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
-                                >
-                                    <ArrowLeft className="w-5 h-5" />
-                                </button>
-                                <div>
-                                    <h2 className="text-lg font-bold text-white">Reviewing: {selectedApprovalItem.name}</h2>
-                                    <p className="text-xs text-gray-500">Board: {selectedApprovalItem.boardName}</p>
-                                </div>
-                            </div>
-                            <button
-                                onClick={closeReview}
-                                className="p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        {/* Project View */}
-                        <div className="flex-1 overflow-hidden relative">
-                            <ProjectSelectionView
-                                boardData={approvalBoardData}
-                                selectedBoardId={selectedApprovalItem.boardId}
-                                refreshBoardDetails={async () => { await loadData(); }} // Simple refresh
-                                setPreviewFile={setPreviewFile}
-                                useYouTubeModal={true}
-                                initialItemId={selectedApprovalItem.id}
-                            />
-                        </div>
-                    </motion.div>
+                    <AdminApprovalModal
+                        approvalItems={items}
+                        currentApprovalItem={selectedApprovalItem}
+                        boardData={approvalBoardData}
+                        onClose={closeReview}
+                        onNext={() => {
+                            const idx = items.findIndex(i => i.id === selectedApprovalItem.id);
+                            if (idx < items.length - 1) handleReviewProject(items[idx + 1]);
+                        }}
+                        onPrev={() => {
+                            const idx = items.findIndex(i => i.id === selectedApprovalItem.id);
+                            if (idx > 0) handleReviewProject(items[idx - 1]);
+                        }}
+                        refreshBoardDetails={async () => { await loadData(); }}
+                        setPreviewFile={setPreviewFile}
+                    />
                 )}
             </AnimatePresence>
 
