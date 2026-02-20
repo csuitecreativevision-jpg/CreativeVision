@@ -26,28 +26,30 @@ export default function AdminClients() {
     const loadData = async (force: boolean = false) => {
         setLoading(true);
         try {
-            // 1. Get User Permissions
+            // 1. Fetch User Permissions & Data in Parallel
             const email = localStorage.getItem('portal_user_email');
-            let allowedBoardIds: string[] = [];
 
-            if (email) {
-                const { data } = await supabase
+            const [userPromise, boardsPromise, foldersPromise] = [
+                // Permission Check
+                email ? supabase
                     .from('users')
                     .select('allowed_board_ids')
                     .eq('email', email)
-                    .single();
-                if (data?.allowed_board_ids) {
-                    allowedBoardIds = data.allowed_board_ids;
-                }
-            }
+                    .single() : Promise.resolve({ data: null }),
 
-            // 2. Fetch Data in Parallel (force sync if requested)
-            const [allBoards, allFolders] = await Promise.all([
+                // Data Fetch (force only if requested, otherwise use cache)
                 getAllBoards(force),
                 getAllFolders(force)
-            ]);
+            ];
 
-            // 3. Process Folders to find Active/Inactive Sets
+            const [userData, allBoards, allFolders] = await Promise.all([userPromise, boardsPromise, foldersPromise]);
+
+            let allowedBoardIds: string[] = [];
+            if (userData.data?.allowed_board_ids) {
+                allowedBoardIds = userData.data.allowed_board_ids;
+            }
+
+            // 2. Process Folders to find Active/Inactive Sets
             const activeFolder = allFolders?.find((f: any) => f.name.toLowerCase().trim() === 'active clients');
             const inactiveFolder = allFolders?.find((f: any) => f.name.toLowerCase().trim() === 'inactive clients');
 
@@ -55,7 +57,7 @@ export default function AdminClients() {
             const activeBoardIds = new Set(activeFolder?.children?.map((c: any) => c.id) || []);
             const inactiveBoardIds = new Set(inactiveFolder?.children?.map((c: any) => c.id) || []);
 
-            // 4. Filter Boards
+            // 3. Filter Boards
             const clientBoards = (allBoards || []).filter((b: any) => {
                 const name = b.name.toLowerCase();
 
@@ -197,8 +199,15 @@ export default function AdminClients() {
                                             ][index % 5]}
                                             onClick={async () => {
                                                 try {
-                                                    const fullBoardData = await getBoardItems(board.id, true);
+                                                    // Optimistic Load: Use cached data first (forceSync: false)
+                                                    const fullBoardData = await getBoardItems(board.id, false);
                                                     setSelectedBoard(fullBoardData);
+
+                                                    // Optional: Trigger background refresh if needed, but don't block UI
+                                                    getBoardItems(board.id, true).then(updated => {
+                                                        if (updated) setSelectedBoard(updated);
+                                                    }).catch(() => { });
+
                                                 } catch (e) {
                                                     console.error("Failed to fetch board items", e);
                                                     setSelectedBoard(board);

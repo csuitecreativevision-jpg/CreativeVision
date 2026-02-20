@@ -241,72 +241,78 @@ export const ProjectSelectionView = ({
         const fetchMirrorSourceColumns = async () => {
             if (!boardData.columns) return;
 
-            const newMirrorOptions: Record<string, any[]> = {};
+            const mirrorCols = boardData.columns.filter((col: any) =>
+                (col.type === 'mirror' || col.type === 'lookup') &&
+                (col.title.toLowerCase().includes('status') || col.title.toLowerCase().includes('priority') || col.title.toLowerCase().includes('client'))
+            );
 
-            for (const col of boardData.columns) {
-                // Check if it's a Mirror Status column
-                if ((col.type === 'mirror' || col.type === 'lookup') &&
-                    (col.title.toLowerCase().includes('status') || col.title.toLowerCase().includes('priority') || col.title.toLowerCase().includes('client'))) {
+            if (mirrorCols.length === 0) return;
 
-                    try {
-                        if (col.settings_str) {
-                            const settings = JSON.parse(col.settings_str);
+            // Map each mirror column to a promise that resolves to [colId, options] or null
+            const promises = mirrorCols.map(async (col: any) => {
+                try {
+                    if (!col.settings_str) return null;
+                    const settings = JSON.parse(col.settings_str);
 
-                            // Strategy for Mirror Columns:
-                            // The settings_str typically contains `displayed_linked_columns` which maps { sourceBoardId: [sourceColumnId] }
-                            // Example: {"displayed_linked_columns":{"7146314401":["color__1"]}}
+                    // Strategy for Mirror Columns:
+                    let sourceBoardId: string | null = null;
+                    let sourceColumnId: string | null = null;
 
-                            let sourceBoardId: string | null = null;
-                            let sourceColumnId: string | null = null;
-
-                            if (settings.displayed_linked_columns) {
-                                const boardIds = Object.keys(settings.displayed_linked_columns);
-                                if (boardIds.length > 0) {
-                                    sourceBoardId = boardIds[0];
-                                    const cols = settings.displayed_linked_columns[sourceBoardId];
-                                    if (cols && cols.length > 0) {
-                                        sourceColumnId = cols[0];
-                                    }
-                                }
-                            }
-                            // Fallback: Check board_ids (standard connect boards column sometimes used)
-                            else if (settings.board_ids && settings.board_ids.length > 0) {
-                                sourceBoardId = settings.board_ids[0];
-                            }
-
-                            if (sourceBoardId) {
-                                // Fetch columns from that board
-                                const sourceColumns = await getBoardColumns(sourceBoardId);
-
-                                // Find the matching status column on the source board
-                                // If we have the exact sourceColumnId, use it. Otherwise fall back to title matching.
-                                let sourceStatusCol;
-                                if (sourceColumnId) {
-                                    sourceStatusCol = sourceColumns?.find((sc: any) => sc.id === sourceColumnId);
-                                } else {
-                                    sourceStatusCol = sourceColumns?.find((sc: any) =>
-                                        sc.type === 'status' && (sc.title === col.title || sc.title.includes('Status') || sc.title.includes('Priority'))
-                                    );
-                                }
-
-                                if (sourceStatusCol && sourceStatusCol.settings_str) {
-                                    const sourceSettings = JSON.parse(sourceStatusCol.settings_str);
-                                    if (sourceSettings.labels) {
-                                        const options = Object.entries(sourceSettings.labels).map(([key, label]: any) => ({
-                                            id: key,
-                                            label: label,
-                                            color: sourceSettings.labels_colors ? sourceSettings.labels_colors[key]?.color : '#579bfc'
-                                        }));
-                                        newMirrorOptions[col.id] = options;
-                                    }
-                                }
+                    if (settings.displayed_linked_columns) {
+                        const boardIds = Object.keys(settings.displayed_linked_columns);
+                        if (boardIds.length > 0) {
+                            sourceBoardId = boardIds[0];
+                            const cols = settings.displayed_linked_columns[sourceBoardId];
+                            if (cols && cols.length > 0) {
+                                sourceColumnId = cols[0];
                             }
                         }
-                    } catch (e) {
-                        console.error("Failed to fetch source for mirror:", col.title, e);
                     }
+                    // Fallback: Check board_ids
+                    else if (settings.board_ids && settings.board_ids.length > 0) {
+                        sourceBoardId = settings.board_ids[0];
+                    }
+
+                    if (sourceBoardId) {
+                        // Fetch columns from that board
+                        const sourceColumns = await getBoardColumns(sourceBoardId);
+
+                        // Find matching status column
+                        let sourceStatusCol;
+                        if (sourceColumnId) {
+                            sourceStatusCol = sourceColumns?.find((sc: any) => sc.id === sourceColumnId);
+                        } else {
+                            sourceStatusCol = sourceColumns?.find((sc: any) =>
+                                sc.type === 'status' && (sc.title === col.title || sc.title.includes('Status') || sc.title.includes('Priority'))
+                            );
+                        }
+
+                        if (sourceStatusCol && sourceStatusCol.settings_str) {
+                            const sourceSettings = JSON.parse(sourceStatusCol.settings_str);
+                            if (sourceSettings.labels) {
+                                const options = Object.entries(sourceSettings.labels).map(([key, label]: any) => ({
+                                    id: key,
+                                    label: label,
+                                    color: sourceSettings.labels_colors ? sourceSettings.labels_colors[key]?.color : '#579bfc'
+                                }));
+                                return { id: col.id, options };
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch source for mirror:", col.title, e);
                 }
-            }
+                return null;
+            });
+
+            const results = await Promise.all(promises);
+            const newMirrorOptions: Record<string, any[]> = {};
+
+            results.forEach(res => {
+                if (res) {
+                    newMirrorOptions[res.id] = res.options;
+                }
+            });
 
             if (Object.keys(newMirrorOptions).length > 0) {
                 setMirrorOptions(prev => ({ ...prev, ...newMirrorOptions }));

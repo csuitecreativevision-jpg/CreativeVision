@@ -24,25 +24,29 @@ export default function AdminTeam() {
     const loadTeamBoards = async () => {
         setLoading(true);
         try {
-            // 1. Get User Permissions
+            // 1. Fetch User Permissions & Data in Parallel
             const email = localStorage.getItem('portal_user_email');
-            let allowedBoardIds: string[] = [];
 
-            if (email) {
-                const { data } = await supabase
+            const [userPromise, boardsPromise] = [
+                // Permission Check
+                email ? supabase
                     .from('users')
                     .select('allowed_board_ids')
                     .eq('email', email)
-                    .single();
-                if (data?.allowed_board_ids) {
-                    allowedBoardIds = data.allowed_board_ids;
-                }
+                    .single() : Promise.resolve({ data: null }),
+
+                // Data Fetch (default cache)
+                getAllBoards()
+            ];
+
+            const [userData, allBoards] = await Promise.all([userPromise, boardsPromise]);
+
+            let allowedBoardIds: string[] = [];
+            if (userData.data?.allowed_board_ids) {
+                allowedBoardIds = userData.data.allowed_board_ids;
             }
 
-            // 2. Fetch All Boards (uses cache, background refresh if stale)
-            const allBoards = await getAllBoards();
-
-            // 3. Filter for Workspace Boards
+            // 2. Filter for Workspace Boards
             const workspaceBoards = (allBoards || []).filter((b: any) => {
                 const name = b.name.toLowerCase();
                 // Check if it's a "Workspace" board
@@ -50,8 +54,7 @@ export default function AdminTeam() {
                 // Exclude Subitems
                 const isSubitem = b.type === 'sub_items_board' || name.includes('subitems');
 
-                // Permission Check (if not admin/open) - assuming admin for now based on portal, 
-                // but good to respect permissions if they exist.
+                // Permission Check
                 const hasPermission = allowedBoardIds.length > 0 ? allowedBoardIds.includes(b.id) : true;
 
                 return isWorkspace && !isSubitem && hasPermission;
@@ -148,8 +151,14 @@ export default function AdminTeam() {
                                             ][index % 5]}
                                             onClick={async () => {
                                                 try {
-                                                    const fullBoardData = await getBoardItems(board.id, true);
+                                                    // Optimistic Load: Use cached data first
+                                                    const fullBoardData = await getBoardItems(board.id, false);
                                                     setSelectedBoard(fullBoardData);
+
+                                                    // Optional: Background refresh
+                                                    getBoardItems(board.id, true).then(updated => {
+                                                        if (updated) setSelectedBoard(updated);
+                                                    }).catch(() => { });
                                                 } catch (e) {
                                                     console.error("Failed to fetch board items", e);
                                                     // Fallback to basic data or show error
