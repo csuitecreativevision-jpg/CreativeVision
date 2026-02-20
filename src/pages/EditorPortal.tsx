@@ -292,6 +292,7 @@ function EditorPortalContent() {
                                             selectedBoardId={selectedBoard.id}
                                             refreshBoardDetails={handleRefresh}
                                             setPreviewFile={setPreviewFile}
+                                            useYouTubeModal={true}
                                         />
                                     </div>
                                 </div>

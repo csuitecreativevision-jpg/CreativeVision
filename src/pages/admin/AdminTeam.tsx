@@ -210,6 +210,7 @@ export default function AdminTeam() {
                                     selectedBoardId={selectedBoard.id}
                                     refreshBoardDetails={handleRefresh}
                                     setPreviewFile={setPreviewFile}
+                                    useYouTubeModal={true}
                                 />
                             </div>
                         </div>

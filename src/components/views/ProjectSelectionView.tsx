@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, X, Calendar, Activity } from 'lucide-react';
+import { Search, X, Calendar, Activity, Smile } from 'lucide-react';
 import { ProjectCard } from '../shared/ProjectCard';
 import { BoardCell } from '../shared/BoardCell';
 import { PremiumModal } from '../ui/PremiumModal';
@@ -112,7 +112,7 @@ export const ProjectSelectionView = ({
         let mainAssetName: string = selectedProject.name;
 
         // A. Check for "Submission Preview" specifically (File or Link)
-        const submissionCol = boardData.columns?.find((c: any) => c.title.toLowerCase().includes('submission preview'));
+        const submissionCol = boardData.columns?.find((c: any) => c.title.toLowerCase().includes('submission'));
 
         if (submissionCol) {
             const val = selectedProject.column_values.find((v: any) => v.id === submissionCol.id);
@@ -645,8 +645,8 @@ export const ProjectSelectionView = ({
                             );
                         })() : (
                             <div className="flex flex-col items-center justify-center text-center p-10">
-                                <div className="w-32 h-32 rounded-3xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 flex items-center justify-center mb-6 border border-white/10 shadow-2xl shadow-violet-500/10">
-                                    <Activity className="w-16 h-16 text-violet-400" />
+                                <div className="mb-6">
+                                    <Smile className="w-16 h-16 text-white opacity-20" />
                                 </div>
                                 <h3 className="text-3xl font-bold text-white mb-2">
                                     {selectedProject ? selectedProject.name : 'Select a Project'}
@@ -687,10 +687,13 @@ export const ProjectSelectionView = ({
                                             </h3>
 
                                             <div className="flex flex-col gap-1">
+                                                {/* Filtered Columns */}
                                                 {boardData.columns?.filter((col: any) =>
                                                     col.type !== 'name' &&
                                                     !col.title.startsWith('C-F-') &&
-                                                    col.title.toLowerCase() !== 'submission preview'
+                                                    !col.title.toLowerCase().startsWith('c-w-') &&
+                                                    !col.title.toLowerCase().includes('submission') &&
+                                                    !col.title.toLowerCase().includes('subitems')
                                                 ).map((col: any) => (
                                                     <div key={col.id} className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl hover:bg-white/[0.03] transition-colors border-b border-white/[0.02] last:border-0 gap-2">
                                                         <span className="text-sm font-medium text-gray-500 group-hover:text-gray-400 transition-colors uppercase tracking-wider min-w-[150px]">
