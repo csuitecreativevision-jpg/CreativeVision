@@ -590,6 +590,9 @@ export async function getBoardItems(boardId: string, forceSync: boolean = false)
                             ... on MirrorValue {
                                 display_value
                             }
+                            ... on BoardRelationValue {
+                                linked_item_ids
+                            }
                         }
                         subitems {
                             id
@@ -599,6 +602,9 @@ export async function getBoardItems(boardId: string, forceSync: boolean = false)
                                 text
                                 value
                                 type
+                                ... on BoardRelationValue {
+                                    linked_item_ids
+                                }
                             }
                         }
                     }
@@ -633,6 +639,9 @@ export async function getBoardItems(boardId: string, forceSync: boolean = false)
                             type
                             ... on MirrorValue {
                                 display_value
+                            }
+                            ... on BoardRelationValue {
+                                linked_item_ids
                             }
                         }
                     }
@@ -714,6 +723,50 @@ export async function updateItemValue(boardId: string, itemId: string, columnId:
         }
     }`;
     const data = await mondayRequest(query);
+    return data;
+}
+
+/**
+ * Updates a column value on a Monday.com source board.
+ * When encountering a mirror column, always update the source board column instead.
+ * 
+ * @param sourceBoardId - The ID of the source board (<SOURCE_BOARD_ID>)
+ * @param sourceItemId - The ID of the source item (<SOURCE_ITEM_ID>)
+ * @param sourceColumnId - The ID of the source column (<SOURCE_COLUMN_ID>)
+ * @param newValue - The new value as a string/JSON (<NEW_VALUE>)
+ */
+export async function updateSourceColumn(sourceBoardId: string | number, sourceItemId: string | number, sourceColumnId: string, newValue: string) {
+    // If the value is complex JSON stringified (like {"label":"Done"}), we need to use change_column_value
+    // If it's simple text, change_simple_column_value can handle it if value is just string
+    // Here we use change_column_value for robustness with JSON stringified newValue
+    const query = `mutation change_column_value($boardId: ID!, $itemId: ID!, $columnId: String!, $value: JSON!) {
+      change_column_value(
+        board_id: $boardId, 
+        item_id: $itemId, 
+        column_id: $columnId, 
+        value: $value
+      ) {
+        id
+      }
+    }`;
+
+    // ensure newValue is valid JSON string format if it is not already
+    let finalValue = newValue;
+    try {
+        JSON.parse(newValue); // test if it's already JSON
+    } catch {
+        // if not valid JSON, assume it's simple string and needs quotes
+        finalValue = JSON.stringify(newValue);
+    }
+
+    const variables = {
+        boardId: String(sourceBoardId),
+        itemId: String(sourceItemId),
+        columnId: sourceColumnId,
+        value: finalValue
+    };
+
+    const data = await mondayRequest(query, variables);
     return data;
 }
 

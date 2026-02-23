@@ -5,7 +5,8 @@ import {
     getAllFolders,
     getAllWorkspaces,
     getBoardItems,
-    updateItemValue
+    updateItemValue,
+    updateSourceColumn
 } from '../services/mondayService';
 
 // --- Query Keys ---
@@ -229,6 +230,28 @@ export function useUpdateItemValue() {
             // Refetch to ensure consistency
             queryClient.invalidateQueries({ queryKey: queryKeys.boardItems(variables.boardId) });
         },
+    });
+}
+
+// --- Optimistic Source Column Update Mutation ---
+export function useUpdateSourceColumn() {
+    return useMutation({
+        mutationFn: async ({
+            sourceBoardId,
+            sourceItemId,
+            sourceColumnId,
+            newValue
+        }: {
+            sourceBoardId: string | number;
+            sourceItemId: string | number;
+            sourceColumnId: string;
+            newValue: string;
+        }) => {
+            return updateSourceColumn(sourceBoardId, sourceItemId, sourceColumnId, newValue);
+        },
+        onError: (err) => {
+            console.error('Failed to update source column:', err);
+        }
     });
 }
 

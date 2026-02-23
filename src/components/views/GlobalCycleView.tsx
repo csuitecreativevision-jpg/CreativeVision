@@ -291,20 +291,31 @@ export const GlobalCycleView = ({ boardData, selectedBoardId, refreshBoardDetail
 
                                     {/* Column Values */}
                                     <div className="space-y-4 flex-1">
-                                        {boardData.columns?.filter((col: any) => col.type !== 'name' && !col.title.startsWith('C-F-')).map((col: any) => (
-                                            <div key={col.id} className="flex flex-col gap-1.5">
-                                                <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">{col.title}</span>
-                                                <div className="min-h-[28px] flex items-center">
-                                                    <BoardCell
-                                                        item={item}
-                                                        column={col}
-                                                        boardId={selectedBoardId}
-                                                        onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
-                                                        onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
-                                                    />
+                                        {boardData.columns?.filter((col: any) => col.type !== 'name' && !col.title.startsWith('C-F-')).map((col: any) => {
+                                            // Extract Unique Values for this column (used for Mirror Fallback Dropdowns)
+                                            const uniqueValuesForCol = Array.from(new Set(
+                                                boardData.items?.map((i: any) => {
+                                                    const cv = i.column_values.find((c: any) => c.id === col.id);
+                                                    return cv?.display_value || cv?.text;
+                                                }).filter(Boolean) as string[]
+                                            )).sort();
+
+                                            return (
+                                                <div key={col.id} className="flex flex-col gap-1.5">
+                                                    <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">{col.title}</span>
+                                                    <div className="min-h-[28px] flex items-center">
+                                                        <BoardCell
+                                                            item={item}
+                                                            column={col}
+                                                            boardId={selectedBoardId}
+                                                            uniqueValues={uniqueValuesForCol}
+                                                            onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
+                                                            onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
+                                                        />
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            )
+                                        })}
                                     </div>
                                 </div>
                             </motion.div>
@@ -402,20 +413,31 @@ export const GlobalCycleView = ({ boardData, selectedBoardId, refreshBoardDetail
                                                                         </div>
 
                                                                         <div className="space-y-3 flex-1">
-                                                                            {boardData.columns?.filter((col: any) => col.type !== 'name' && !col.title.startsWith('C-F-')).map((col: any) => (
-                                                                                <div key={col.id} className="flex flex-col gap-1">
-                                                                                    <span className="text-[9px] uppercase tracking-wider text-gray-500 font-bold opacity-60">{col.title}</span>
-                                                                                    <div className="min-h-[24px] flex items-center text-xs">
-                                                                                        <BoardCell
-                                                                                            item={item}
-                                                                                            column={col}
-                                                                                            boardId={selectedBoardId}
-                                                                                            onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
-                                                                                            onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
-                                                                                        />
+                                                                            {boardData.columns?.filter((col: any) => col.type !== 'name' && !col.title.startsWith('C-F-')).map((col: any) => {
+                                                                                // Extract Unique Values for this column (used for Mirror Fallback Dropdowns)
+                                                                                const uniqueValuesForCol = Array.from(new Set(
+                                                                                    boardData.items?.map((i: any) => {
+                                                                                        const cv = i.column_values.find((c: any) => c.id === col.id);
+                                                                                        return cv?.display_value || cv?.text;
+                                                                                    }).filter(Boolean) as string[]
+                                                                                )).sort();
+
+                                                                                return (
+                                                                                    <div key={col.id} className="flex flex-col gap-1">
+                                                                                        <span className="text-[9px] uppercase tracking-wider text-gray-500 font-bold opacity-60">{col.title}</span>
+                                                                                        <div className="min-h-[24px] flex items-center text-xs">
+                                                                                            <BoardCell
+                                                                                                item={item}
+                                                                                                column={col}
+                                                                                                boardId={selectedBoardId}
+                                                                                                uniqueValues={uniqueValuesForCol}
+                                                                                                onUpdate={() => refreshBoardDetails(selectedBoardId!, true)}
+                                                                                                onPreview={(url, name, assetId) => setPreviewFile({ url, name, assetId })}
+                                                                                            />
+                                                                                        </div>
                                                                                     </div>
-                                                                                </div>
-                                                                            ))}
+                                                                                )
+                                                                            })}
                                                                         </div>
                                                                     </div>
                                                                 </motion.div>

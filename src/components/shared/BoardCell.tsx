@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Loader2, PlayCircle, FileText, Eye, Check } from 'lucide-react';
-import { useUpdateItemValue } from '../../hooks/useMondayData';
+import { useUpdateItemValue, useUpdateSourceColumn } from '../../hooks/useMondayData';
 import { normalizeMondayFileUrl } from '../../services/mondayService';
 import { MondayItem, MondayColumn } from '../../types/monday';
 
@@ -16,10 +16,11 @@ interface BoardCellProps {
 }
 
 export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dropdownOptions, onUpdate, onPreview }: BoardCellProps) => {
-    // ... existing state ...
     const [isEditing, setIsEditing] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [optimisticValue, setOptimisticValue] = useState<string | null>(null);
     const { mutateAsync: updateItem } = useUpdateItemValue();
+    const { mutateAsync: updateSourceCol } = useUpdateSourceColumn();
 
     // ... existing displayValue logic ...
     // Find value for this column
@@ -36,6 +37,11 @@ export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dro
     // Fix for Mirror Columns: Use display_value if available (native or from our updated query)
     if ((column.type === 'mirror' || column.type === 'lookup') && colValueObj?.display_value) {
         displayValue = colValueObj.display_value;
+    }
+
+    // Apply Optimistic Override if set (for instant UI feedback before Monday API fully syncs)
+    if (optimisticValue !== null) {
+        displayValue = optimisticValue;
     }
 
     // NEW PRE-PROCESSING: Check for "Filename - URL" pattern in plain text columns
@@ -164,8 +170,113 @@ export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dro
 
         setIsLoading(true);
         try {
-            // 1. Update the Main Column (e.g., Status)
-            await updateItem({ boardId, itemId: item.id, columnId: column.id, value: newValue });
+            // Check if this is a mirror status that needs source updating
+            const isMirrorStatus = (column.type === 'mirror' || column.type === 'lookup') &&
+                (column.title.toLowerCase().includes('status') ||
+                    column.title.toLowerCase().includes('priority') ||
+                    column.title.toLowerCase().includes('client') ||
+                    column.title.toLowerCase().includes('phase'));
+
+            if (isMirrorStatus) {
+                // To update a mirror column, we need the source board ID, item ID, and column ID.
+                // In Monday.com's API, we can often extract this from the mirror column value or settings.
+                // However, without explicit source IDs passed down, we must rely on a convention or 
+                // data embedded in the item/column.
+                // 
+                // As instructed: "When asked to update a mirror column, always update the source board column instead.
+                // Use the following parameters: Source Board ID: <SOURCE_BOARD_ID>, Source Item ID: <SOURCE_ITEM_ID>, 
+                // Source Column ID: <SOURCE_COLUMN_ID>, New Value: <NEW_VALUE>"
+
+                // For a robust implementation, we'd need these IDs. Since they might be hardcoded for a specific 
+                // request or passed via props/context in a real app, we use placeholders per instruction, 
+                // but we will implement the actual API call logic using our new hook.
+
+                // CRITICAL FIX: Extract source board, item, and column IDs dynamically from Monday API data
+                let sourceBoardId = "<SOURCE_BOARD_ID>";
+                let sourceItemId = "<SOURCE_ITEM_ID>";
+                let sourceColumnId = "<SOURCE_COLUMN_ID>";
+                let relationColId = "";
+
+                // 1. EXTRACT SOURCE BOARD ID, COLUMN ID, and RELATION COLUMN ID from mirror settings
+                if (column.settings_str) {
+                    try {
+                        const settings = JSON.parse(column.settings_str);
+
+                        // Extract Board ID and Column ID
+                        if (settings.displayed_linked_columns) {
+                            const boardIds = Object.keys(settings.displayed_linked_columns);
+                            if (boardIds.length > 0) {
+                                sourceBoardId = boardIds[0];
+                                const linkedCols = settings.displayed_linked_columns[sourceBoardId];
+                                if (linkedCols && linkedCols.length > 0) {
+                                    sourceColumnId = linkedCols[0];
+                                }
+                            }
+                        }
+
+                        // Extract Relation Column ID
+                        if (settings.relation_column) {
+                            const relKeys = Object.keys(settings.relation_column);
+                            if (relKeys.length > 0) {
+                                relationColId = relKeys[0];
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse mirror column settings for source IDs');
+                    }
+                }
+
+                // 2. EXTRACT SOURCE ITEM ID from the relation column value
+                if (relationColId) {
+                    const relationColValue = item.column_values.find(c => c.id === relationColId);
+                    console.log("[DEBUG] relationColId:", relationColId, "relationColValue:", relationColValue);
+
+                    if (relationColValue) {
+                        // Priority 1: Check native linked_item_ids array (from 2024-01 API BoardRelationValue fragment)
+                        const rawLinked = (relationColValue as any).linked_item_ids;
+                        if (rawLinked && Array.isArray(rawLinked) && rawLinked.length > 0) {
+                            sourceItemId = String(rawLinked[0]);
+                        }
+                        // Priority 2: Fallback to parsing the stringified JSON value if available (older/alternative format)
+                        else if (relationColValue.value) {
+                            try {
+                                const parsedRel = JSON.parse(relationColValue.value);
+                                if (parsedRel && parsedRel.linkedPulseIds && parsedRel.linkedPulseIds.length > 0) {
+                                    sourceItemId = parsedRel.linkedPulseIds[0].linkedPulseId.toString();
+                                }
+                            } catch (e) {
+                                // Ignore parse errors
+                            }
+                        }
+                    }
+                }
+
+                if (sourceBoardId === "<SOURCE_BOARD_ID>" || sourceItemId === "<SOURCE_ITEM_ID>") {
+                    console.error("Mirror column source extraction failed. Cannot update.", { sourceBoardId, sourceItemId, sourceColumnId });
+                    setIsEditing(false);
+                    alert("This column cannot be edited because it is not linked to any source item. Please link an item in the Connect Boards column first.");
+                    return;
+                }
+
+                console.log(`[Mirror Column Update] Triggered for ${column.title}. Board: ${sourceBoardId}, Item: ${sourceItemId}, Col: ${sourceColumnId}, Value: ${newValue}`);
+                await updateSourceCol({
+                    sourceBoardId,
+                    sourceItemId,
+                    sourceColumnId,
+                    newValue: JSON.stringify({ label: newValue })
+                });
+
+                setOptimisticValue(newValue);
+                setIsEditing(false);
+                onUpdate();
+
+            } else {
+                // 1. Update the Main Column (e.g., Status)
+                await updateItem({ boardId, itemId: item.id, columnId: column.id, value: newValue });
+
+                setOptimisticValue(newValue);
+                onUpdate();
+            }
 
             // 2. SYSTEM LOGIC: Check for Revision Logic
             // If this is a Status column AND new value implies Revision (e.g. "Sent for Revisions")
@@ -311,7 +422,10 @@ export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dro
             });
         }
 
-        // Mirror/lookup columns are read-only — can't be updated via the Monday API
+        // REMOVED READ-ONLY RESTRICTION FOR MIRROR STATUS:
+        // We now allow editing mirror columns by capturing the source IDs in `handleSave`
+        // and routing the update to the source board.
+        /*
         if (isMirrorStatus) {
             return (
                 <span
@@ -323,6 +437,7 @@ export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dro
                 </span>
             );
         }
+        */
 
         if (isEditing) {
             return (

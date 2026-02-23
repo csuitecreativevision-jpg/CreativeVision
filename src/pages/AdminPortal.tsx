@@ -13,6 +13,7 @@ import {
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { RefreshProvider, useRefresh } from '../contexts/RefreshContext';
 import { getAllBoards, getAllFolders, getWorkspaceAnalytics, prefetchOverviewData } from '../services/mondayService';
+import { AdminChatbot } from '../components/admin/AdminChatbot';
 
 function AdminPortalContent() {
     const navigate = useNavigate();
@@ -148,6 +149,9 @@ function AdminPortalContent() {
                     <div className="flex-1 overflow-hidden flex relative">
                         <Outlet />
                     </div>
+
+                    {/* Global Admin Chatbot */}
+                    <AdminChatbot />
                 </>
             }
         />

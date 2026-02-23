@@ -1,0 +1,16 @@
+{
+  "data": {
+    "boards": [
+      {
+        "columns": [
+          {
+            "settings_str": "{\"done_colors\":[],\"color_mapping\":{\"0\":1,\"1\":6,\"2\":2,\"3\":110,\"4\":19,\"6\":12,\"7\":9,\"8\":0,\"9\":8,\"12\":103,\"13\":15,\"15\":7,\"19\":13,\"103\":4,\"110\":3},\"deactivated_labels\":[],\"labels\":{\"0\":\"Approved (CV)\",\"1\":\"(Client) Sent for Revisions\",\"2\":\"Client Info\",\"3\":\"For Approval (CV)\",\"4\":\"Working on it (CV)\",\"5\":\"Unassigned\",\"6\":\"Taking a break (CV)\",\"7\":\"Assigned (CV)\",\"8\":\"Exporting \\u0026 Uploading (CV)\",\"9\":\"(CV) Sent for Revisions\",\"10\":\"Downloading (CV)\",\"11\":\"(Client) Approved\",\"12\":\"Approved by SMS  (CV)\",\"13\":\"1st Approval (Storyboard)\",\"14\":\"(Client) Uploading\",\"15\":\"Waiting for Client\"},\"labels_positions_v2\":{\"0\":9,\"1\":12,\"2\":11,\"3\":7,\"4\":3,\"5\":0,\"6\":5,\"7\":1,\"8\":4,\"9\":6,\"10\":2,\"11\":13,\"12\":10,\"13\":8,\"14\":14,\"15\":15},\"labels_colors\":{\"0\":{\"color\":\"#00c875\",\"border\":\"#00b461\",\"var_name\":\"green-shadow\"},\"1\":{\"color\":\"#037f4c\",\"border\":\"#006b38\",\"var_name\":\"grass-green\"},\"2\":{\"color\":\"#df2f4a\",\"border\":\"#ce3048\",\"var_name\":\"red-shadow\"},\"3\":{\"color\":\"#401694\",\"border\":\"#401694\",\"var_name\":\"dark_indigo\"},\"4\":{\"color\":\"#ff6d3b\",\"border\":\"#e05828\",\"var_name\":\"dark-orange\"},\"5\":{\"color\":\"#c4c4c4\",\"border\":\"#b0b0b0\",\"var_name\":\"grey\"},\"6\":{\"color\":\"#ff007f\",\"border\":\"#e01279\",\"var_name\":\"dark-pink\"},\"7\":{\"color\":\"#ffcb00\",\"border\":\"#c0ab1b\",\"var_name\":\"yellow\"},\"8\":{\"color\":\"#fdab3d\",\"border\":\"#e99729\",\"var_name\":\"orange\"},\"9\":{\"color\":\"#cab641\",\"border\":\"#c0ab31\",\"var_name\":\"mustered\"},\"10\":{\"color\":\"#333333\",\"border\":\"#000\",\"var_name\":\"soft-black\"},\"11\":{\"color\":\"#bb3354\",\"border\":\"#a42d4a\",\"var_name\":\"dark-red\"},\"12\":{\"color\":\"#ffadad\",\"border\":\"#ffadad\",\"var_name\":\"peach\"},\"13\":{\"color\":\"#9cd326\",\"border\":\"#89b921\",\"var_name\":\"lime-green\"},\"14\":{\"color\":\"#784bd1\",\"border\":\"#8f4dc4\",\"var_name\":\"dark-purple\"},\"15\":{\"color\":\"#579bfc\",\"border\":\"#4387e8\",\"var_name\":\"bright-blue\"}}}"
+          }
+        ]
+      }
+    ]
+  },
+  "extensions": {
+    "request_id": "b9fce220-bd7f-91ba-8333-8b5c02d02989"
+  }
+}

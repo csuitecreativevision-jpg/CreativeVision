@@ -232,7 +232,7 @@ export default function AdminOverview() {
                     </h3>
                     <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar relative z-10">
                         {overviewStats.clientProjectDistribution.length > 0 ? (
-                            overviewStats.clientProjectDistribution.map((client, i) => (
+                            overviewStats.clientProjectDistribution.map((client: { name: string, count: number }, i: number) => (
                                 <div key={i} className="flex items-center gap-4 group/item">
                                     <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/5 flex items-center justify-center text-xs font-bold text-gray-400 group-hover/item:border-purple-500/30 group-hover/item:text-purple-400 transition-colors">
                                         {i + 1}
@@ -278,7 +278,7 @@ export default function AdminOverview() {
                     </h3>
                     <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar relative z-10">
                         {overviewStats.editorPerformance.length > 0 ? (
-                            overviewStats.editorPerformance.map((editor, i) => (
+                            overviewStats.editorPerformance.map((editor: { name: string, count: number }, i: number) => (
                                 <div key={i} className="flex items-center gap-4 group/item">
                                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-800 to-black border border-white/10 flex items-center justify-center text-xs font-bold text-gray-400 group-hover/item:border-emerald-500/30 group-hover/item:text-emerald-400 transition-colors shadow-lg">
                                         {editor.name.charAt(0)}
