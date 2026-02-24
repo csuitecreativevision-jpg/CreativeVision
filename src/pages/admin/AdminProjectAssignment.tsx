@@ -27,6 +27,7 @@ export default function AdminProjectAssignment() {
     const [veBoardGroups, setVeBoardGroups] = useState<{ id: string, title: string }[]>([]); // For Submission Mapping
     const [availableTeam, setAvailableTeam] = useState<{ name: string, id: string }[]>([]);
     const [loadingClients, setLoadingClients] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [veProjectBoardId, setVeProjectBoardId] = useState<string | null>(null);
 
 
@@ -105,10 +106,16 @@ export default function AdminProjectAssignment() {
                             const settings = JSON.parse(statusCol.settings_str);
                             let labels: string[] = [];
                             if (settings.labels) labels = Object.values(settings.labels);
-                            labels = labels.filter(l => l && l.trim().length > 0 && l.toLowerCase() !== 'default');
+                            // Filter specifically for the unassigned status only
+                            labels = labels.filter(l => l && typeof l === 'string' && l.toLowerCase().includes('unassigned'));
+
                             if (labels.length > 0) {
                                 setProjectStatuses(labels);
                                 setFormData(prev => ({ ...prev, projectStatus: labels[0] }));
+                            } else {
+                                // Fallback just in case it's completely missing
+                                setProjectStatuses(['Unassigned (cv)']);
+                                setFormData(prev => ({ ...prev, projectStatus: 'Unassigned (cv)' }));
                             }
                         } catch (e) { }
                     }
@@ -197,7 +204,7 @@ export default function AdminProjectAssignment() {
             return;
         }
 
-        setLoadingClients(true);
+        setIsSubmitting(true);
         try {
             // Find Group ID
             const targetGroup = veBoardGroups.find(g => g.title.toLowerCase() === formData.client.toLowerCase());
@@ -222,7 +229,7 @@ export default function AdminProjectAssignment() {
             console.error(error);
             alert("Failed to create assignment. Check console.");
         } finally {
-            setLoadingClients(false);
+            setIsSubmitting(false);
         }
     };
 
@@ -483,10 +490,10 @@ export default function AdminProjectAssignment() {
 
                         <button
                             onClick={step === 3 ? handleSubmit : handleNext}
-                            disabled={loadingClients}
-                            className={`px-8 py-3 rounded-full bg-white text-black font-bold hover:bg-custom-bright hover:text-white transition-all flex items-center gap-2 ${loadingClients ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={isSubmitting || loadingClients}
+                            className={`px-8 py-3 rounded-full bg-white text-black font-bold hover:bg-custom-bright hover:text-white transition-all flex items-center gap-2 ${isSubmitting || loadingClients ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
-                            {loadingClients ? 'Processing...' : (step === 3 ? 'Create Assignment' : 'Continue')}
+                            {isSubmitting ? 'Processing...' : (loadingClients ? 'Loading...' : (step === 3 ? 'Create Assignment' : 'Continue'))}
 
                         </button>
                     </div >
