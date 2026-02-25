@@ -1323,7 +1323,8 @@ export async function submitProjectAssignment(
         price?: string,
         timeline?: string,
         priority?: string,
-        instructions?: string
+        instructions?: string,
+        rawVideoLink?: string
     }
 ) {
     // 1. Fetch Columns to map IDs
@@ -1336,6 +1337,7 @@ export async function submitProjectAssignment(
     const priceId = getColId('price') || getColId('budget') || 'numbers';
     const instructionId = getColId('instruction') || getColId('notes') || 'text';
     const priorityId = getColId('priority');
+    const rawVideoId = getColId('raw video') || getColId('video link') || getColId('link');
 
     const columnValues: any = {};
 
@@ -1344,6 +1346,7 @@ export async function submitProjectAssignment(
     if (data.price) columnValues[priceId] = data.price;
     if (data.priority && priorityId) columnValues[priorityId] = { label: data.priority };
     if (data.instructions) columnValues[instructionId] = { text: data.instructions };
+    if (data.rawVideoLink && rawVideoId) columnValues[rawVideoId] = { url: data.rawVideoLink, text: "Raw Video" };
 
 
     // Editor Logic for VE Board: Assign to People column only

@@ -34,14 +34,15 @@ export default function AdminProjectAssignment() {
     // Form State
     const [formData, setFormData] = useState({
         projectName: '',
-        projectStatus: '',
+        projectStatus: 'Unassigned',
         projectType: '',
         client: '',
         price: '',
         editor: '',
         deadline: '',
         priority: '',
-        instructions: ''
+        instructions: '',
+        rawVideoLink: ''
     });
 
 
@@ -220,7 +221,8 @@ export default function AdminProjectAssignment() {
                 price: formData.price,
                 timeline: formData.deadline,
                 priority: formData.priority,
-                instructions: formData.instructions
+                instructions: formData.instructions,
+                rawVideoLink: formData.rawVideoLink
             });
 
             alert("Project Assigned Successfully!");
@@ -299,6 +301,18 @@ export default function AdminProjectAssignment() {
                                         />
                                     </div>
 
+                                    {/* Raw Video Link */}
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-gray-300">Raw Video Link</label>
+                                        <input
+                                            type="url"
+                                            value={formData.rawVideoLink}
+                                            onChange={(e) => setFormData({ ...formData, rawVideoLink: e.target.value })}
+                                            placeholder="https://drive.google.com/..."
+                                            className="w-full bg-[#0E0E1A] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500 transition-colors placeholder:text-gray-600"
+                                        />
+                                    </div>
+
                                     {/* Deadline */}
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium text-gray-300">Deadline</label>
@@ -327,26 +341,7 @@ export default function AdminProjectAssignment() {
                                 </div>
 
                                 {/* MODAL SELECTION SECTION */}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    {/* Project Status */}
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium text-gray-300">Project Status</label>
-                                        <button
-                                            onClick={() => setActiveModal('status')}
-                                            className="w-full p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-violet-500/50 transition-all text-left flex items-center justify-between group"
-                                        >
-                                            <div>
-                                                <span className="text-xs text-violet-400 uppercase tracking-wider font-bold mb-1 block">Current Status</span>
-                                                <span className="text-lg font-bold text-white block truncate">
-                                                    {formData.projectStatus || 'Select Status...'}
-                                                </span>
-                                            </div>
-                                            <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-violet-500 group-hover:text-white transition-colors">
-                                                <Layers className="w-5 h-5 text-gray-400 group-hover:text-white" />
-                                            </div>
-                                        </button>
-                                    </div>
-
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {/* Project Type */}
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium text-gray-300">Project Type</label>
