@@ -1,11 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { StatCard } from '../../components/shared/StatCard';
 import { AdminPageLayout } from '../../components/layout/AdminPageLayout';
 import {
     Activity,
     TrendingUp,
     Briefcase,
-    Users
+    Users,
+    ChevronDown,
+    Check,
+    Calendar
 } from 'lucide-react';
 import {
     getAllBoards, getMultipleBoardItems, getWorkspaceAnalytics, getAllFolders
@@ -17,36 +20,25 @@ const OVERVIEW_CACHE_KEY = 'admin_overview_stats';
 
 // --- Admin Overview Component ---
 export default function AdminOverview() {
-    // Overview Stats State
-    const [overviewStats, setOverviewStats] = useState(() => {
-        // Try to hydrate from localStorage cache instantly
+    // Raw data state (fetched once)
+    const [rawData, setRawData] = useState<any>(() => {
         const cached = getCache<any>(OVERVIEW_CACHE_KEY);
-        return cached?.data || {
-            activeClientsCount: 0,
-            activeProjectsCount: 0,
-            activeEditorsCount: 0,
-            topEditor: { name: 'N/A', count: 0 },
-            systemStatus: 'Stable',
-            clientProjectDistribution: [] as { name: string, count: number }[],
-            editorPerformance: [] as { name: string, count: number }[],
-            currentCycleName: ''
-        };
+        return cached?.data || null;
     });
-    const [overviewLoading, setOverviewLoading] = useState(() => {
-        // Only show spinner if there's NO cached data at all
-        return !getCache(OVERVIEW_CACHE_KEY);
-    });
+    const [overviewLoading, setOverviewLoading] = useState(() => !getCache(OVERVIEW_CACHE_KEY));
+
+    // Cycle selection state
+    const [selectedCycles, setSelectedCycles] = useState<Set<string>>(new Set());
+    const [isCycleDropdownOpen, setIsCycleDropdownOpen] = useState(false);
 
     useEffect(() => {
         fetchOverviewData();
     }, []);
 
     const fetchOverviewData = async () => {
-        // Only show spinner if there's no cached data already displayed
         const hasCachedData = !!getCache(OVERVIEW_CACHE_KEY);
         if (!hasCachedData) setOverviewLoading(true);
         try {
-            // 1. Fetch Board List, Analytics & Folders in Parallel
             const [boardsData, analyticsData, allFolders] = await Promise.all([
                 getAllBoards(),
                 getWorkspaceAnalytics(),
@@ -54,124 +46,41 @@ export default function AdminOverview() {
             ]);
 
             const allFetchedBoards = boardsData || [];
-
-            // ---------------------------------------------------------
-            // C) Active Editors & Performance (Use getWorkspaceAnalytics)
-            // ---------------------------------------------------------
             const { cycles, data: cycleData } = analyticsData;
 
-            // Get Latest Cycle
-            const currentCycleKey = cycles.length > 0 ? cycles[0] : null;
-
-            // ---------------------------------------------------------
-            // A) Client/Project Data Source: "Active Clients" Folder (Cycle Based)
-            // ---------------------------------------------------------
-            // Fetch Folders (already fetched above)
+            // Find Active Clients folder
             const activeClientsFolder = allFolders.find((f: any) => f.name.toLowerCase() === 'active clients');
+            let clientBoardItems: any[] = [];
 
-            let activeClientsCount = 0;
-            let totalActiveProjects = 0;
-            const clientProjectDistribution: { name: string, count: number }[] = [];
-
-            if (activeClientsFolder && currentCycleKey) {
-                // Parse Cycle Key to get Date Range
-                // Key format: "MonthName Year - Cycle X" e.g. "February 2026 - Cycle 1"
-                const match = currentCycleKey.match(/(\w+) (\d+) - Cycle (\d)/);
-                let cycleInfo = null;
-
-                if (match) {
-                    const [, monthStr, yearStr, cycleNumStr] = match;
-                    const year = parseInt(yearStr);
-                    const cycle = parseInt(cycleNumStr) as 1 | 2;
-                    const month = new Date(`${monthStr} 1, ${year}`).getMonth() + 1; // 1-indexed
-
-                    cycleInfo = getCycleDates(cycle, month, year);
-                }
-
-                // 1. Identify Client Boards
+            if (activeClientsFolder) {
                 const clientBoardIds = activeClientsFolder.children.map((c: any) => String(c.id));
                 const clientBoards = allFetchedBoards.filter((b: any) => clientBoardIds.includes(String(b.id)));
                 const clientBoardMap = new Map(clientBoards.map((b: any) => [String(b.id), b.name]));
 
-                // 2. Fetch Items
-                if (clientBoardIds.length > 0 && cycleInfo) {
+                if (clientBoardIds.length > 0) {
                     const [clientItemsData] = await Promise.all([
                         getMultipleBoardItems(clientBoardIds)
                     ]);
-
-                    const activeClientIds = new Set();
-
-                    clientItemsData.forEach((board: any) => {
-                        const boardName = clientBoardMap.get(String(board.id)) || board.name;
-
-                        // Count Projects Created in this Cycle
-                        const validItems = (board.items || []).filter((i: any) => {
-                            if (!i.created_at) return false;
-                            const createdDate = new Date(i.created_at);
-                            // Check if created within current cycle
-                            return isDateInCycle(createdDate, cycleInfo!);
-                        });
-
-                        const count = validItems.length;
-                        totalActiveProjects += count;
-
-                        if (count > 0) {
-                            activeClientIds.add(board.id);
-                            clientProjectDistribution.push({ name: boardName, count });
-                        }
-                    });
-
-                    activeClientsCount = activeClientIds.size;
+                    clientBoardItems = clientItemsData.map((board: any) => ({
+                        ...board,
+                        boardName: clientBoardMap.get(String(board.id)) || board.name
+                    }));
                 }
-            } else {
-                console.warn("Folder 'Active Clients' or Cycle Key not found.");
             }
 
-            clientProjectDistribution.sort((a, b) => b.count - a.count);
-
-
-
-
-            let activeEditorsCount = 0;
-            let topEditorName = 'None';
-            let maxDoneCount = 0;
-            const editorPerformance: { name: string, count: number }[] = [];
-
-            if (currentCycleKey && cycleData[currentCycleKey]) {
-                const currentCycleStats = cycleData[currentCycleKey];
-
-                // Active editors are those with > 0 videos in this cycle
-                const editorsInCycle = Object.entries(currentCycleStats);
-                activeEditorsCount = editorsInCycle.length;
-
-                editorsInCycle.forEach(([name, count]) => {
-                    const c = count as number;
-                    editorPerformance.push({ name, count: c });
-
-                    if (c > maxDoneCount) {
-                        maxDoneCount = c;
-                        topEditorName = name;
-                    }
-                });
-            } else {
-                // Fallback / Empty State
-                activeEditorsCount = 0;
-            }
-
-            editorPerformance.sort((a, b) => b.count - a.count);
-
-            const newStats = {
-                activeClientsCount,
-                activeProjectsCount: totalActiveProjects,
-                activeEditorsCount,
-                topEditor: { name: topEditorName, count: maxDoneCount },
-                systemStatus: 'Stable',
-                clientProjectDistribution,
-                editorPerformance,
-                currentCycleName: currentCycleKey || ''
+            const newData = {
+                cycles,
+                cycleData,
+                clientBoardItems
             };
-            setOverviewStats(newStats);
-            setCache(OVERVIEW_CACHE_KEY, newStats);
+
+            setRawData(newData);
+            setCache(OVERVIEW_CACHE_KEY, newData);
+
+            // Default to latest cycle selected
+            if (cycles.length > 0 && selectedCycles.size === 0) {
+                setSelectedCycles(new Set([cycles[0]]));
+            }
 
         } catch (error) {
             console.error("Failed to load overview data", error);
@@ -180,11 +89,186 @@ export default function AdminOverview() {
         }
     };
 
+    // --- Derived stats based on selected cycles ---
+    const overviewStats = useMemo(() => {
+        if (!rawData || !rawData.cycles) return {
+            activeClientsCount: 0,
+            activeProjectsCount: 0,
+            activeEditorsCount: 0,
+            topEditor: { name: 'N/A', count: 0 },
+            clientProjectDistribution: [] as { name: string, count: number }[],
+            editorPerformance: [] as { name: string, count: number }[],
+        };
+
+        const { cycles, cycleData, clientBoardItems } = rawData;
+        const cyclesToUse = selectedCycles.size > 0 ? Array.from(selectedCycles) : (cycles.length > 0 ? [cycles[0]] : []);
+
+        // --- Editor Stats (aggregated across selected cycles) ---
+        const editorTotals: Record<string, number> = {};
+
+        cyclesToUse.forEach((cycleKey: string) => {
+            if (cycleData[cycleKey]) {
+                Object.entries(cycleData[cycleKey]).forEach(([name, count]) => {
+                    editorTotals[name] = (editorTotals[name] || 0) + (count as number);
+                });
+            }
+        });
+
+        const editorPerformance = Object.entries(editorTotals)
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => b.count - a.count);
+
+        const activeEditorsCount = editorPerformance.length;
+        const topEditor = editorPerformance.length > 0
+            ? { name: editorPerformance[0].name, count: editorPerformance[0].count }
+            : { name: 'None', count: 0 };
+
+        // --- Client/Project Stats (aggregated across selected cycles) ---
+        const clientCounts: Record<string, number> = {};
+        let totalActiveProjects = 0;
+
+        cyclesToUse.forEach((cycleKey: string) => {
+            // Parse cycle key to get date range
+            const match = cycleKey.match(/(\w+) (\d+) - Cycle (\d)/);
+            if (!match) return;
+
+            const [, monthStr, yearStr, cycleNumStr] = match;
+            const year = parseInt(yearStr);
+            const cycle = parseInt(cycleNumStr) as 1 | 2;
+            const month = new Date(`${monthStr} 1, ${year}`).getMonth() + 1;
+            const cycleInfo = getCycleDates(cycle, month, year);
+
+            (clientBoardItems || []).forEach((board: any) => {
+                const validItems = (board.items || []).filter((i: any) => {
+                    if (!i.created_at) return false;
+                    const createdDate = new Date(i.created_at);
+                    return isDateInCycle(createdDate, cycleInfo);
+                });
+
+                const count = validItems.length;
+                if (count > 0) {
+                    clientCounts[board.boardName] = (clientCounts[board.boardName] || 0) + count;
+                }
+            });
+        });
+
+        const clientProjectDistribution = Object.entries(clientCounts)
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => b.count - a.count);
+
+        totalActiveProjects = clientProjectDistribution.reduce((sum, c) => sum + c.count, 0);
+        const activeClientsCount = clientProjectDistribution.length;
+
+        return {
+            activeClientsCount,
+            activeProjectsCount: totalActiveProjects,
+            activeEditorsCount,
+            topEditor,
+            clientProjectDistribution,
+            editorPerformance,
+        };
+    }, [rawData, selectedCycles]);
+
+    // --- Cycle selector helpers ---
+    const availableCycles: string[] = rawData?.cycles || [];
+
+    const toggleCycle = (cycle: string) => {
+        setSelectedCycles(prev => {
+            const next = new Set(prev);
+            if (next.has(cycle)) {
+                next.delete(cycle);
+            } else {
+                next.add(cycle);
+            }
+            return next;
+        });
+    };
+
+    const selectAll = () => {
+        setSelectedCycles(new Set(availableCycles));
+    };
+
+    const clearAll = () => {
+        setSelectedCycles(new Set());
+    };
+
+    const cycleLabel = selectedCycles.size === 0
+        ? 'Select Cycles'
+        : selectedCycles.size === 1
+            ? Array.from(selectedCycles)[0]
+            : `${selectedCycles.size} Cycles Selected`;
 
     return (
         <AdminPageLayout
             title="Overview"
             subtitle="Platform activity at a glance. Real-time metrics and performance tracking."
+            action={
+                <div className="relative">
+                    <button
+                        onClick={() => setIsCycleDropdownOpen(!isCycleDropdownOpen)}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-[#0e0e1a] border border-white/10 rounded-xl text-sm font-bold text-white hover:bg-white/5 transition-all"
+                    >
+                        <Calendar className="w-4 h-4 text-violet-400" />
+                        <span className="truncate max-w-[200px]">{cycleLabel}</span>
+                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isCycleDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {/* Backdrop */}
+                    {isCycleDropdownOpen && (
+                        <div className="fixed inset-0 z-40" onClick={() => setIsCycleDropdownOpen(false)} />
+                    )}
+
+                    {/* Dropdown */}
+                    {isCycleDropdownOpen && (
+                        <div className="absolute top-full right-0 mt-2 w-80 bg-[#0A0A16] border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 z-50">
+                            {/* Header with Select All / Clear */}
+                            <div className="p-3 border-b border-white/5 flex items-center justify-between">
+                                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Filter by Cycle</span>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={selectAll}
+                                        className="text-[10px] font-bold text-violet-400 hover:text-violet-300 transition-colors"
+                                    >
+                                        All
+                                    </button>
+                                    <span className="text-gray-600">|</span>
+                                    <button
+                                        onClick={clearAll}
+                                        className="text-[10px] font-bold text-gray-500 hover:text-gray-300 transition-colors"
+                                    >
+                                        Clear
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Cycle List */}
+                            <div className="max-h-[300px] overflow-y-auto custom-scrollbar p-2">
+                                {availableCycles.map(cycle => {
+                                    const isSelected = selectedCycles.has(cycle);
+                                    return (
+                                        <button
+                                            key={cycle}
+                                            onClick={() => toggleCycle(cycle)}
+                                            className={`w-full text-left px-4 py-3 rounded-xl transition-all mb-1 flex items-center justify-between group ${isSelected
+                                                ? 'bg-violet-500/10 text-violet-400 font-bold'
+                                                : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                                                }`}
+                                        >
+                                            <span className="text-xs">{cycle}</span>
+                                            {isSelected && <Check className="w-3.5 h-3.5 flex-shrink-0" />}
+                                        </button>
+                                    );
+                                })}
+                                {availableCycles.length === 0 && (
+                                    <div className="p-4 text-center text-gray-500 text-xs italic">
+                                        No cycles available.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            }
         >
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -222,8 +306,6 @@ export default function AdminOverview() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Client Distribution */}
                 <div className="bg-[#13141f] border border-white/5 rounded-2xl p-8 relative overflow-hidden">
-
-
                     <h3 className="text-white font-bold mb-6 flex items-center gap-2 relative z-10">
                         <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400">
                             <Activity className="w-4 h-4" />
@@ -261,8 +343,6 @@ export default function AdminOverview() {
 
                 {/* Editor Performance */}
                 <div className="bg-[#13141f] border border-white/5 rounded-2xl p-8 relative overflow-hidden">
-
-
                     <h3 className="text-white font-bold mb-6 flex items-center gap-2 relative z-10 w-full justify-between">
                         <div className="flex items-center gap-2">
                             <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
@@ -270,9 +350,9 @@ export default function AdminOverview() {
                             </div>
                             Editor Workload
                         </div>
-                        {overviewStats.currentCycleName && (
-                            <span className="text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-full">
-                                {overviewStats.currentCycleName}
+                        {selectedCycles.size > 0 && (
+                            <span className="text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-full truncate max-w-[200px]">
+                                {selectedCycles.size === 1 ? Array.from(selectedCycles)[0] : `${selectedCycles.size} Cycles`}
                             </span>
                         )}
                     </h3>
