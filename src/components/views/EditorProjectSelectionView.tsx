@@ -7,7 +7,6 @@ import { PremiumModal } from '../ui/PremiumModal';
 import { YouTubeModal } from '../ui/YouTubeModal';
 import { getCycleFromDate } from '../../features/performance-dashboard/utils/dateUtils';
 import { getBoardColumns, getAssetPublicUrl, normalizeMondayFileUrl } from '../../services/mondayService';
-import { ClientAnalytics } from '../analytics/ClientAnalytics';
 
 interface ProjectSelectionViewProps {
     boardData: any;
@@ -91,7 +90,7 @@ const SubmissionVideoPlayer = ({ url }: { url: string }) => {
     );
 };
 
-export const ProjectSelectionView = ({
+export const EditorProjectSelectionView = ({
     boardData,
     selectedBoardId,
     refreshBoardDetails,
@@ -113,8 +112,7 @@ export const ProjectSelectionView = ({
         }
     }, [initialItemId, boardData]);
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
-    const [viewMode, setViewMode] = useState<'all' | 'cycles'>('all'); // NEW: View Mode
-    const [viewTab, setViewTab] = useState<'projects' | 'analytics'>('projects'); // NEW: Top Level Tab
+    const [viewMode, setViewMode] = useState<'all' | 'cycles'>('cycles'); // NEW: View Mode
     const [expandedCycles, setExpandedCycles] = useState<Set<string>>(new Set()); // NEW: Expanded Cycles
     const [mirrorOptions, setMirrorOptions] = useState<Record<string, any[]>>({});
 
@@ -420,6 +418,34 @@ export const ProjectSelectionView = ({
     };
     // ---------------------------
 
+    // helper to clean and extract price
+    const extractPrice = (priceStr: string | undefined): number => {
+        if (!priceStr) return 0;
+        const cleaned = priceStr.replace(/[^0-9.-]+/g, "");
+        const val = parseFloat(cleaned);
+        return isNaN(val) ? 0 : val;
+    };
+
+    // Calculate Earnings per Cycle
+    const getCycleEarnings = (items: any[]) => {
+        const priceColId = boardData.columns?.find((c: any) =>
+            c.title.toLowerCase().includes('price') || c.title.toLowerCase().includes('budget') || c.title.toLowerCase().includes('php')
+        )?.id;
+
+        if (!priceColId) return 0;
+
+        return items.reduce((sum, item) => {
+            const priceVal = item.column_values?.find((cv: any) => cv.id === priceColId);
+            const strValue = priceVal ? (priceVal.text || priceVal.display_value || '') : '';
+            return sum + extractPrice(strValue);
+        }, 0);
+    };
+
+    // Calculate Total Lifetime Earnings
+    const lifetimeEarnings = useMemo(() => {
+        return getCycleEarnings(filteredItems);
+    }, [filteredItems, boardData.columns]);
+
     // Helper to get Status Color
     const getStatusColor = (item: any) => {
         const statusCol = boardData.columns?.find((c: any) => c.title.toLowerCase().includes('status'));
@@ -469,57 +495,29 @@ export const ProjectSelectionView = ({
             {/* Header / Controls */}
             <div className="flex flex-col xl:flex-row gap-4 items-center justify-between">
 
-                {/* Search & Tabs Group */}
+                {/* Search & View Mode Group */}
                 <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto">
-                    {/* Top Level Tabs Switcher */}
+                    {/* View Switcher */}
                     <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 relative flex-shrink-0">
                         <div className="relative flex gap-1">
-                            {['projects', 'analytics'].map((tab) => (
+                            {['all', 'cycles'].map((mode) => (
                                 <button
-                                    key={tab}
-                                    onClick={() => setViewTab(tab as 'projects' | 'analytics')}
-                                    className={`relative px-4 py-2 rounded-lg text-xs font-bold transition-all z-10 ${viewTab === tab ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+                                    key={mode}
+                                    onClick={() => setViewMode(mode as 'all' | 'cycles')}
+                                    className={`relative px-4 py-2 rounded-lg text-xs font-bold transition-all z-10 ${viewMode === mode ? 'text-white' : 'text-gray-400 hover:text-white'}`}
                                 >
-                                    {viewTab === tab && (
+                                    {viewMode === mode && (
                                         <motion.div
-                                            layoutId="viewTabHighlight"
+                                            layoutId="viewModeHighlight"
                                             className="absolute inset-0 bg-white/10 rounded-lg"
                                             transition={{ type: "spring", stiffness: 300, damping: 30 }}
                                         />
                                     )}
-                                    {tab === 'projects' ? 'Projects' : 'Analytics'}
+                                    {mode === 'all' ? 'All Projects' : 'Cycles Trend'}
                                 </button>
                             ))}
                         </div>
                     </div>
-
-                    {/* View Switcher (All vs Cycles) - ONLY in Projects Tab */}
-                    {viewTab === 'projects' && (
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95, width: 0 }}
-                            animate={{ opacity: 1, scale: 1, width: 'auto' }}
-                            className="flex bg-white/5 border border-white/10 rounded-xl p-1 relative flex-shrink-0"
-                        >
-                            <div className="relative flex gap-1">
-                                {['all', 'cycles'].map((mode) => (
-                                    <button
-                                        key={mode}
-                                        onClick={() => setViewMode(mode as 'all' | 'cycles')}
-                                        className={`relative px-4 py-2 rounded-lg text-xs font-bold transition-all z-10 ${viewMode === mode ? 'text-white' : 'text-gray-400 hover:text-white'}`}
-                                    >
-                                        {viewMode === mode && (
-                                            <motion.div
-                                                layoutId="viewModeHighlight"
-                                                className="absolute inset-0 bg-white/10 rounded-lg"
-                                                transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                                            />
-                                        )}
-                                        {mode === 'all' ? 'All Projects' : 'Cycles Trend'}
-                                    </button>
-                                ))}
-                            </div>
-                        </motion.div>
-                    )}
 
                     <div className="relative w-full md:w-80">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -547,120 +545,132 @@ export const ProjectSelectionView = ({
                 </div>
             </div>
 
-            {/* --- ANALYTICS VIEW --- */}
-            {viewTab === 'analytics' && (
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <ClientAnalytics boardId={boardData.id} />
+            {/* --- ALL PROJECTS VIEW --- */}
+            {viewMode === 'all' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <AnimatePresence mode='popLayout'>
+                        {filteredItems.map((item: any, index: number) => (
+                            <ProjectCard
+                                key={item.id}
+                                index={index}
+                                name={item.name}
+                                status={getStatusText(item)}
+                                color={getStatusColor(item)}
+                                date={new Date(item.created_at).toLocaleDateString()}
+                                onClick={() => setSelectedProject(item)}
+                            />
+                        ))}
+                    </AnimatePresence>
                 </div>
             )}
 
-            {/* --- PROJECTS VIEW --- */}
-            {viewTab === 'projects' && (
-                <>
-                    {/* --- ALL PROJECTS VIEW --- */}
-                    {viewMode === 'all' && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            <AnimatePresence mode='popLayout'>
-                                {filteredItems.map((item: any, index: number) => (
-                                    <ProjectCard
-                                        key={item.id}
-                                        index={index}
-                                        name={item.name}
-                                        status={getStatusText(item)}
-                                        color={getStatusColor(item)}
-                                        date={new Date(item.created_at).toLocaleDateString()}
-                                        onClick={() => setSelectedProject(item)}
-                                    />
-                                ))}
-                            </AnimatePresence>
+            {/* --- CYCLES VIEW --- */}
+            {viewMode === 'cycles' && (
+                <div className="space-y-6">
+                    {/* Lifetime Earnings Summary */}
+                    {sortedCycles.length > 0 && (
+                        <div className="bg-gradient-to-r from-emerald-500/10 to-transparent border border-emerald-500/20 rounded-2xl p-6 mb-8 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-emerald-400 font-bold uppercase tracking-widest text-xs mb-1">Lifetime Earnings</h3>
+                                <p className="text-3xl font-black text-white">
+                                    {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(lifetimeEarnings)}
+                                </p>
+                            </div>
+                            <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                                <Activity className="w-6 h-6 text-emerald-400" />
+                            </div>
                         </div>
                     )}
 
-                    {/* --- CYCLES VIEW --- */}
-                    {viewMode === 'cycles' && (
-                        <div className="space-y-6">
-                            {sortedCycles.length > 0 ? sortedCycles.map((cycleKey) => {
-                                const isExpanded = expandedCycles.has(cycleKey);
-                                const cycleNum = cycleKey.match(/Cycle (\d+)/)?.[1]?.padStart(2, '0') || '01';
-                                const items = cycleGroups[cycleKey];
+                    {sortedCycles.length > 0 ? sortedCycles.map((cycleKey) => {
+                        const isExpanded = expandedCycles.has(cycleKey);
+                        const cycleNum = cycleKey.match(/Cycle (\d+)/)?.[1]?.padStart(2, '0') || '01';
+                        const items = cycleGroups[cycleKey];
+                        const cycleEarnings = getCycleEarnings(items);
 
-                                return (
-                                    <motion.div
-                                        key={cycleKey}
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        className="group"
-                                    >
-                                        <div
-                                            onClick={() => toggleCycle(cycleKey)}
-                                            className={`
-                                                    cursor-pointer rounded-2xl border transition-all duration-300 overflow-hidden
-                                                    ${isExpanded ? 'bg-[#0E0E1A] border-white/10' : 'bg-transparent border-white/5 hover:bg-white/5'}
-                                                `}
-                                        >
-                                            {/* Header */}
-                                            <div className="p-6 flex items-center gap-6">
-                                                {/* Badge */}
-                                                <div className={`
-                                                        w-14 h-14 rounded-2xl flex flex-col items-center justify-center border transition-all
-                                                        ${isExpanded ? 'bg-violet-500/10 border-violet-500/30 text-violet-400' : 'bg-white/5 border-white/5 text-gray-500 group-hover:bg-white/10'}
-                                                    `}>
-                                                    <span className="text-[9px] uppercase font-bold tracking-wider opacity-60">Cycle</span>
-                                                    <span className="text-xl font-bold">{cycleNum}</span>
-                                                </div>
-
-                                                <div className="flex-1">
-                                                    <h3 className={`text-xl font-bold transition-colors ${isExpanded ? 'text-white' : 'text-gray-400 group-hover:text-white'}`}>
-                                                        {cycleKey.replace(/ - Cycle \d+$/, '')}
-                                                    </h3>
-                                                    <p className="text-xs text-gray-500 mt-1">{items.length} Projects</p>
-                                                </div>
-                                            </div>
-
-                                            {/* Grid Body */}
-                                            <AnimatePresence>
-                                                {isExpanded && (
-                                                    <motion.div
-                                                        initial={{ height: 0, opacity: 0 }}
-                                                        animate={{ height: 'auto', opacity: 1 }}
-                                                        exit={{ height: 0, opacity: 0 }}
-                                                        transition={{ duration: 0.3, ease: 'easeInOut' }}
-                                                    >
-                                                        <div className="p-6 pt-0 border-t border-white/5 mt-0">
-                                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mt-6">
-                                                                {items.map((item: any, index: number) => (
-                                                                    <ProjectCard
-                                                                        key={item.id}
-                                                                        index={index}
-                                                                        name={item.name}
-                                                                        status={getStatusText(item)}
-                                                                        color={getStatusColor(item)}
-                                                                        date={new Date(item.created_at).toLocaleDateString()}
-                                                                        onClick={() => setSelectedProject(item)}
-                                                                    />
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    </motion.div>
-                                                )}
-                                            </AnimatePresence>
+                        return (
+                            <motion.div
+                                key={cycleKey}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="group"
+                            >
+                                <div
+                                    onClick={() => toggleCycle(cycleKey)}
+                                    className={`
+                                            cursor-pointer rounded-2xl border transition-all duration-300 overflow-hidden
+                                            ${isExpanded ? 'bg-[#0E0E1A] border-white/10' : 'bg-transparent border-white/5 hover:bg-white/5'}
+                                        `}
+                                >
+                                    {/* Header */}
+                                    <div className="p-6 flex items-center gap-6 relative">
+                                        {/* Badge */}
+                                        <div className={`
+                                                w-14 h-14 rounded-2xl flex flex-col items-center justify-center border transition-all shrink-0
+                                                ${isExpanded ? 'bg-violet-500/10 border-violet-500/30 text-violet-400' : 'bg-white/5 border-white/5 text-gray-500 group-hover:bg-white/10'}
+                                            `}>
+                                            <span className="text-[9px] uppercase font-bold tracking-wider opacity-60">Cycle</span>
+                                            <span className="text-xl font-bold">{cycleNum}</span>
                                         </div>
-                                    </motion.div>
-                                );
-                            }) : (
-                                <div className="text-center py-20 text-gray-500">
-                                    No cycles found.
-                                </div>
-                            )}
-                        </div>
-                    )}
 
-                    {filteredItems.length === 0 && (
+                                        <div className="flex-1">
+                                            <h3 className={`text-xl font-bold transition-colors ${isExpanded ? 'text-white' : 'text-gray-400 group-hover:text-white'}`}>
+                                                {cycleKey.replace(/ - Cycle \d+$/, '')}
+                                            </h3>
+                                            <p className="text-xs text-gray-500 mt-1">{items.length} Projects</p>
+                                        </div>
+
+                                        {/* Cycle Earnings Badge */}
+                                        <div className="text-right shrink-0">
+                                            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">Cycle Earnings</p>
+                                            <p className="text-xl font-black text-emerald-400">
+                                                {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(cycleEarnings)}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Grid Body */}
+                                    <AnimatePresence>
+                                        {isExpanded && (
+                                            <motion.div
+                                                initial={{ height: 0, opacity: 0 }}
+                                                animate={{ height: 'auto', opacity: 1 }}
+                                                exit={{ height: 0, opacity: 0 }}
+                                                transition={{ duration: 0.3, ease: 'easeInOut' }}
+                                            >
+                                                <div className="p-6 pt-0 border-t border-white/5 mt-0">
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mt-6">
+                                                        {items.map((item: any, index: number) => (
+                                                            <ProjectCard
+                                                                key={item.id}
+                                                                index={index}
+                                                                name={item.name}
+                                                                status={getStatusText(item)}
+                                                                color={getStatusColor(item)}
+                                                                date={new Date(item.created_at).toLocaleDateString()}
+                                                                onClick={() => setSelectedProject(item)}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            </motion.div>
+                        );
+                    }) : (
                         <div className="text-center py-20 text-gray-500">
-                            No projects found matching your search.
+                            No cycles found.
                         </div>
                     )}
-                </>
+                </div>
+            )}
+
+            {filteredItems.length === 0 && (
+                <div className="text-center py-20 text-gray-500">
+                    No projects found matching your search.
+                </div>
             )}
 
             {/* Detail Modal */}

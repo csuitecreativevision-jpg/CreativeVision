@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { PortalLayout } from '../components/shared/PortalLayout';
 import { PortalWorkspaceCard } from '../components/shared/PortalWorkspaceCard';
-import { ProjectSelectionView } from '../components/views/ProjectSelectionView';
+import { EditorProjectSelectionView } from '../components/views/EditorProjectSelectionView';
 import { getAllBoards, getBoardItems } from '../services/mondayService';
 import { supabase } from '../services/boardsService';
 import { FilePreviewModal, useProtectedPreview } from '../components/ui/FilePreviewModal';
@@ -287,7 +287,7 @@ function EditorPortalContent() {
                                 {/* Content */}
                                 <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
                                     <div className="max-w-7xl mx-auto pb-20">
-                                        <ProjectSelectionView
+                                        <EditorProjectSelectionView
                                             boardData={selectedBoard}
                                             selectedBoardId={selectedBoard.id}
                                             refreshBoardDetails={handleRefresh}

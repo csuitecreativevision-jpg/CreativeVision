@@ -1005,9 +1005,13 @@ export async function getAggregatedAnalytics() {
     };
 }
 
-export async function getWorkspaceAnalytics() {
+export async function getWorkspaceAnalytics(allowedBoardIds?: string[]) {
     // --- Check IndexedDB for cached analytics result ---
-    const ANALYTICS_CACHE_KEY = 'workspace_analytics';
+    // Make cache key unique to the specific boards being requested (or 'all' if none)
+    const boardKeySuffix = allowedBoardIds && allowedBoardIds.length > 0
+        ? `_${allowedBoardIds.sort().join('_')}`
+        : '_all';
+    const ANALYTICS_CACHE_KEY = `workspace_analytics${boardKeySuffix}`;
     const CACHE_TTL_MS = 1000 * 60 * 5; // 5 Minutes
 
     try {
@@ -1023,8 +1027,8 @@ export async function getWorkspaceAnalytics() {
             }
 
             // If stale cache exists, return it immediately and refresh in background
-            console.log('[Analytics] Cache stale, refreshing in background...');
-            getWorkspaceAnalyticsFresh().then(freshResult => {
+            console.log(`[Analytics] Cache stale for ${boardKeySuffix}, refreshing in background...`);
+            getWorkspaceAnalyticsFresh(allowedBoardIds).then(freshResult => {
                 idbSet(ANALYTICS_CACHE_KEY, { data: freshResult, timestamp: Date.now() });
             }).catch(err => console.error('[Analytics] Background refresh failed', err));
 
@@ -1035,19 +1039,31 @@ export async function getWorkspaceAnalytics() {
     }
 
     // No cache at all — fetch and wait
-    console.log('[Analytics] No cache, fetching fresh...');
-    const result = await getWorkspaceAnalyticsFresh();
+    console.log(`[Analytics] No cache for ${boardKeySuffix}, fetching fresh...`);
+    const result = await getWorkspaceAnalyticsFresh(allowedBoardIds);
     idbSet(ANALYTICS_CACHE_KEY, { data: result, timestamp: Date.now() });
     return result;
 }
 
 /** Internal: Actually fetch workspace analytics from Monday.com API */
-async function getWorkspaceAnalyticsFresh() {
-    // 1. Get all Workspace Boards
-    const workspaceBoards = await getWorkspaceBoards();
+async function getWorkspaceAnalyticsFresh(allowedBoardIds?: string[]) {
+    let boardIds: string[] = [];
 
-    // 2. Fetch Items
-    const boardIds = workspaceBoards.map((b: any) => b.id);
+    // 1. Determine which boards to fetch
+    if (allowedBoardIds && allowedBoardIds.length > 0) {
+        // If specific boards are requested (e.g., Client Portal), fetch them directly
+        // bypassing the '- workspace' name filter.
+        boardIds = allowedBoardIds;
+    } else {
+        // Get all Editor Workspace Boards
+        const workspaceBoards = await getWorkspaceBoards();
+        boardIds = workspaceBoards.map((b: any) => b.id);
+    }
+
+    if (boardIds.length === 0) {
+        return { cycles: [], data: {}, payments: {}, types: {}, statuses: {}, revisions: {} }; // Return empty data if no boards allowed
+    }
+
     const boardsWithItems = await getMultipleBoardItems(boardIds);
 
     // 3. Process Items & Assign Cycles

@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
-import { AdminPageLayout } from '../../components/layout/AdminPageLayout';
 import { AnalyticCard } from '../../components/analytics/AnalyticCard';
 import { AnalyticAreaChart } from '../../components/analytics/AnalyticAreaChart';
-import { AnalyticBarChart } from '../../components/analytics/AnalyticBarChart';
 import { AnalyticPieChart } from '../../components/analytics/AnalyticPieChart';
 import { AnalyticsFilterModal } from '../../components/analytics/AnalyticsFilterModal';
 import { Play, Filter, Users, Calendar, Settings2 } from 'lucide-react';
@@ -10,17 +8,13 @@ import { Play, Filter, Users, Calendar, Settings2 } from 'lucide-react';
 import { getWorkspaceAnalytics } from '../../services/mondayService';
 import { getCache, setCache } from '../../services/cacheService';
 
-interface AdminAnalyticsProps {
-    embedded?: boolean;
-    allowedBoardIds?: string[];
+interface ClientAnalyticsProps {
+    boardId: string;
 }
 
-export default function AdminAnalytics({ embedded = false, allowedBoardIds }: AdminAnalyticsProps) {
-    // Make cache key unique to the specific boards being requested (or 'all' if none)
-    const boardKeySuffix = allowedBoardIds && allowedBoardIds.length > 0
-        ? `_${allowedBoardIds.sort().join('_')}`
-        : '_all';
-    const ANALYTICS_CACHE_KEY = `admin_analytics_page${boardKeySuffix}`;
+export const ClientAnalytics = ({ boardId }: ClientAnalyticsProps) => {
+    // Make cache key unique to the specific client board
+    const ANALYTICS_CACHE_KEY = `client_analytics_${boardId}`;
 
     // Try to hydrate from cache instantly
     const cachedPage = getCache<any>(ANALYTICS_CACHE_KEY)?.data;
@@ -29,10 +23,7 @@ export default function AdminAnalytics({ embedded = false, allowedBoardIds }: Ad
 
     // Cycle Analytics State
     const [cycleData, setCycleData] = useState<any>(cachedPage?.cycleData || null);
-    const [paymentData, setPaymentData] = useState<any>(cachedPage?.paymentData || null);
-    const [typeData, setTypeData] = useState<any>(cachedPage?.typeData || null);
     const [statusData, setStatusData] = useState<any>(cachedPage?.statusData || null);
-    const [revisionsData, setRevisionsData] = useState<any>(cachedPage?.revisionsData || null);
     const [selectedCycle, setSelectedCycle] = useState<string>(cachedPage?.selectedCycle || '');
     const [availableCycles, setAvailableCycles] = useState<string[]>(cachedPage?.availableCycles || []);
 
@@ -40,26 +31,20 @@ export default function AdminAnalytics({ embedded = false, allowedBoardIds }: Ad
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
     const [dateFilter, setDateFilter] = useState<{ year: number, month: number | null, cycle: string } | null>(cachedPage?.dateFilter || null);
 
-    // View Mode: 'productivity' (Videos) or 'earnings' (Payments)
-    const [viewMode, setViewMode] = useState<'productivity' | 'earnings'>('productivity');
-
     useEffect(() => {
         loadData();
-    }, []);
+    }, [boardId]);
 
     const loadData = async () => {
         // Only show spinner if there's no cached data at all
         if (!cachedPage) setLoading(true);
         try {
-            // Fetch Cycle Based Analytics from Workspace Boards
-            const { cycles, data: cData, payments: pData, types: tData, statuses: sData, revisions: rData } = await getWorkspaceAnalytics(allowedBoardIds);
+            // Fetch Cycle Based Analytics from Workspace Boards, specifically for this client's board
+            const { cycles, data: cData, statuses: sData } = await getWorkspaceAnalytics([boardId]);
 
             setAvailableCycles(cycles);
             setCycleData(cData);
-            setPaymentData(pData);
-            setTypeData(tData);
             setStatusData(sData);
-            setRevisionsData(rData);
 
             // Default to most recent cycle
             let newDateFilter = dateFilter;
@@ -83,10 +68,7 @@ export default function AdminAnalytics({ embedded = false, allowedBoardIds }: Ad
             // Save to localStorage cache
             setCache(ANALYTICS_CACHE_KEY, {
                 cycleData: cData,
-                paymentData: pData,
-                typeData: tData,
                 statusData: sData,
-                revisionsData: rData,
                 selectedCycle: newSelectedCycle,
                 availableCycles: cycles,
                 dateFilter: newDateFilter
@@ -127,7 +109,7 @@ export default function AdminAnalytics({ embedded = false, allowedBoardIds }: Ad
 
     // Aggregation: Get Monthly Trend Data for the Selected Year AND Previous Year
     const getMonthlyTrendData = () => {
-        const sourceData = viewMode === 'productivity' ? cycleData : paymentData;
+        const sourceData = cycleData;
         if (!sourceData) return [];
 
         const targetYear = dateFilter?.year || new Date().getFullYear();
@@ -147,11 +129,6 @@ export default function AdminAnalytics({ embedded = false, allowedBoardIds }: Ad
 
             // Future Data Logic: If target is current year and month is in future, return null
             if (targetYear === currentYear && index > currentMonthIndex) {
-                // Still calculate previous year if needed, but current usage implies we might want to stop line
-                // If we return null for value, chart stops.
-                // We still might want previousValue? Yes, usually.
-                // But let's check sourceData for previous year regardless.
-
                 let previousTotal = 0;
                 Object.keys(sourceData).forEach(key => {
                     if (key.includes(`${longMonth} ${previousYear}`)) {
@@ -167,20 +144,13 @@ export default function AdminAnalytics({ embedded = false, allowedBoardIds }: Ad
             let previousTotal = 0;
 
             Object.keys(sourceData).forEach(key => {
-                // Parse Month and Year from Cycle Name (e.g. "January 2026 - Cycle 1")
-                // Robust Regex to find "MonthName YYYY" pattern
                 const match = key.match(/([a-zA-Z]+) (\d{4})/);
 
                 if (match) {
                     const [_, cycleMonthName, cycleYearStr] = match;
                     const cycleYear = parseInt(cycleYearStr);
 
-                    // Check if Month matches current loop month
-                    // (monthName is "Jan", "Feb", etc. from the loop, cycleMonthName is "January", etc.)
-                    // We need to normalize.
-
                     const normalizeMonth = (m: string) => new Date(`${m} 1, 2000`).getMonth();
-
                     const isSameMonth = normalizeMonth(cycleMonthName) === index; // index is 0-11
 
                     // Current Year Match
@@ -201,62 +171,7 @@ export default function AdminAnalytics({ embedded = false, allowedBoardIds }: Ad
         });
     };
 
-    // Aggregation: Get Editor Breakdown for the Selected Scope (BAR CHART)
-    const getEditorBreakdownData = () => {
-        const sourceData = viewMode === 'productivity' ? cycleData : paymentData;
-        if (!sourceData) return [];
-
-        // If a specific cycle is selected, show ONLY that cycle
-        if (selectedCycle && sourceData[selectedCycle]) {
-            return Object.entries(sourceData[selectedCycle])
-                .map(([name, value]) => ({ name, value }))
-                .sort((a: any, b: any) => b.value - a.value);
-        }
-
-        // Otherwise (All Cycles), aggregate across filtered cycles (based on year/month filter)
-        const totals: Record<string, number> = {};
-
-        filteredCycles.forEach(cycle => {
-            if (sourceData[cycle]) {
-                Object.entries(sourceData[cycle]).forEach(([editor, val]: [string, any]) => {
-                    totals[editor] = (totals[editor] || 0) + val;
-                });
-            }
-        });
-
-        return Object.entries(totals)
-            .map(([name, value]) => ({ name, value }))
-            .sort((a, b) => b.value - a.value);
-    };
-
-    const getProjectTypeData = () => {
-        if (!typeData) return [];
-
-        // If a specific cycle is selected
-        if (selectedCycle && typeData[selectedCycle]) {
-            return Object.entries(typeData[selectedCycle])
-                .map(([name, value]: [string, any]) => ({ name, value }))
-                .sort((a, b) => b.value - a.value);
-        }
-
-        // Otherwise (All Cycles), aggregate across filtered cycles
-        const totals: Record<string, number> = {};
-
-        filteredCycles.forEach(cycle => {
-            if (typeData[cycle]) {
-                Object.entries(typeData[cycle]).forEach(([type, val]: [string, any]) => {
-                    totals[type] = (totals[type] || 0) + val;
-                });
-            }
-        });
-
-        const result = Object.entries(totals)
-            .map(([name, value]) => ({ name, value }))
-            .sort((a, b) => b.value - a.value);
-
-        return result;
-    };
-
+    const monthlyTrendData = getMonthlyTrendData();
     // Aggregation: Get Project Status Data (PIE CHART)
     const getProjectStatusData = () => {
         if (!statusData) return { data: [], colors: [] };
@@ -305,44 +220,32 @@ export default function AdminAnalytics({ embedded = false, allowedBoardIds }: Ad
         return { data: rawData, colors };
     };
 
-    // Aggregation: Get Revisions Data (BAR CHART)
-    const getRevisionsData = () => {
-        if (!revisionsData) return [];
+    const projectStatusData = getProjectStatusData();
 
-        // If a specific cycle is selected
-        if (selectedCycle && revisionsData[selectedCycle]) {
-            return Object.entries(revisionsData[selectedCycle])
-                .map(([name, value]: [string, any]) => ({ name, value }))
-                .sort((a, b) => b.value - a.value);
+    // Active Editors Count (Keep this calculation for the KPI, simplified)
+    const getActiveEditorsCount = () => {
+        const sourceData = cycleData;
+        if (!sourceData) return 0;
+
+        const editors = new Set<string>();
+
+        if (selectedCycle && sourceData[selectedCycle]) {
+            Object.keys(sourceData[selectedCycle]).forEach(ext => editors.add(ext));
+        } else {
+            filteredCycles.forEach(cycle => {
+                if (sourceData[cycle]) {
+                    Object.keys(sourceData[cycle]).forEach(ext => editors.add(ext));
+                }
+            });
         }
-
-        // Otherwise (All Cycles), aggregate across filtered cycles
-        const totals: Record<string, number> = {};
-
-        filteredCycles.forEach(cycle => {
-            if (revisionsData[cycle]) {
-                Object.entries(revisionsData[cycle]).forEach(([editor, val]: [string, any]) => {
-                    totals[editor] = (totals[editor] || 0) + val;
-                });
-            }
-        });
-
-        const result = Object.entries(totals)
-            .map(([name, value]) => ({ name, value }))
-            .sort((a, b) => b.value - a.value);
-
-        return result;
+        return editors.size;
     };
 
-    const monthlyTrendData = getMonthlyTrendData();
-    const editorBreakdownData = getEditorBreakdownData();
-    const projectTypeData = getProjectTypeData();
-    const projectStatusData = getProjectStatusData();
-    const revisionsChartData = getRevisionsData();
+    const activeEditorsCount = getActiveEditorsCount();
 
     // Calculate total value for the selected scope (For KPI)
     const getSelectedCycleTotal = () => {
-        const sourceData = viewMode === 'productivity' ? cycleData : paymentData;
+        const sourceData = cycleData;
         if (!sourceData) return 0;
 
         // If specific cycle
@@ -361,11 +264,6 @@ export default function AdminAnalytics({ embedded = false, allowedBoardIds }: Ad
     };
 
     const totalValueInCycle = getSelectedCycleTotal(); // Now represents Total in Scope
-    const activeEditorsCount = editorBreakdownData.length;
-
-    const formatCurrency = (val: number) => {
-        return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(val);
-    };
 
     const getFilterLabel = () => {
         if (!dateFilter) return "Loading...";
@@ -378,26 +276,6 @@ export default function AdminAnalytics({ embedded = false, allowedBoardIds }: Ad
 
     const Controls = (
         <div className="flex items-center gap-3">
-            {/* View Toggle */}
-            <div className="bg-[#0e0e1a] p-1 rounded-xl border border-white/10 flex items-center">
-                <button
-                    onClick={() => setViewMode('productivity')}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'productivity'
-                        ? 'bg-violet-500 text-white shadow-lg'
-                        : 'text-gray-400 hover:text-white'}`}
-                >
-                    Production
-                </button>
-                <button
-                    onClick={() => setViewMode('earnings')}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'earnings'
-                        ? 'bg-emerald-500 text-white shadow-lg'
-                        : 'text-gray-400 hover:text-white'}`}
-                >
-                    Earnings
-                </button>
-            </div>
-
             <button
                 onClick={loadData}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white text-sm font-bold transition-all"
@@ -438,9 +316,9 @@ export default function AdminAnalytics({ embedded = false, allowedBoardIds }: Ad
 
                 {/* KPI: Primary Metric */}
                 <AnalyticCard
-                    title={viewMode === 'productivity' ? "Total Videos Produced" : "Total Payout"}
-                    value={viewMode === 'productivity' ? totalValueInCycle : formatCurrency(totalValueInCycle)}
-                    icon={viewMode === 'productivity' ? <Play className="w-5 h-5" /> : <span className="font-bold text-emerald-400">₱</span>}
+                    title="Total Videos Produced"
+                    value={totalValueInCycle}
+                    icon={<Play className="w-5 h-5" />}
                     trend={{ value: 0, label: selectedCycle || "Monthly Total", isPositive: true }}
                     delay={0.1}
                 />
@@ -461,78 +339,27 @@ export default function AdminAnalytics({ embedded = false, allowedBoardIds }: Ad
                 {/* 1. Yearly Trend (Area Chart) */}
                 <div className="w-full">
                     <AnalyticAreaChart
-                        title={viewMode === 'productivity' ? `Yearly Production: ${dateFilter?.year || new Date().getFullYear()} vs ${dateFilter?.year ? dateFilter.year - 1 : new Date().getFullYear() - 1}` : `Yearly Income: ${dateFilter?.year || new Date().getFullYear()} vs ${dateFilter?.year ? dateFilter.year - 1 : new Date().getFullYear() - 1}`}
+                        title={`Yearly Production: ${dateFilter?.year || new Date().getFullYear()} vs ${dateFilter?.year ? dateFilter.year - 1 : new Date().getFullYear() - 1}`}
                         data={monthlyTrendData}
                         dataKey="value"
                         compareDataKey="previousValue"
                         xAxisKey="name"
-                        color={viewMode === 'productivity' ? "#8b5cf6" : "#10b981"}
+                        color="#8b5cf6"
                         compareColor="#64748b"
                         delay={0.3}
                         height={300}
-                        valuePrefix={viewMode === 'earnings' ? "₱" : ""}
-                    />
-                </div>
-
-                {/* 2. Editor Breakdown (Bar Chart) - Full Width */}
-                <div className="w-full">
-                    <AnalyticBarChart
-                        title={
-                            selectedCycle
-                                ? (viewMode === 'productivity' ? `Top Editors: ${selectedCycle}` : `Editor Earnings: ${selectedCycle}`)
-                                : (dateFilter?.month
-                                    ? (viewMode === 'productivity' ? `Top Editors: ${new Date(2000, dateFilter.month - 1).toLocaleString('default', { month: 'long' })}` : `Editor Earnings: ${new Date(2000, dateFilter.month - 1).toLocaleString('default', { month: 'long' })}`)
-                                    : (viewMode === 'productivity' ? `Editor Breakdown` : `Earnings Breakdown`)
-                                )
-                        }
-                        data={editorBreakdownData}
-                        dataKey="value"
-                        xAxisKey="name"
-                        color={viewMode === 'productivity' ? "#8b5cf6" : "#10b981"}
-                        delay={0.4}
-                        layout="vertical"
-                        height={400}
-                        valuePrefix={viewMode === 'earnings' ? "₱" : ""}
-                    />
-                </div>
-
-                {/* 3. Distributions: Type + Status (Side by Side) */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* Project Type Distribution (Pie Chart) */}
-                    <div className="w-full">
-                        <AnalyticPieChart
-                            title="Project Type Distribution"
-                            data={projectTypeData}
-                            delay={0.5}
-                            height={400}
-                        />
-                    </div>
-
-                    {/* Project Status Distribution (Pie Chart) */}
-                    <div className="w-full">
-                        <AnalyticPieChart
-                            title="Project Status Distribution"
-                            data={projectStatusData.data}
-                            delay={0.55}
-                            height={400}
-                            colors={projectStatusData.colors} // Custom mapped colors
-                        />
-                    </div>
-                </div>
-
-                {/* 4. Revisions Chart (Bar Chart) */}
-                <div className="w-full">
-                    <AnalyticBarChart
-                        title="Revision Rates per Editor"
-                        data={revisionsChartData}
-                        dataKey="value"
-                        xAxisKey="name"
-                        color="#f59e0b" // Amber/Orange for caution/revisions
-                        delay={0.6}
-                        layout="vertical"
-                        height={400}
                         valuePrefix=""
-                        emptyMessage="No revisions found for editors yet"
+                    />
+                </div>
+
+                {/* 2. Distributions: Status (Full Width) */}
+                <div className="w-full">
+                    <AnalyticPieChart
+                        title="Project Status Distribution"
+                        data={projectStatusData.data}
+                        delay={0.55}
+                        height={400}
+                        colors={projectStatusData.colors}
                     />
                 </div>
             </div>
@@ -561,33 +388,21 @@ export default function AdminAnalytics({ embedded = false, allowedBoardIds }: Ad
         );
     }
 
-    if (embedded) {
-        return (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                {/* Replicate AdminPageLayout Header Styling */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                        <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight mb-2">
-                            {viewMode === 'productivity' ? "Editor Performance" : "Editor Earnings"}
-                        </h1>
-                        <p className="text-gray-400 max-w-2xl">
-                            {viewMode === 'productivity' ? "Videos produced per editor per cycle." : "Total earnings per editor per cycle."}
-                        </p>
-                    </div>
-                    <div>{Controls}</div>
-                </div>
-                {Content}
-            </div>
-        );
-    }
-
     return (
-        <AdminPageLayout
-            title={viewMode === 'productivity' ? "Editor Performance" : "Editor Earnings"}
-            subtitle={viewMode === 'productivity' ? "Videos produced per editor per cycle." : "Total earnings per editor per cycle."}
-            action={Controls}
-        >
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Embedded layout styling */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight mb-2">
+                        Project Performance
+                    </h1>
+                    <p className="text-gray-400 max-w-2xl">
+                        Videos produced for this workspace per cycle.
+                    </p>
+                </div>
+                <div>{Controls}</div>
+            </div>
             {Content}
-        </AdminPageLayout>
+        </div>
     );
-}
+};
