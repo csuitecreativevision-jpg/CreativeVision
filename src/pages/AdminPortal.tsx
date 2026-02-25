@@ -12,7 +12,8 @@ import {
     LayoutList,
     FilePlus,
     CheckSquare,
-    TrendingUp
+    TrendingUp,
+    Rocket
 } from 'lucide-react';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { RefreshProvider, useRefresh } from '../contexts/RefreshContext';
@@ -72,6 +73,7 @@ function AdminPortalContent() {
         if (path.includes('approvals')) return 'Approvals';
         if (path.includes('users')) return 'Users';
         if (path.includes('analytics')) return 'Analytics';
+        if (path.includes('deployments')) return 'Deployments';
         if (path.includes('boards')) return 'Boards';
         if (path.includes('settings')) return 'Settings';
         if (path.includes('clients')) return 'Clients';
@@ -103,6 +105,7 @@ function AdminPortalContent() {
                                     activeTab === 'Assign Project' ||
                                     activeTab === 'Approvals' ||
                                     activeTab === 'Analytics' ||
+                                    activeTab === 'Deployments' ||
                                     activeTab === 'Users'
                                 }
                             >
@@ -117,6 +120,12 @@ function AdminPortalContent() {
                                     label="Approval Center"
                                     active={activeTab === 'Approvals'}
                                     onClick={() => navigate('/admin-portal/approvals')}
+                                />
+                                <SidebarItem
+                                    icon={<Rocket className="w-4 h-4" />}
+                                    label="Deployment Center"
+                                    active={activeTab === 'Deployments'}
+                                    onClick={() => navigate('/admin-portal/deployments')}
                                 />
                                 <SidebarItem
                                     icon={<Users className="w-4 h-4" />}
