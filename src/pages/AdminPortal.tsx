@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { PortalLayout } from '../components/shared/PortalLayout';
 import { SidebarItem } from '../components/shared/SidebarItem';
+import { SidebarDropdown } from '../components/shared/SidebarDropdown';
 import {
     LayoutDashboard,
     Users,
@@ -8,7 +9,10 @@ import {
     Menu,
     LogOut,
     Briefcase,
-    LayoutList
+    LayoutList,
+    FilePlus,
+    CheckSquare,
+    TrendingUp
 } from 'lucide-react';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { RefreshProvider, useRefresh } from '../contexts/RefreshContext';
@@ -64,12 +68,13 @@ function AdminPortalContent() {
     const getActiveTab = () => {
         const path = location.pathname;
         if (path.includes('overview')) return 'Overview';
-        if (path.includes('management')) return 'Management';
-        if (path.includes('boards')) return 'Boards';
+        if (path.includes('assign-project')) return 'Assign Project';
+        if (path.includes('approvals')) return 'Approvals';
         if (path.includes('users')) return 'Users';
+        if (path.includes('analytics')) return 'Analytics';
+        if (path.includes('boards')) return 'Boards';
         if (path.includes('settings')) return 'Settings';
         if (path.includes('clients')) return 'Clients';
-        if (path.includes('analytics')) return 'Analytics';
         if (path.includes('team')) return 'Team';
         return 'Overview';
     };
@@ -91,7 +96,41 @@ function AdminPortalContent() {
                     <SidebarItem icon={<LayoutDashboard className="w-5 h-5" />} label="Overview" active={activeTab === 'Overview'} onClick={() => navigate('/admin-portal/overview')} />
                     {currentUserRole === 'admin' && (
                         <>
-                            <SidebarItem icon={<LayoutList className="w-5 h-5" />} label="Management" active={activeTab === 'Management'} onClick={() => navigate('/admin-portal/management')} />
+                            <SidebarDropdown
+                                icon={<LayoutList className="w-5 h-5" />}
+                                label="Management Hub"
+                                active={
+                                    activeTab === 'Assign Project' ||
+                                    activeTab === 'Approvals' ||
+                                    activeTab === 'Analytics' ||
+                                    activeTab === 'Users'
+                                }
+                            >
+                                <SidebarItem
+                                    icon={<FilePlus className="w-4 h-4" />}
+                                    label="Assign Project"
+                                    active={activeTab === 'Assign Project'}
+                                    onClick={() => navigate('/admin-portal/assign-project')}
+                                />
+                                <SidebarItem
+                                    icon={<CheckSquare className="w-4 h-4" />}
+                                    label="Approval Center"
+                                    active={activeTab === 'Approvals'}
+                                    onClick={() => navigate('/admin-portal/approvals')}
+                                />
+                                <SidebarItem
+                                    icon={<Users className="w-4 h-4" />}
+                                    label="Manage Team"
+                                    active={activeTab === 'Users'}
+                                    onClick={() => navigate('/admin-portal/users')}
+                                />
+                                <SidebarItem
+                                    icon={<TrendingUp className="w-4 h-4" />}
+                                    label="Analytics"
+                                    active={activeTab === 'Analytics'}
+                                    onClick={() => navigate('/admin-portal/analytics')}
+                                />
+                            </SidebarDropdown>
                             <SidebarItem
                                 icon={<Briefcase className="w-5 h-5" />}
                                 label="Clients"

@@ -12,8 +12,8 @@ export const SidebarItem = ({ icon, label, active = false, onClick, isClientItem
     <button
         onClick={onClick}
         className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300 group relative overflow-hidden ${active
-                ? 'bg-[#1E1B2E] text-white shadow-lg shadow-black/20'
-                : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
+            ? 'bg-[#1E1B2E] text-white shadow-lg shadow-black/20'
+            : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
             }`}
     >
         {/* Active Indicator Glow (Left) */}
@@ -23,7 +23,7 @@ export const SidebarItem = ({ icon, label, active = false, onClick, isClientItem
             {icon}
         </div>
 
-        <span className={`text-[13px] font-medium tracking-wide ${active ? 'font-semibold' : ''}`}>{label}</span>
+        <span className={`text-[13px] font-medium tracking-wide whitespace-nowrap overflow-hidden text-ellipsis ${active ? 'font-semibold' : ''}`}>{label}</span>
 
         {/* Active Dot (Right) */}
         {active && !isClientItem && (
