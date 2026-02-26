@@ -544,7 +544,6 @@ export async function getAllWorkspaces() {
             id
             name
             kind
-            }
         }
     }`;
         const data = await mondayRequest(query);

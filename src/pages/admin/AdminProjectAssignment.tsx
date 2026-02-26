@@ -17,13 +17,14 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { getAllBoards, getBoardColumns, getBoardGroups, submitProjectAssignment } from '../../services/mondayService';
 import { RichTextEditor } from '../../components/ui/RichTextEditor';
+import { announceAssignment } from '../../services/discordService';
 
 import { SelectionModal } from '../../components/ui/SelectionModal';
 
 export default function AdminProjectAssignment() {
     const navigate = useNavigate();
     const [step, setStep] = useState(1);
-    const [activeModal, setActiveModal] = useState<'status' | 'type' | 'priority' | 'client' | 'team' | null>(null);
+    const [activeModal, setActiveModal] = useState<'status' | 'type' | 'priority' | 'client' | 'team' | 'checker' | null>(null);
 
     // Data State
     const [availableClients, setAvailableClients] = useState<string[]>([]); // Active Clients (Fulfillment Boards)
@@ -42,6 +43,7 @@ export default function AdminProjectAssignment() {
         client: '',
         price: '',
         editor: '',
+        checkerName: '',
         deadline: '',
         priority: '',
         instructions: '',
@@ -54,6 +56,7 @@ export default function AdminProjectAssignment() {
     const [isBulkMode, setIsBulkMode] = useState(false);
     const [sharedClient, setSharedClient] = useState(true);
     const [sharedEditor, setSharedEditor] = useState(true);
+    const [sharedChecker, setSharedChecker] = useState(true);
 
     const activeProject = projects[activeProjectIndex];
 
@@ -221,8 +224,17 @@ export default function AdminProjectAssignment() {
 
             for (const project of validProjects) {
                 const targetGroup = veBoardGroups.find(g => g.title.toLowerCase() === project.client.toLowerCase());
-                const groupId = targetGroup ? targetGroup.id : 'topics'; // Default to top group if mismatch
-                if (!targetGroup) console.warn(`Group not found for client: ${project.client}. Using default.`);
+
+                // Fallback to the first available group on the board if 'client' doesn't exactly match a group name
+                let groupId = targetGroup?.id;
+                if (!groupId) {
+                    if (veBoardGroups.length > 0) {
+                        groupId = veBoardGroups[0].id; // Use the very top group
+                        console.warn(`Group not found for client: ${project.client}. Using first available group: ${veBoardGroups[0].title}`);
+                    } else {
+                        throw new Error("No groups found on the VE Project Board to place this assignment.");
+                    }
+                }
 
                 await submitProjectAssignment(veProjectBoardId, groupId, {
                     itemName: project.projectName,
@@ -235,6 +247,20 @@ export default function AdminProjectAssignment() {
                     instructions: project.instructions,
                     rawVideoLink: project.rawVideoLink
                 });
+
+                // Announce to Discord if an editor is assigned
+                if (project.editor) {
+                    // Do not `await` this to avoid blocking the UI if Discord is slow/down
+                    announceAssignment({
+                        projectName: project.projectName,
+                        clientName: project.client || 'N/A',
+                        editorName: project.editor,
+                        checkerName: project.checkerName, // Added Checker
+                        price: project.price,
+                        deadline: project.deadline ? new Date(project.deadline).toLocaleString() : undefined,
+                        instructions: project.instructions
+                    }).catch(err => console.error("Discord Announcement failed for", project.projectName, err));
+                }
             }
 
             alert(`Successfully assigned ${validProjects.length} project(s)!`);
@@ -599,22 +625,65 @@ export default function AdminProjectAssignment() {
                                     </div>
 
                                     {/* Team Member Selection Card */}
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium text-gray-300">Select Team Member</label>
-                                        <button
-                                            onClick={() => setActiveModal('team')}
-                                            className="w-full p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-blue-500/50 transition-all text-left flex items-center justify-between group"
-                                        >
-                                            <div>
-                                                <span className="text-xs text-blue-400 uppercase tracking-wider font-bold mb-1 block">Team Member</span>
-                                                <span className="text-lg font-bold text-white block truncate">
-                                                    {activeProject.editor || 'Select Team Member...'}
-                                                </span>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-gray-300">Select Team Member</label>
+                                            <button
+                                                onClick={() => setActiveModal('team')}
+                                                className="w-full p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-blue-500/50 transition-all text-left flex items-center justify-between group"
+                                            >
+                                                <div>
+                                                    <span className="text-xs text-blue-400 uppercase tracking-wider font-bold mb-1 block">Team Member</span>
+                                                    <span className="text-lg font-bold text-white block truncate">
+                                                        {activeProject.editor || 'Select Team Member...'}
+                                                    </span>
+                                                </div>
+                                                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                                                    <User className="w-5 h-5 text-gray-400 group-hover:text-white" />
+                                                </div>
+                                            </button>
+                                        </div>
+
+                                        {/* Checker of the Day Selection Card */}
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-sm font-medium text-gray-300">Checker of the Day</label>
+                                                {isBulkMode && (
+                                                    <label className="flex items-center cursor-pointer group">
+                                                        <div className="relative flex items-center justify-center">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="sr-only"
+                                                                checked={sharedChecker}
+                                                                onChange={(e) => {
+                                                                    setSharedChecker(e.target.checked);
+                                                                    if (e.target.checked && activeProject.checkerName) {
+                                                                        setProjects(prev => prev.map(p => ({ ...p, checkerName: activeProject.checkerName })));
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all duration-300 ${sharedChecker ? 'bg-orange-500 border-orange-500' : 'bg-transparent border-gray-500 group-hover:border-orange-400'}`}>
+                                                                <Check className={`w-3 h-3 text-white transition-opacity duration-300 ${sharedChecker ? 'opacity-100' : 'opacity-0'}`} strokeWidth={3} />
+                                                            </div>
+                                                        </div>
+                                                    </label>
+                                                )}
                                             </div>
-                                            <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-colors">
-                                                <User className="w-5 h-5 text-gray-400 group-hover:text-white" />
-                                            </div>
-                                        </button>
+                                            <button
+                                                onClick={() => setActiveModal('checker')}
+                                                className="w-full p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-orange-500/50 transition-all text-left flex items-center justify-between group"
+                                            >
+                                                <div>
+                                                    <span className="text-xs text-orange-400 uppercase tracking-wider font-bold mb-1 block">Checker</span>
+                                                    <span className="text-lg font-bold text-white block truncate">
+                                                        {activeProject.checkerName || 'Select Checker...'}
+                                                    </span>
+                                                </div>
+                                                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-orange-500 group-hover:text-white transition-colors">
+                                                    <Check className="w-5 h-5 text-gray-400 group-hover:text-white" />
+                                                </div>
+                                            </button>
+                                        </div>
                                     </div>
                                 </motion.div>
                             )
@@ -646,9 +715,15 @@ export default function AdminProjectAssignment() {
                                                             {p.client || 'No Client'}
                                                         </p>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <p className="text-xs text-emerald-400 uppercase tracking-wider font-bold mb-1">Assigned Editor</p>
-                                                        <p className="text-sm font-bold text-white">{p.editor || 'Unassigned'}</p>
+                                                    <div className="text-right flex items-center gap-6">
+                                                        <div>
+                                                            <p className="text-xs text-orange-400 uppercase tracking-wider font-bold mb-1">Checker</p>
+                                                            <p className="text-sm font-bold text-white">{p.checkerName || 'None'}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs text-emerald-400 uppercase tracking-wider font-bold mb-1">Editor</p>
+                                                            <p className="text-sm font-bold text-white">{p.editor || 'Unassigned'}</p>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             ))}
@@ -738,6 +813,21 @@ export default function AdminProjectAssignment() {
                     }
                 }}
                 icon={User}
+            />
+            <SelectionModal
+                isOpen={activeModal === 'checker'}
+                onClose={() => setActiveModal(null)}
+                title="Select Checker of the Day"
+                options={['Mark', 'Ray', 'Kyle']}
+                selected={activeProject.checkerName}
+                onSelect={(val) => {
+                    if (isBulkMode && sharedChecker) {
+                        setProjects(prev => prev.map(p => ({ ...p, checkerName: val })));
+                    } else {
+                        updateCurrentProject({ checkerName: val });
+                    }
+                }}
+                icon={Check}
             />
         </AdminPageLayout>
     );
