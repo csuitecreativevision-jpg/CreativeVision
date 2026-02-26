@@ -264,3 +264,73 @@ export async function updateUser(id: string, updates: { role?: UserRole, workspa
 
 // Export the supabase client for use elsewhere if needed
 // (Already exported at top)
+
+// ==========================================
+// CHECKERS MANAGEMENT
+// ==========================================
+
+export interface Checker {
+    id: string;
+    name: string;
+    is_active: boolean;
+    created_at: string;
+}
+
+export async function getAllCheckers(): Promise<{ success: boolean; data?: Checker[]; error?: string }> {
+    try {
+        const { data, error } = await supabase
+            .from('checkers')
+            .select('*')
+            .order('name', { ascending: true });
+
+        if (error) throw error;
+        return { success: true, data };
+    } catch (error: any) {
+        console.error('Failed to fetch checkers:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+export async function createChecker(name: string): Promise<{ success: boolean; error?: string }> {
+    try {
+        const { error } = await supabase
+            .from('checkers')
+            .insert([{ name: name.trim() }]);
+
+        if (error) throw error;
+        return { success: true };
+    } catch (error: any) {
+        console.error('Failed to create checker:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+export async function toggleCheckerStatus(id: string, is_active: boolean): Promise<{ success: boolean; error?: string }> {
+    try {
+        const { error } = await supabase
+            .from('checkers')
+            .update({ is_active })
+            .eq('id', id);
+
+        if (error) throw error;
+        return { success: true };
+    } catch (error: any) {
+        console.error('Failed to update checker status:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+export async function deleteChecker(id: string): Promise<{ success: boolean; error?: string }> {
+    try {
+        const { error } = await supabase
+            .from('checkers')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+        return { success: true };
+    } catch (error: any) {
+        console.error('Failed to delete checker:', error);
+        return { success: false, error: error.message };
+    }
+}

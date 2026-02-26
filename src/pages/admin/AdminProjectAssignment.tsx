@@ -18,6 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import { getAllBoards, getBoardColumns, getBoardGroups, submitProjectAssignment } from '../../services/mondayService';
 import { RichTextEditor } from '../../components/ui/RichTextEditor';
 import { announceAssignment } from '../../services/discordService';
+import { getAllCheckers, Checker } from '../../services/boardsService';
 
 import { SelectionModal } from '../../components/ui/SelectionModal';
 
@@ -30,6 +31,7 @@ export default function AdminProjectAssignment() {
     const [availableClients, setAvailableClients] = useState<string[]>([]); // Active Clients (Fulfillment Boards)
     const [veBoardGroups, setVeBoardGroups] = useState<{ id: string, title: string }[]>([]); // For Submission Mapping
     const [availableTeam, setAvailableTeam] = useState<{ name: string, id: string }[]>([]);
+    const [availableCheckers, setAvailableCheckers] = useState<Checker[]>([]);
     const [loadingClients, setLoadingClients] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [veProjectBoardId, setVeProjectBoardId] = useState<string | null>(null);
@@ -197,6 +199,16 @@ export default function AdminProjectAssignment() {
                 console.error("Failed to fetch data", error);
             } finally {
                 setLoadingClients(false);
+            }
+
+            // --- FETCH CHECKERS ---
+            try {
+                const checkersRes = await getAllCheckers();
+                if (checkersRes.success && checkersRes.data) {
+                    setAvailableCheckers(checkersRes.data);
+                }
+            } catch (error) {
+                console.error("Failed to fetch checkers", error);
             }
         };
 
@@ -818,7 +830,7 @@ export default function AdminProjectAssignment() {
                 isOpen={activeModal === 'checker'}
                 onClose={() => setActiveModal(null)}
                 title="Select Checker of the Day"
-                options={['Mark', 'Ray', 'Kyle']}
+                options={availableCheckers.filter(c => c.is_active).map(c => c.name)}
                 selected={activeProject.checkerName}
                 onSelect={(val) => {
                     if (isBulkMode && sharedChecker) {

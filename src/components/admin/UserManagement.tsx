@@ -13,10 +13,14 @@ import {
     X,
     Shield,
     Briefcase,
-    Layout
+    Layout,
+    Plus,
+    AlertCircle,
+    Check
 } from 'lucide-react';
 import {
-    createUser, getAllUsers, updateUser, deleteUser
+    createUser, getAllUsers, updateUser, deleteUser,
+    getAllCheckers, createChecker, deleteChecker, Checker
 } from '../../services/boardsService';
 import { getAllWorkspaces, getAllBoards } from '../../services/mondayService';
 import { PremiumModal } from '../ui/PremiumModal';
@@ -67,6 +71,13 @@ export function UserManagement() {
     const [isUserListOpen, setIsUserListOpen] = useState(false);
     const [userError, setUserError] = useState<string | null>(null);
     const [editingUserId, setEditingUserId] = useState<string | null>(null);
+
+    // --- Checker State ---
+    const [checkers, setCheckers] = useState<Checker[]>([]);
+    const [newCheckerName, setNewCheckerName] = useState('');
+    const [isCheckersLoading, setIsCheckersLoading] = useState(false);
+    const [checkerError, setCheckerError] = useState<string | null>(null);
+    const [checkerSuccess, setCheckerSuccess] = useState<string | null>(null);
     const [showPassword, setShowPassword] = useState(false);
 
     // Data State
@@ -78,6 +89,7 @@ export function UserManagement() {
     useEffect(() => {
         fetchUsers();
         fetchAuxData();
+        fetchCheckers(); // Fetch checkers on component mount
     }, []);
 
     const fetchUsers = async () => {
@@ -94,6 +106,19 @@ export function UserManagement() {
         ]);
         setWorkspaces(ws || []);
         setBoards(b || []);
+    };
+
+    const fetchCheckers = async () => {
+        setIsCheckersLoading(true);
+        setCheckerError(null);
+        try {
+            const fetchedCheckers = await getAllCheckers();
+            setCheckers(fetchedCheckers.data || []);
+        } catch (error: any) {
+            setCheckerError(error.message || 'Failed to fetch checkers.');
+        } finally {
+            setIsCheckersLoading(false);
+        }
     };
 
     // Auto-generate email
@@ -214,6 +239,41 @@ export function UserManagement() {
             } else {
                 setUserError(result.error || 'Failed to create user');
             }
+        }
+    };
+
+    const handleCreateChecker = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setCheckerError(null);
+        setCheckerSuccess(null);
+
+        if (!newCheckerName.trim()) {
+            setCheckerError('Checker name is required.');
+            return;
+        }
+
+        const result = await createChecker(newCheckerName);
+        if (result.success) {
+            setCheckerSuccess('Checker added successfully!');
+            setNewCheckerName('');
+            fetchCheckers();
+        } else {
+            setCheckerError(result.error || 'Failed to add checker.');
+        }
+    };
+
+    const handleDeleteChecker = async (id: string, name: string) => {
+        if (!window.confirm(`Are you sure you want to delete checker "${name}"?`)) return;
+
+        setCheckerError(null);
+        setCheckerSuccess(null);
+
+        const result = await deleteChecker(id);
+        if (result.success) {
+            setCheckerSuccess(`Checker "${name}" deleted.`);
+            fetchCheckers();
+        } else {
+            setCheckerError(result.error || 'Failed to delete checker.');
         }
     };
 
@@ -482,83 +542,150 @@ export function UserManagement() {
                             ))}
                         </div>
                     </div>
-                </div>
-            </div>
+                    {/* Manage Checkers Section */}
+                    <div className="mt-8">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
+                                <Users className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold text-white tracking-tight">Checkers</h2>
+                                <p className="text-sm text-gray-400">Manage the dynamic list of Checkers for project assignments.</p>
+                            </div>
+                        </div>
 
-            {/* --- User Directory Modal --- */}
-            <PremiumModal
-                isOpen={isUserListOpen}
-                onClose={() => setIsUserListOpen(false)}
-                maxWidth="max-w-5xl"
-            >
-                {/* Modal Header */}
-                <div className="p-6 border-b border-white/10 flex items-center justify-between bg-[#131322]/50">
-                    <div>
-                        <h2 className="text-xl font-bold text-white">User Directory</h2>
-                        <p className="text-sm text-gray-400">{userList.length} registered accounts</p>
-                    </div>
-                    <button
-                        onClick={() => setIsUserListOpen(false)}
-                        className="p-2 hover:bg-white/10 rounded-xl text-gray-400 hover:text-white transition-colors"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
+                        <GlassCard>
+                            <form onSubmit={handleCreateChecker} className="flex gap-4 mb-6">
+                                <input
+                                    type="text"
+                                    placeholder="New Checker Name..."
+                                    value={newCheckerName}
+                                    onChange={(e) => setNewCheckerName(e.target.value)}
+                                    className="flex-1 bg-[#1A1A2E]/50 border border-white/5 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+                                />
+                                <button
+                                    type="submit"
+                                    className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold transition-colors flex items-center gap-2"
+                                >
+                                    <Plus className="w-5 h-5" />
+                                    Add Checker
+                                </button>
+                            </form>
 
-                {/* Modal Content */}
-                <div className="flex-1 overflow-auto p-0">
-                    <table className="w-full text-left border-collapse">
-                        <thead className="bg-[#131322] sticky top-0 z-10">
-                            <tr>
-                                {['Name', 'Role', 'Workspace', 'Actions'].map(h => (
-                                    <th key={h} className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-white/5">{h}</th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/5">
-                            {userList.map((user) => (
-                                <tr key={user.id} className="group hover:bg-white/5 transition-colors">
-                                    <td className="p-4">
-                                        <div className="font-bold text-white text-sm">{user.name}</div>
-                                        <div className="text-xs text-gray-500 font-mono">{user.email}</div>
-                                    </td>
-                                    <td className="p-4">
-                                        <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${user.role === 'admin' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
-                                            user.role === 'editor' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
-                                                'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                            }`}>
-                                            {user.role}
-                                        </span>
-                                    </td>
-                                    <td className="p-4">
-                                        {user.workspace_id ? (
-                                            <span className="text-xs text-gray-300">
-                                                {workspaces.find(w => w.id.toString() === user.workspace_id)?.name || 'Unknown'}
-                                            </span>
-                                        ) : <span className="text-gray-600">-</span>}
-                                    </td>
-                                    <td className="p-4">
-                                        <div className="flex gap-2">
+                            {checkerError && (
+                                <div className="mb-4 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-3">
+                                    <AlertCircle className="w-5 h-5 shrink-0" />
+                                    <p>{checkerError}</p>
+                                </div>
+                            )}
+                            {checkerSuccess && (
+                                <div className="mb-4 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm flex items-center gap-3">
+                                    <Check className="w-5 h-5 shrink-0" />
+                                    <p>{checkerSuccess}</p>
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                                {isCheckersLoading ? (
+                                    <div className="col-span-full py-8 text-center text-gray-500">Loading checkers...</div>
+                                ) : checkers.length === 0 ? (
+                                    <div className="col-span-full py-8 text-center text-gray-500">No Checkers found. Add one above.</div>
+                                ) : (
+                                    checkers.map((checker) => (
+                                        <div key={checker.id} className="flex items-center justify-between bg-white/5 border border-white/5 rounded-xl p-4 group hover:bg-white/10 transition-colors">
+                                            <div className="font-bold text-white">{checker.name}</div>
                                             <button
-                                                onClick={() => handleEditUser(user)}
-                                                className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-blue-400 transition-colors"
-                                            >
-                                                <Pencil className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDeleteUser(user.id, user.name)}
-                                                className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-400 hover:text-red-400 transition-colors"
+                                                type="button"
+                                                onClick={() => handleDeleteChecker(checker.id, checker.name)}
+                                                className="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100"
+                                                title="Delete Checker"
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
                                         </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                                    ))
+                                )}
+                            </div>
+                        </GlassCard>
+                    </div>
+
                 </div>
-            </PremiumModal>
+
+                {/* --- User Directory Modal --- */}
+                <PremiumModal
+                    isOpen={isUserListOpen}
+                    onClose={() => setIsUserListOpen(false)}
+                    maxWidth="max-w-5xl"
+                >
+                    {/* Modal Header */}
+                    <div className="p-6 border-b border-white/10 flex items-center justify-between bg-[#131322]/50">
+                        <div>
+                            <h2 className="text-xl font-bold text-white">User Directory</h2>
+                            <p className="text-sm text-gray-400">{userList.length} registered accounts</p>
+                        </div>
+                        <button
+                            onClick={() => setIsUserListOpen(false)}
+                            className="p-2 hover:bg-white/10 rounded-xl text-gray-400 hover:text-white transition-colors"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+
+                    {/* Modal Content */}
+                    <div className="flex-1 overflow-auto p-0">
+                        <table className="w-full text-left border-collapse">
+                            <thead className="bg-[#131322] sticky top-0 z-10">
+                                <tr>
+                                    {['Name', 'Role', 'Workspace', 'Actions'].map(h => (
+                                        <th key={h} className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-white/5">{h}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {userList.map((user) => (
+                                    <tr key={user.id} className="group hover:bg-white/5 transition-colors">
+                                        <td className="p-4">
+                                            <div className="font-bold text-white text-sm">{user.name}</div>
+                                            <div className="text-xs text-gray-500 font-mono">{user.email}</div>
+                                        </td>
+                                        <td className="p-4">
+                                            <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${user.role === 'admin' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
+                                                user.role === 'editor' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                                                    'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                }`}>
+                                                {user.role}
+                                            </span>
+                                        </td>
+                                        <td className="p-4">
+                                            {user.workspace_id ? (
+                                                <span className="text-xs text-gray-300">
+                                                    {workspaces.find(w => w.id.toString() === user.workspace_id)?.name || 'Unknown'}
+                                                </span>
+                                            ) : <span className="text-gray-600">-</span>}
+                                        </td>
+                                        <td className="p-4">
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => handleEditUser(user)}
+                                                    className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-blue-400 transition-colors"
+                                                >
+                                                    <Pencil className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteUser(user.id, user.name)}
+                                                    className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-400 hover:text-red-400 transition-colors"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </PremiumModal>
+            </div>
         </div>
     );
 }
