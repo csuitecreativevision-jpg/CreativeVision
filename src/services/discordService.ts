@@ -15,6 +15,34 @@ export interface DiscordAnnouncementParams {
  * Calls the secure Supabase Edge Function to post the announcement to Discord,
  * preventing CORS errors and hiding the Bot Token from the client.
  */
+export async function createDiscordThread(editorName: string) {
+    if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        console.error("Supabase URL or Anon Key is missing");
+        throw new Error("Missing Supabase Configuration");
+    }
+
+    try {
+        const { supabase } = await import('./boardsService'); // Use existing Supabase client
+
+        const { error } = await supabase.functions.invoke('discord-bot', {
+            body: {
+                action: 'createThread',
+                editorName
+            },
+        });
+
+        if (error) {
+            console.error("Supabase Edge Function Error:", error);
+            throw error;
+        }
+
+        return { success: true };
+    } catch (e: any) {
+        console.error("Failed to create discord thread:", e);
+        throw e;
+    }
+}
+
 export const announceAssignment = async (params: DiscordAnnouncementParams) => {
     try {
         const { supabase } = await import('./boardsService'); // Use existing Supabase client

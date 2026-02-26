@@ -20,6 +20,7 @@ import {
 } from '../../services/boardsService';
 import { getAllWorkspaces, getAllBoards } from '../../services/mondayService';
 import { PremiumModal } from '../ui/PremiumModal';
+import { createDiscordThread } from '../../services/discordService';
 
 // --- Reusable UI Sub-Components (Internal) ---
 
@@ -194,6 +195,16 @@ export function UserManagement() {
             setIsCreatingUser(false);
             if (result.success) {
                 setUserSuccess(`User created successfully!`);
+
+                // --- Start Discord Thread Creation ---
+                if (newUserRole === 'editor') {
+                    // Fire and forget - don't let it block the UI
+                    createDiscordThread(newUserName.trim()).catch(err => {
+                        console.error('Failed to auto-create discord thread:', err);
+                    });
+                }
+                // --- End Discord Thread Creation ---
+
                 setNewUserName('');
                 setNewUserPassword('');
                 setNewUserRole('editor');

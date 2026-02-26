@@ -1,23 +1,52 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const DISCORD_BOT_TOKEN = Deno.env.get('DISCORD_BOT_TOKEN') || '';
-const GUILD_ID = '1157004682905014292'; // CreativeVision PH
-const FORUM_CHANNEL_ID = '1425325185548029994'; // 📹〕workspaces
+const BOT_TOKEN = Deno.env.get('DISCORD_BOT_TOKEN');
+const GUILD_ID = '1157004682905014292'; // Creative Vision PH
+const WORKSPACE_FORUM_ID = '1425325185548029994'; // workspaces forum
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface DiscordAnnouncementParams {
-    projectName: string;
-    clientName: string;
-    editorName: string;
-    checkerName?: string;
-    projectType?: string; // Mapped from UI options
-    price?: string;
-    deadline?: string;
-    instructions?: string;
+interface RequestBody {
+    action?: 'announce' | 'createThread'; // Action router
+    editorName: string; // The assigned editor's name
+    checkerName?: string; // The assigned checker's name
+    clientName?: string; // Client name for announcement
+    projectName?: string; // Project title for announcement
+    price?: string; // Project price for announcement
+    deadline?: string; // Project deadline for announcement
+    instructions?: string; // Additional instructions for announcement
+    projectType?: string; // Orientation/Type of the project
+}
+
+// Helper function to search for a Discord guild member by name
+async function searchGuildMemberByName(name: string): Promise<string | null> {
+    if (!name) return null;
+    const normalizedName = name.toLowerCase().trim();
+    const headers = { 'Authorization': `Bot ${BOT_TOKEN}` };
+
+    try {
+        const searchRes = await fetch(`https://discord.com/api/v10/guilds/${GUILD_ID}/members/search?query=${encodeURIComponent(normalizedName)}&limit=5`, { headers });
+        if (searchRes.ok) {
+            const members = await searchRes.json();
+            const memberMatch = members.find((m: any) =>
+                (m.nick && m.nick.toLowerCase().includes(normalizedName)) ||
+                m.user.username.toLowerCase().includes(normalizedName) ||
+                (m.user.global_name && m.user.global_name.toLowerCase().includes(normalizedName))
+            );
+            if (memberMatch) {
+                return memberMatch.user.id;
+            } else if (members.length > 0) {
+                // Fallback to the first result if no exact match
+                return members[0].user.id;
+            }
+        }
+    } catch (searchErr) {
+        console.warn(`[Discord Bot] Failed to search for Discord User ID for '${name}':`, searchErr);
+    }
+    return null;
 }
 
 serve(async (req) => {
@@ -27,139 +56,174 @@ serve(async (req) => {
     }
 
     try {
-        if (!DISCORD_BOT_TOKEN) {
+        if (!BOT_TOKEN) {
             throw new Error("DISCORD_BOT_TOKEN is not configured in Supabase Secrets.");
         }
 
-        const params: DiscordAnnouncementParams = await req.json();
+        const body = await req.json() as RequestBody;
+        const {
+            action = 'announce',
+            editorName, checkerName, clientName, projectName, price, deadline, instructions, projectType
+        } = body;
 
-        if (!params.editorName || !params.projectName) {
-            throw new Error("Missing required parameters: editorName or projectName");
-        }
+        console.log(`[discord-bot] Processing action: '${action}' for editor: '${editorName}'`);
 
-        const headers = {
-            'Authorization': `Bot ${DISCORD_BOT_TOKEN}`,
-            'Content-Type': 'application/json'
-        };
+        // Early lookup: Find Editor's User ID
+        console.log(`[discord-bot] Searching for Discord user for editor: ${editorName}`);
+        let editorUserId = await searchGuildMemberByName(editorName);
 
-        // 2. Find the Editor's thread in the Workspaces forum
-        let targetThreadId: string | null = null;
-        const normalizedEditorName = params.editorName.toLowerCase().trim();
-
-        // First, check active threads
-        const activeRes = await fetch(`https://discord.com/api/v10/guilds/${GUILD_ID}/threads/active`, { headers });
-        if (activeRes.ok) {
-            const activeData = await activeRes.json();
-            const forumThreads = activeData.threads?.filter((t: any) => t.parent_id === FORUM_CHANNEL_ID) || [];
-
-            const match = forumThreads.find((t: any) => t.name.toLowerCase().includes(normalizedEditorName));
-            if (match) {
-                targetThreadId = match.id;
+        if (!editorUserId) {
+            console.warn(`[discord-bot] WARNING: Could not find exact match for editor '${editorName}'. Trying loose match...`);
+            editorUserId = await searchGuildMemberByName(editorName.split(' ')[0]);
+            if (!editorUserId) {
+                console.warn(`[discord-bot] ERROR: Could not find ANY match for editor '${editorName}'. Tags will fail.`);
             }
         }
 
-        // If not found in active threads, check archived threads (public) for the forum
-        if (!targetThreadId) {
-            const archivedRes = await fetch(`https://discord.com/api/v10/channels/${FORUM_CHANNEL_ID}/threads/archived/public`, { headers });
-            if (archivedRes.ok) {
-                const archivedData = await archivedRes.json();
-                const match = archivedData.threads?.find((t: any) => t.name.toLowerCase().includes(normalizedEditorName));
-                if (match) {
-                    targetThreadId = match.id;
-                }
+        // ----------------------------------------------------
+        // ACTION: CREATE THREAD FOR NEW EDITOR
+        // ----------------------------------------------------
+        if (action === 'createThread') {
+            const threadName = editorName;
+            const editorMention = editorUserId ? `<@${editorUserId}>` : `**${editorName}**`;
+            const welcomeMessage = `${editorMention} Welcome to the team!`;
+
+            const embed = {
+                description: "This is your dedicated workspace thread. Please keep an eye on this thread for your upcoming project assignments.",
+                color: 0x8a2be2, // Violet/Purple
+                timestamp: new Date().toISOString(),
+            };
+
+            const payloadContent = {
+                content: welcomeMessage, // The ping happens outside the embed for true mentions
+                embeds: [embed]
+            };
+
+            console.log(`[discord-bot] Creating new thread: '${threadName}'`);
+            const createThreadRes = await fetch(`https://discord.com/api/v10/channels/${WORKSPACE_FORUM_ID}/threads`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bot ${BOT_TOKEN}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name: threadName,
+                    message: payloadContent,
+                    auto_archive_duration: 10080 // 7 days in minutes
+                })
+            });
+
+            if (!createThreadRes.ok) {
+                const errText = await createThreadRes.text();
+                console.error(`[discord-bot] Failed to create thread. Status: ${createThreadRes.status}, Error: ${errText}`);
+                throw new Error(`Discord API Thread Creation Error: ${createThreadRes.status}`);
+            }
+
+            const threadData = await createThreadRes.json();
+            console.log(`[discord-bot] Thread created successfully: ${threadData.id}`);
+
+            return new Response(JSON.stringify({ success: true, threadId: threadData.id }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200,
+            });
+        }
+
+        // ----------------------------------------------------
+        // ACTION: ANNOUNCE ASSIGNMENT
+        // ----------------------------------------------------
+
+        // 1. Fetch Active Threads in Workspace Forum
+        console.log(`[discord-bot] Fetching active threads in workspace forum...`);
+        const activeThreadsRes = await fetch(`https://discord.com/api/v10/guilds/${GUILD_ID}/threads/active`, {
+            headers: {
+                'Authorization': `Bot ${BOT_TOKEN}`,
+            },
+        });
+
+        if (!activeThreadsRes.ok) throw new Error(`Failed to fetch active threads: ${activeThreadsRes.status}`);
+        const activeThreadsData = await activeThreadsRes.json();
+
+        // 2. Fetch Archived Threads in Workspace Forum (In case editor thread was archived)
+        console.log(`[discord-bot] Fetching archived threads in workspace forum...`);
+        const archivedThreadsRes = await fetch(`https://discord.com/api/v10/channels/${WORKSPACE_FORUM_ID}/threads/archived/public`, {
+            headers: {
+                'Authorization': `Bot ${BOT_TOKEN}`,
+            }
+        });
+        if (!archivedThreadsRes.ok) throw new Error(`Failed to fetch archived threads: ${archivedThreadsRes.status}`);
+        const archivedThreadsData = await archivedThreadsRes.json();
+
+        // Combine threads and filter by exact parent forum ID
+        const allThreads = [
+            ...(activeThreadsData.threads || []),
+            ...(archivedThreadsData.threads || [])
+        ].filter((t: any) => t.parent_id === WORKSPACE_FORUM_ID);
+
+        console.log(`[discord-bot] Found ${allThreads.length} total threads in workspace forum.`);
+
+        // 3. Find specific editor's thread (Exact match or starts with name)
+        const editorThread = allThreads.find((t: any) => {
+            const threadName = t.name.toLowerCase();
+            // "clarke - workspace" -> "clarke"
+            const baseName = threadName.split('-')[0].trim();
+            return baseName === editorName.toLowerCase();
+        });
+
+        if (!editorThread) {
+            console.error(`[discord-bot] Target thread not found for editor: ${editorName}`);
+            throw new Error(`Workspace thread not found for editor: ${editorName}`);
+        }
+
+        console.log(`[discord-bot] Found target thread: ${editorThread.name} (${editorThread.id})`);
+
+        // Lookup Checker's User ID if provided
+        let checkerUserId = null;
+        if (checkerName) {
+            console.log(`[discord-bot] Searching for Discord user for checker: ${checkerName}`);
+            checkerUserId = await searchGuildMemberByName(checkerName);
+            if (!checkerUserId) {
+                console.warn(`[discord-bot] WARNING: Could not find match for checker '${checkerName}'.`);
             }
         }
 
-        if (!targetThreadId) {
-            throw new Error(`Could not find a Discord thread for editor: ${params.editorName}`);
-        }
-
-        // 3. Fetch the editor's Discord User ID via Guild Members Search
-        let editorUserId: string | null = null;
-        try {
-            const searchRes = await fetch(`https://discord.com/api/v10/guilds/${GUILD_ID}/members/search?query=${encodeURIComponent(params.editorName)}&limit=5`, { headers });
-            if (searchRes.ok) {
-                const members = await searchRes.json();
-                const memberMatch = members.find((m: any) =>
-                    (m.nick && m.nick.toLowerCase().includes(normalizedEditorName)) ||
-                    m.user.username.toLowerCase().includes(normalizedEditorName)
-                );
-                if (memberMatch) {
-                    editorUserId = memberMatch.user.id;
-                } else if (members.length > 0) {
-                    editorUserId = members[0].user.id;
-                }
-            }
-        } catch (searchErr) {
-            console.warn("[Discord Bot] Failed to search for editor's Discord User ID", searchErr);
-        }
-
-        // 4. Fetch the Checker's Discord User ID
-        let checkerUserId: string | null = null;
-        if (params.checkerName) {
-            const normalizedCheckerName = params.checkerName.toLowerCase().trim();
-            try {
-                const searchRes = await fetch(`https://discord.com/api/v10/guilds/${GUILD_ID}/members/search?query=${encodeURIComponent(params.checkerName)}&limit=5`, { headers });
-                if (searchRes.ok) {
-                    const members = await searchRes.json();
-                    const memberMatch = members.find((m: any) =>
-                        (m.nick && m.nick.toLowerCase().includes(normalizedCheckerName)) ||
-                        m.user.username.toLowerCase().includes(normalizedCheckerName)
-                    );
-                    if (memberMatch) {
-                        checkerUserId = memberMatch.user.id;
-                    } else if (members.length > 0) {
-                        checkerUserId = members[0].user.id;
-                    }
-                }
-            } catch (searchErr) {
-                console.warn("[Discord Bot] Failed to search for checker's Discord User ID", searchErr);
-            }
-        }
-
-        // 5. Construct the Embed Message
-        const editorMention = editorUserId ? `<@${editorUserId}>` : `**${params.editorName}**`;
-        const checkerMention = checkerUserId ? `<@${checkerUserId}>` : (params.checkerName || 'None');
-        const orientation = params.projectType || 'Standard';
-
-        const descriptionTemplate = `${editorMention} You've been assigned a Project. Kindly take note of the following details:\n\n` +
-            `Client: **${params.clientName || 'N/A'}**\n` +
-            `Project Title: **${params.projectName}**\n` +
-            `Deadline: **${params.deadline || 'N/A'}**\n` +
-            `Project Orientation: **${orientation}**\n` +
-            `Checker of the Day: ${checkerMention}\n\n` +
-            `Don't forget to read the instructions!\n` +
-            `React once you have read this message. Have a nice day!`;
+        // 4. Construct Embed per user request
+        const editorMention = editorUserId ? `<@${editorUserId}>` : editorName;
+        const checkerMention = checkerUserId ? `<@${checkerUserId}>` : (checkerName || 'None');
+        const embedDescription = `${editorMention} You've been assigned a Project. Kindly take note of the following details:\n\nClient: **${clientName}**\nProject Title: **${projectName}**\nDeadline: **${deadline}**\nProject Orientation: **${projectType || 'Standard'}**\nChecker of the Day: ${checkerMention}\n\nDon't forget to read the instructions!\nReact once you have read this message. Have a nice day!`;
 
         const embed = {
-            color: 0x7c3aed, // Violet-500
-            description: descriptionTemplate,
-            footer: {
-                text: "CreativeVision Admin Console",
-                icon_url: "https://i.ibb.co/k2xQp4w/CV-Logo.png"
-            },
-            timestamp: new Date().toISOString()
+            title: "New Project Assignment 🚀",
+            description: embedDescription,
+            color: 0x8a2be2, // Violet/Purple
+            timestamp: new Date().toISOString(),
         };
 
-        const payload: any = {
-            content: editorUserId ? `<@${editorUserId}>` : '', // Invisible ping outside embed just in case
+        const payloadContent = {
+            content: editorMention, // Invisible ping outside embed
             embeds: [embed]
         };
 
-        // 6. Send the message
-        const sendRes = await fetch(`https://discord.com/api/v10/channels/${targetThreadId}/messages`, {
+        // 5. Post message to the specific thread
+        console.log(`[discord-bot] Posting embed to thread ${editorThread.id}...`);
+        const postMessageRes = await fetch(`https://discord.com/api/v10/channels/${editorThread.id}/messages`, {
             method: 'POST',
-            headers,
-            body: JSON.stringify(payload)
+            headers: {
+                'Authorization': `Bot ${BOT_TOKEN}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payloadContent)
         });
 
-        if (!sendRes.ok) {
-            const errBody = await sendRes.json();
-            throw new Error(`Failed to send Discord message: ${sendRes.status} - ${JSON.stringify(errBody)}`);
+        if (!postMessageRes.ok) {
+            const errText = await postMessageRes.text();
+            console.error(`[discord-bot] Failed to post message: Status ${postMessageRes.status}, Error: ${errText}`);
+            throw new Error(`Failed to post message to thread: ${postMessageRes.status}`);
         }
 
-        return new Response(JSON.stringify({ success: true, message: "Announcement sent." }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+        console.log(`[discord-bot] Announcement sent successfully!`);
+        return new Response(JSON.stringify({ success: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
         });
 
     } catch (error: any) {
