@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Loader2, Sparkles } from 'lucide-react';
 import { WorkspaceCard } from '../../components/shared/WorkspaceCard';
-import { ProjectSelectionView } from '../../components/views/ProjectSelectionView';
+import { EditorProjectSelectionView } from '../../components/views/EditorProjectSelectionView';
 import { getAllBoards, getBoardItems } from '../../services/mondayService';
 import { supabase } from '../../lib/supabaseClient';
 import { FilePreviewModal, useProtectedPreview } from '../../components/ui/FilePreviewModal';
@@ -205,7 +205,7 @@ export default function AdminTeam() {
                         {/* Content */}
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
                             <div className="max-w-7xl mx-auto">
-                                <ProjectSelectionView
+                                <EditorProjectSelectionView
                                     boardData={selectedBoard}
                                     selectedBoardId={selectedBoard.id}
                                     refreshBoardDetails={handleRefresh}

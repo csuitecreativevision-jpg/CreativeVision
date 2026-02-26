@@ -1376,15 +1376,29 @@ export async function submitProjectAssignment(
             try {
                 const allUsers = await getUsers();
                 // data.editor is the clean name "John Mark Ormido"
-                const matchedUser = allUsers.find((u: any) => u.name.toLowerCase() === data.editor?.toLowerCase());
+
+                // Try exact lowercase match first
+                let matchedUser = allUsers.find((u: any) => u.name.toLowerCase() === data.editor?.toLowerCase());
+
+                // If not found, try a looser includes match (e.g. "John" in "John Mark")
+                if (!matchedUser && data.editor) {
+                    matchedUser = allUsers.find((u: any) =>
+                        u.name.toLowerCase().includes(data.editor!.toLowerCase()) ||
+                        data.editor!.toLowerCase().includes(u.name.toLowerCase())
+                    );
+                }
+
                 if (matchedUser) {
                     columnValues[peopleCol.id] = { personsAndTeams: [{ id: Number(matchedUser.id), kind: "person" }] };
+                    console.log(`Successfully mapped editor '${data.editor}' to Monday ID: ${matchedUser.id}`);
                 } else {
-                    console.warn(`Could not find Monday User ID for editor: ${data.editor}`);
+                    console.warn(`Could not find Monday User ID for editor: ${data.editor}. Available users: `, allUsers.map((u: any) => u.name).join(', '));
                 }
             } catch (err) {
                 console.error("Failed to map editor to User ID", err);
             }
+        } else {
+            console.warn("Could not find a 'People' column for Editor mapping.");
         }
     }
 
