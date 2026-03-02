@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS users (
     role TEXT NOT NULL CHECK (role IN ('admin', 'editor', 'client')),
     workspace_id TEXT,  -- The user's assigned main workspace from Monday.com
     allowed_board_ids TEXT[], -- Optional: Specific boards the user is allowed to access
+    discord_thread_id TEXT,    -- The ID of the Discord thread for this editor
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

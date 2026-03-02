@@ -1,4 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+
+const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+);
 
 const BOT_TOKEN = Deno.env.get('DISCORD_BOT_TOKEN');
 const GUILD_ID = '1157004682905014292'; // Creative Vision PH
@@ -39,8 +45,8 @@ async function searchGuildMemberByName(name: string): Promise<string | null> {
             if (memberMatch) {
                 return memberMatch.user.id;
             } else if (members.length > 0) {
-                // Fallback to the first result if no exact match
-                return members[0].user.id;
+                // Return null if no clear match - better than guessing
+                return null;
             }
         }
     } catch (searchErr) {
@@ -109,20 +115,35 @@ serve(async (req) => {
                 body: JSON.stringify({
                     name: threadName,
                     message: payloadContent,
-                    auto_archive_duration: 10080 // 7 days in minutes
+                    auto_archive_duration: 1440 // 24 hours (safer for non-boosted guilds)
                 })
             });
 
             if (!createThreadRes.ok) {
                 const errText = await createThreadRes.text();
                 console.error(`[discord-bot] Failed to create thread. Status: ${createThreadRes.status}, Error: ${errText}`);
-                throw new Error(`Discord API Thread Creation Error: ${createThreadRes.status}`);
+                throw new Error(`Discord API Thread Creation Error: ${createThreadRes.status} - ${errText}`);
             }
 
             const threadData = await createThreadRes.json();
-            console.log(`[discord-bot] Thread created successfully: ${threadData.id}`);
+            const threadId = threadData.id;
+            console.log(`[discord-bot] Thread created successfully: ${threadId}`);
 
-            return new Response(JSON.stringify({ success: true, threadId: threadData.id }), {
+            // Update user record with the thread ID
+            console.log(`[discord-bot] Updating user record for '${editorName}' with threadId: ${threadId}`);
+            const { error: updateError } = await supabase
+                .from('users')
+                .update({ discord_thread_id: threadId })
+                .ilike('name', `%${editorName}%`); // Matching name partially if needed, or exact if preferred
+
+            if (updateError) {
+                console.error(`[discord-bot] Failed to update user record:`, updateError);
+                // We don't throw here to avoid failing the whole request if just the DB update fails
+            } else {
+                console.log(`[discord-bot] User record updated successfully.`);
+            }
+
+            return new Response(JSON.stringify({ success: true, threadId: threadId }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 200,
             });

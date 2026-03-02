@@ -16,15 +16,9 @@ export interface DiscordAnnouncementParams {
  * preventing CORS errors and hiding the Bot Token from the client.
  */
 export async function createDiscordThread(editorName: string) {
-    if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
-        console.error("Supabase URL or Anon Key is missing");
-        throw new Error("Missing Supabase Configuration");
-    }
-
     try {
-        const { supabase } = await import('./boardsService'); // Use existing Supabase client
-
-        const { error } = await supabase.functions.invoke('discord-bot', {
+        const { supabase } = await import('./boardsService');
+        const { data, error } = await supabase.functions.invoke('discord-bot', {
             body: {
                 action: 'createThread',
                 editorName
@@ -32,8 +26,10 @@ export async function createDiscordThread(editorName: string) {
         });
 
         if (error) {
-            console.error("Supabase Edge Function Error:", error);
-            throw error;
+            // THIS will show the real error
+            const realError = await error.context.json();
+            console.error("REAL ERROR FROM EDGE FUNCTION:", realError);
+            throw new Error(realError.error);
         }
 
         return { success: true };

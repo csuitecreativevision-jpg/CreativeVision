@@ -30,6 +30,7 @@ function EditorPortalContent() {
     const [selectedBoard, setSelectedBoard] = useState<any | null>(null);
     const [sortOption, setSortOption] = useState<'name' | 'count'>('name');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+    const [discordThreadId, setDiscordThreadId] = useState<string | null>(null);
 
     // User info
     const currentUserName = localStorage.getItem('portal_user_name') || 'Editor';
@@ -54,11 +55,15 @@ function EditorPortalContent() {
             if (email) {
                 const { data } = await supabase
                     .from('users')
-                    .select('allowed_board_ids')
+                    .select('allowed_board_ids, discord_thread_id')
                     .eq('email', email)
                     .single();
+
                 if (data?.allowed_board_ids) {
                     allowedBoardIds = data.allowed_board_ids;
+                }
+                if (data?.discord_thread_id) {
+                    setDiscordThreadId(data.discord_thread_id);
                 }
             }
 
@@ -150,6 +155,19 @@ function EditorPortalContent() {
                                 </div>
                             </div>
                         </div>
+                    )}
+                    {discordThreadId && (
+                        <a
+                            href={`https://discord.com/channels/1157004682905014292/${discordThreadId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 hover:border-indigo-500/40 transition-all group mb-2"
+                        >
+                            <svg viewBox="0 0 127.14 96.36" className="w-5 h-5 fill-current">
+                                <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.71,32.65-1.82,56.6.48,80.21a105.73,105.73,0,0,0,32.17,16.15,77.7,77.7,0,0,0,6.89-11.11,68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1,105.25,105.25,0,0,0,32.19-16.14c2.72-27.42-4.59-51.1-19.34-72.14ZM42.45,65.69C36.18,65.69,31,60,31,53s5.07-12.73,11.41-12.73S54,46,53.86,53,48.79,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5.07-12.73,11.44-12.73S96.23,46,96.12,53,91.06,65.69,84.71,65.69Z" />
+                            </svg>
+                            <span className="text-sm font-bold">Discord Workspace</span>
+                        </a>
                     )}
                     <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-500/10 hover:text-red-400 text-gray-400 transition-colors group">
                         <LogOut className="w-5 h-5" />
