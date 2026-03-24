@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, Square, Loader2, Clock } from 'lucide-react';
+import { Play, Square, Loader2, Clock, Pause, RefreshCw } from 'lucide-react';
 import { supabase } from '../../services/boardsService';
 
 export const TimeTracker = () => {
@@ -7,6 +7,9 @@ export const TimeTracker = () => {
     const [actionLoading, setActionLoading] = useState(false);
     const [activeLogId, setActiveLogId] = useState<string | null>(null);
     const [timeIn, setTimeIn] = useState<Date | null>(null);
+    const [status, setStatus] = useState<'active' | 'paused' | 'completed' | null>(null);
+    const [lastPausedAt, setLastPausedAt] = useState<Date | null>(null);
+    const [totalPausedSeconds, setTotalPausedSeconds] = useState(0);
     const [elapsedTime, setElapsedTime] = useState('00:00:00');
 
     const userEmail = localStorage.getItem('portal_user_email') || '';
@@ -22,22 +25,34 @@ export const TimeTracker = () => {
 
     useEffect(() => {
         let interval: NodeJS.Timeout;
-        if (timeIn) {
-            interval = setInterval(() => {
-                const now = new Date();
-                const diff = now.getTime() - timeIn.getTime();
-                
-                const hours = Math.floor(diff / (1000 * 60 * 60));
-                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-                
-                setElapsedTime(
-                    `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-                );
-            }, 1000);
+        if (timeIn && status) {
+            // Immediate update once
+            updateTimerDisplay();
+            // Then interval
+            interval = setInterval(updateTimerDisplay, 1000);
         }
         return () => clearInterval(interval);
-    }, [timeIn]);
+    }, [timeIn, status, lastPausedAt, totalPausedSeconds]);
+
+    const updateTimerDisplay = () => {
+        if (!timeIn) return;
+        let diff = 0;
+        const now = new Date().getTime();
+        
+        if (status === 'active') {
+            diff = now - timeIn.getTime() - (totalPausedSeconds * 1000);
+        } else if (status === 'paused' && lastPausedAt) {
+            diff = lastPausedAt.getTime() - timeIn.getTime() - (totalPausedSeconds * 1000);
+        }
+
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        
+        setElapsedTime(
+            `${Math.max(0, hours).toString().padStart(2, '0')}:${Math.max(0, minutes).toString().padStart(2, '0')}:${Math.max(0, seconds).toString().padStart(2, '0')}`
+        );
+    };
 
     const checkActiveSession = async () => {
         try {
@@ -45,7 +60,7 @@ export const TimeTracker = () => {
                 .from('time_logs')
                 .select('*')
                 .eq('user_email', userEmail)
-                .eq('status', 'active')
+                .in('status', ['active', 'paused'])
                 .limit(1)
                 .maybeSingle();
 
@@ -54,9 +69,15 @@ export const TimeTracker = () => {
             if (data) {
                 setActiveLogId(data.id);
                 setTimeIn(new Date(data.time_in));
+                setStatus(data.status);
+                setLastPausedAt(data.last_paused_at ? new Date(data.last_paused_at) : null);
+                setTotalPausedSeconds(data.total_paused_seconds || 0);
             } else {
                 setActiveLogId(null);
                 setTimeIn(null);
+                setStatus(null);
+                setLastPausedAt(null);
+                setTotalPausedSeconds(0);
                 setElapsedTime('00:00:00');
             }
         } catch (error) {
@@ -83,6 +104,9 @@ export const TimeTracker = () => {
             if (data) {
                 setActiveLogId(data.id);
                 setTimeIn(new Date(data.time_in));
+                setStatus('active');
+                setTotalPausedSeconds(0);
+                setLastPausedAt(null);
             }
         } catch (error) {
             console.error('Error clocking in:', error);
@@ -92,15 +116,63 @@ export const TimeTracker = () => {
         }
     };
 
+    const handlePause = async () => {
+        if (!activeLogId || status === 'paused') return;
+        setActionLoading(true);
+        const now = new Date();
+        try {
+            const { error } = await supabase
+                .from('time_logs')
+                .update({ last_paused_at: now.toISOString(), status: 'paused' })
+                .eq('id', activeLogId);
+            if (error) throw error;
+            setStatus('paused');
+            setLastPausedAt(now);
+        } catch (error) {
+            console.error('Error pausing:', error);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleResume = async () => {
+        if (!activeLogId || status === 'active' || !lastPausedAt) return;
+        setActionLoading(true);
+        const now = new Date();
+        const additionalSeconds = Math.floor((now.getTime() - lastPausedAt.getTime()) / 1000);
+        const newTotal = totalPausedSeconds + additionalSeconds;
+        try {
+            const { error } = await supabase
+                .from('time_logs')
+                .update({ last_paused_at: null, total_paused_seconds: newTotal, status: 'active' })
+                .eq('id', activeLogId);
+            if (error) throw error;
+            setStatus('active');
+            setLastPausedAt(null);
+            setTotalPausedSeconds(newTotal);
+        } catch (error) {
+            console.error('Error resuming:', error);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     const handleTimeOut = async () => {
         if (!activeLogId) return;
         setActionLoading(true);
+
+        let finalTotalPausedSeconds = totalPausedSeconds;
+        if (status === 'paused' && lastPausedAt) {
+            finalTotalPausedSeconds += Math.floor((new Date().getTime() - lastPausedAt.getTime()) / 1000);
+        }
+
         try {
             const { error } = await supabase
                 .from('time_logs')
                 .update({
                     time_out: new Date().toISOString(),
-                    status: 'completed'
+                    status: 'completed',
+                    total_paused_seconds: finalTotalPausedSeconds
                 })
                 .eq('id', activeLogId);
 
@@ -108,6 +180,9 @@ export const TimeTracker = () => {
             
             setActiveLogId(null);
             setTimeIn(null);
+            setStatus(null);
+            setLastPausedAt(null);
+            setTotalPausedSeconds(0);
             setElapsedTime('00:00:00');
         } catch (error) {
             console.error('Error clocking out:', error);
@@ -138,36 +213,61 @@ export const TimeTracker = () => {
                         <span className="text-xs font-bold text-gray-300">Time Tracking</span>
                     </div>
                     {activeLogId && (
-                        <div className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-400 font-mono font-bold animate-pulse">
-                            ACTIVE
+                        <div className={`px-2 py-0.5 rounded-full border text-[10px] font-mono font-bold animate-pulse ${
+                            status === 'paused' 
+                                ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' 
+                                : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                        }`}>
+                            {status === 'paused' ? 'PAUSED' : 'ACTIVE'}
                         </div>
                     )}
                 </div>
 
                 <div className="flex items-center justify-between mt-1">
-                    <div className={`font-mono text-lg font-bold ${activeLogId ? 'text-white tracking-wider' : 'text-gray-600'}`}>
+                    <div className={`font-mono text-lg font-bold ${activeLogId ? 'text-white tracking-wider' : 'text-gray-600'} ${status === 'paused' && 'opacity-50'}`}>
                         {elapsedTime}
                     </div>
 
-                    {!activeLogId ? (
-                        <button
-                            onClick={handleTimeIn}
-                            disabled={actionLoading}
-                            className="bg-emerald-500 hover:bg-emerald-400 text-black px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 disabled:opacity-50"
-                        >
-                            {actionLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3 fill-current" />}
-                            TIME IN
-                        </button>
-                    ) : (
-                        <button
-                            onClick={handleTimeOut}
-                            disabled={actionLoading}
-                            className="bg-red-500/20 border border-red-500/30 hover:bg-red-500 hover:text-white text-red-400 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 disabled:opacity-50"
-                        >
-                            {actionLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Square className="w-3 h-3 fill-current" />}
-                            TIME OUT
-                        </button>
-                    )}
+                    <div className="flex gap-1.5">
+                        {!activeLogId ? (
+                            <button
+                                onClick={handleTimeIn}
+                                disabled={actionLoading}
+                                className="bg-emerald-500 hover:bg-emerald-400 text-black px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 disabled:opacity-50"
+                            >
+                                {actionLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3 fill-current" />}
+                                TIME IN
+                            </button>
+                        ) : (
+                            <>
+                                {status === 'active' ? (
+                                    <button
+                                        onClick={handlePause}
+                                        disabled={actionLoading}
+                                        className="bg-amber-500/20 border border-amber-500/30 hover:bg-amber-500 hover:text-white text-amber-500 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 disabled:opacity-50"
+                                    >
+                                        {actionLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Pause className="w-3 h-3 fill-current" />}
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={handleResume}
+                                        disabled={actionLoading}
+                                        className="bg-emerald-500/20 border border-emerald-500/30 hover:bg-emerald-500 hover:text-white text-emerald-400 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 disabled:opacity-50"
+                                    >
+                                        {actionLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                                    </button>
+                                )}
+                                <button
+                                    onClick={handleTimeOut}
+                                    disabled={actionLoading}
+                                    className="bg-red-500/20 border border-red-500/30 hover:bg-red-500 hover:text-white text-red-400 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 disabled:opacity-50"
+                                >
+                                    {actionLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Square className="w-3 h-3 fill-current" />}
+                                    OUT
+                                </button>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
