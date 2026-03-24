@@ -28,7 +28,7 @@ export default function StartProjectPage({ onBack }: StartProjectPageProps) {
         if (step === 0) {
             onBack();
         } else {
-            setStep(prev => prev - 1);
+            setStep(0);
         }
     };
 
@@ -80,14 +80,14 @@ export default function StartProjectPage({ onBack }: StartProjectPageProps) {
                         className="shrink-0 flex items-center justify-center gap-2 w-11 h-11 md:w-auto md:px-5 md:h-11 bg-white/5 text-white/90 rounded-full border border-white/10 hover:bg-white/10 hover:text-white transition-colors backdrop-blur-xl uppercase text-xs md:text-sm tracking-widest font-bold shadow-lg"
                     >
                         <span className="text-lg leading-none mb-[2px]">←</span>
-                        <span className="hidden md:block">Back</span>
+                        <span className="hidden md:block whitespace-nowrap">Previous Page</span>
                     </motion.button>
 
                     {/* Plans Navigation Wrapper */}
                     <div className="min-w-0 flex-1 flex justify-end md:justify-center relative">
                         {/* Gradient mask for edge fading on scroll */}
                         <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-[#050511] to-transparent pointer-events-none z-10 md:hidden rounded-r-full" />
-                        
+
                         <AnimatePresence>
                             {step > 0 && (
                                 <motion.div
@@ -106,8 +106,8 @@ export default function StartProjectPage({ onBack }: StartProjectPageProps) {
                                             whileTap={{ scale: 0.95 }}
                                             onClick={() => setStep(idx + 1)}
                                             className={`shrink-0 px-4 md:px-6 py-2 rounded-full text-sm font-semibold transition-colors duration-300 relative group ${step === idx + 1
-                                                    ? 'text-white'
-                                                    : 'text-white/60 hover:text-white hover:bg-white/5'
+                                                ? 'text-white'
+                                                : 'text-white/60 hover:text-white hover:bg-white/5'
                                                 }`}
                                         >
                                             {step === idx + 1 && (
@@ -134,8 +134,8 @@ export default function StartProjectPage({ onBack }: StartProjectPageProps) {
                                         whileTap={{ scale: 0.95 }}
                                         onClick={() => setStep(packages.length + 1)}
                                         className={`shrink-0 px-4 md:px-6 py-2 rounded-full text-sm font-semibold transition-colors duration-300 relative ${step === packages.length + 1
-                                                ? 'text-white'
-                                                : 'text-white/60 hover:text-white hover:bg-white/5'
+                                            ? 'text-white'
+                                            : 'text-white/60 hover:text-white hover:bg-white/5'
                                             }`}
                                     >
                                         {step === packages.length + 1 && (
