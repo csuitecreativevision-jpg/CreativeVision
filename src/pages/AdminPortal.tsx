@@ -13,7 +13,8 @@ import {
     FilePlus,
     CheckSquare,
     TrendingUp,
-    Rocket
+    Rocket,
+    Clock
 } from 'lucide-react';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { RefreshProvider, useRefresh } from '../contexts/RefreshContext';
@@ -72,6 +73,7 @@ function AdminPortalContent() {
         if (path.includes('assign-project')) return 'Assign Project';
         if (path.includes('approvals')) return 'Approvals';
         if (path.includes('users')) return 'Users';
+        if (path.includes('time-logs')) return 'Time Tracking';
         if (path.includes('analytics')) return 'Analytics';
         if (path.includes('deployments')) return 'Deployments';
         if (path.includes('boards')) return 'Boards';
@@ -105,6 +107,7 @@ function AdminPortalContent() {
                                     activeTab === 'Assign Project' ||
                                     activeTab === 'Approvals' ||
                                     activeTab === 'Analytics' ||
+                                    activeTab === 'Time Tracking' ||
                                     activeTab === 'Deployments' ||
                                     activeTab === 'Users'
                                 }
@@ -132,6 +135,12 @@ function AdminPortalContent() {
                                     label="Manage Team"
                                     active={activeTab === 'Users'}
                                     onClick={() => navigate('/admin-portal/users')}
+                                />
+                                <SidebarItem
+                                    icon={<Clock className="w-4 h-4" />}
+                                    label="Time Tracking"
+                                    active={activeTab === 'Time Tracking'}
+                                    onClick={() => navigate('/admin-portal/time-logs')}
                                 />
                                 <SidebarItem
                                     icon={<TrendingUp className="w-4 h-4" />}

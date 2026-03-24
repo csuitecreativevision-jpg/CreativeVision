@@ -17,6 +17,7 @@ import { supabase } from '../services/boardsService';
 import { FilePreviewModal, useProtectedPreview } from '../components/ui/FilePreviewModal';
 import { useNavigate } from 'react-router-dom';
 import { RefreshProvider, useRefresh } from '../contexts/RefreshContext';
+import { TimeTracker } from '../components/shared/TimeTracker';
 
 function EditorPortalContent() {
     const navigate = useNavigate();
@@ -143,6 +144,7 @@ function EditorPortalContent() {
             }
             sidebarFooter={
                 <div className="pt-4 border-t border-white/5">
+                    <TimeTracker />
                     {currentUserName && (
                         <div className="px-2 py-2 mb-2">
                             <div className="flex items-center gap-3">
