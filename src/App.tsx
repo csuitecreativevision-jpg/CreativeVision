@@ -3,6 +3,7 @@ import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-
 import { BackgroundLayout } from './components/layout/BackgroundLayout';
 import { CinematicOverlay } from './components/ui/CinematicOverlay';
 import { Preloader } from './components/ui/Preloader';
+import { MainChatbot } from './components/MainChatbot';
 
 // Lazy Load Pages
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -61,16 +62,19 @@ export default function App() {
 
       {/* Global Floating Secret Portal Trigger - Bottom Left */}
       {location.pathname !== '/portal' && location.pathname !== '/admin-dashboard' && (
-        <div className="fixed left-6 bottom-6 z-50 opacity-10 hover:opacity-40 transition-opacity duration-300">
-          <img
-            src="/Untitled design (3).png"
-            alt="CV"
-            className="w-10 h-10 object-contain cursor-pointer"
-            width="40"
-            height="40"
-            onClick={handleSecretClick}
-          />
-        </div>
+        <>
+          <div className="fixed left-6 bottom-6 z-50 opacity-10 hover:opacity-40 transition-opacity duration-300">
+            <img
+              src="/Untitled design (3).png"
+              alt="CV"
+              className="w-10 h-10 object-contain cursor-pointer"
+              width="40"
+              height="40"
+              onClick={handleSecretClick}
+            />
+          </div>
+          <MainChatbot />
+        </>
       )}
 
       {/* Main Routing */}
