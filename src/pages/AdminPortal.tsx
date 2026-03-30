@@ -14,7 +14,8 @@ import {
     CheckSquare,
     TrendingUp,
     Rocket,
-    Clock
+    Clock,
+    Calendar
 } from 'lucide-react';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { RefreshProvider, useRefresh } from '../contexts/RefreshContext';
@@ -72,6 +73,7 @@ function AdminPortalContent() {
         if (path.includes('overview')) return 'Overview';
         if (path.includes('assign-project')) return 'Assign Project';
         if (path.includes('approvals')) return 'Approvals';
+        if (path.includes('leave-approvals')) return 'Leave Approvals';
         if (path.includes('users')) return 'Users';
         if (path.includes('time-logs')) return 'Time Tracking';
         if (path.includes('analytics')) return 'Analytics';
@@ -106,6 +108,7 @@ function AdminPortalContent() {
                                 active={
                                     activeTab === 'Assign Project' ||
                                     activeTab === 'Approvals' ||
+                                    activeTab === 'Leave Approvals' ||
                                     activeTab === 'Analytics' ||
                                     activeTab === 'Time Tracking' ||
                                     activeTab === 'Deployments' ||
@@ -120,9 +123,15 @@ function AdminPortalContent() {
                                 />
                                 <SidebarItem
                                     icon={<CheckSquare className="w-4 h-4" />}
-                                    label="Approval Center"
+                                    label="Project Approvals"
                                     active={activeTab === 'Approvals'}
                                     onClick={() => navigate('/admin-portal/approvals')}
+                                />
+                                <SidebarItem
+                                    icon={<Calendar className="w-4 h-4" />}
+                                    label="Leave Approvals"
+                                    active={activeTab === 'Leave Approvals'}
+                                    onClick={() => navigate('/admin-portal/leave-approvals')}
                                 />
                                 <SidebarItem
                                     icon={<Rocket className="w-4 h-4" />}

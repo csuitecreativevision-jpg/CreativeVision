@@ -74,4 +74,30 @@ CREATE POLICY "Allow all access to cache_monday_board_items" ON cache_monday_boa
 
 CREATE POLICY "Allow all access to cache_monday_meta" ON cache_monday_meta
     FOR ALL USING (true) WITH CHECK (true);
- 
+
+-- ============================================
+-- Leave Requests Table
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS leave_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_email TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    leave_type TEXT NOT NULL DEFAULT 'vacation' CHECK (leave_type IN ('vacation', 'sick', 'personal', 'bereavement', 'unpaid', 'other')),
+    reason TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_leave_requests_user_email ON leave_requests(user_email);
+CREATE INDEX IF NOT EXISTS idx_leave_requests_status ON leave_requests(status);
+
+ALTER TABLE leave_requests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all access to leave_requests" ON leave_requests
+    FOR ALL USING (true) WITH CHECK (true);
+
+COMMENT ON TABLE leave_requests IS 'Employee leave requests';

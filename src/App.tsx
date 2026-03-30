@@ -28,6 +28,7 @@ const EditorPortal = lazy(() => import('./pages/EditorPortal'));
 const ClientPortal = lazy(() => import('./pages/ClientPortal'));
 const AdminUserManagement = lazy(() => import('./pages/admin/AdminUserManagement'));
 const AdminTimeLogs = lazy(() => import('./pages/admin/AdminTimeLogs'));
+const AdminLeaveApprovals = lazy(() => import('./pages/admin/AdminLeaveApprovals'));
 
 export default function App() {
   const navigate = useNavigate();
@@ -106,6 +107,7 @@ export default function App() {
             <Route path="approvals" element={<AdminApprovalCenter />} />
             <Route path="deployments" element={<AdminDeploymentCenter />} />
             <Route path="time-logs" element={<AdminTimeLogs />} />
+            <Route path="leave-approvals" element={<AdminLeaveApprovals />} />
           </Route>
           <Route path="/editor-portal" element={<EditorPortal />} />
           <Route path="/client-portal" element={<ClientPortal />} />
