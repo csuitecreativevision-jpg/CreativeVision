@@ -72,8 +72,9 @@ function AdminPortalContent() {
         const path = location.pathname;
         if (path.includes('overview')) return 'Overview';
         if (path.includes('assign-project')) return 'Assign Project';
-        if (path.includes('approvals')) return 'Approvals';
         if (path.includes('leave-approvals')) return 'Leave Approvals';
+        if (path.includes('approvals')) return 'Approvals';
+        if (path.includes('calendar')) return 'Team Calendar';
         if (path.includes('users')) return 'Users';
         if (path.includes('time-logs')) return 'Time Tracking';
         if (path.includes('analytics')) return 'Analytics';
@@ -102,19 +103,20 @@ function AdminPortalContent() {
                     <SidebarItem icon={<LayoutDashboard className="w-5 h-5" />} label="Overview" active={activeTab === 'Overview'} onClick={() => navigate('/admin-portal/overview')} />
                     {currentUserRole === 'admin' && (
                         <>
-                            <SidebarDropdown
-                                icon={<LayoutList className="w-5 h-5" />}
-                                label="Management Hub"
-                                active={
-                                    activeTab === 'Assign Project' ||
-                                    activeTab === 'Approvals' ||
-                                    activeTab === 'Leave Approvals' ||
-                                    activeTab === 'Analytics' ||
-                                    activeTab === 'Time Tracking' ||
-                                    activeTab === 'Deployments' ||
-                                    activeTab === 'Users'
-                                }
-                            >
+                                <SidebarDropdown
+                                    icon={<LayoutList className="w-5 h-5" />}
+                                    label="Management Hub"
+                                    active={
+                                        activeTab === 'Assign Project' ||
+                                        activeTab === 'Approvals' ||
+                                        activeTab === 'Leave Approvals' ||
+                                        activeTab === 'Team Calendar' ||
+                                        activeTab === 'Analytics' ||
+                                        activeTab === 'Time Tracking' ||
+                                        activeTab === 'Deployments' ||
+                                        activeTab === 'Users'
+                                    }
+                                >
                                 <SidebarItem
                                     icon={<FilePlus className="w-4 h-4" />}
                                     label="Assign Project"
@@ -132,6 +134,12 @@ function AdminPortalContent() {
                                     label="Leave Approvals"
                                     active={activeTab === 'Leave Approvals'}
                                     onClick={() => navigate('/admin-portal/leave-approvals')}
+                                />
+                                <SidebarItem
+                                    icon={<Calendar className="w-4 h-4" />}
+                                    label="Team Calendar"
+                                    active={activeTab === 'Team Calendar'}
+                                    onClick={() => navigate('/admin-portal/calendar')}
                                 />
                                 <SidebarItem
                                     icon={<Rocket className="w-4 h-4" />}
