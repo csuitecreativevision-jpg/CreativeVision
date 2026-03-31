@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { AdminPageLayout } from '../../components/layout/AdminPageLayout';
 import { supabase } from '../../lib/supabaseClient';
-import { getWorkspaceBoards, getMultipleBoardItems } from '../../services/mondayService';
+import { getAllBoards, getBoardItems } from '../../services/mondayService';
 import { 
     format, 
     addMonths, 
@@ -15,7 +15,7 @@ import {
     isSameDay, 
     isToday 
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Loader2, Clock, Briefcase, UserX } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Clock, Briefcase, UserX } from 'lucide-react';
 
 export default function AdminCalendar() {
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -52,49 +52,61 @@ export default function AdminCalendar() {
             if (leavesData) setLeaveRequests(leavesData);
 
             // 3. Fetch Monday Projects & Extract Deadlines
-            const boards = await getWorkspaceBoards();
-            const boardIds = boards.map((b: any) => b.id);
-            const boardsWithItems = await getMultipleBoardItems(boardIds);
+            const allBoards = await getAllBoards();
+            const workspaceBoards = (allBoards || []).filter((b: any) => {
+                const name = b.name.toLowerCase();
+                const isWorkspace = name.includes('- workspace');
+                const isSubitem = b.type === 'sub_items_board' || name.includes('subitems');
+                return isWorkspace && !isSubitem;
+            });
             
             const allProjects: any[] = [];
             
-            boardsWithItems.forEach((board: any) => {
-                const deadlineCol = board.columns?.find((c: any) => 
-                    c.title.toLowerCase().includes('deadline') || 
-                    c.title.toLowerCase() === 'date' || 
-                    c.title.toLowerCase().includes('timeline')
-                );
+            // Limit concurrent fetches to avoid hitting Monday limits
+            for (const board of workspaceBoards) {
+                try {
+                    const fullBoardData = await getBoardItems(board.id);
+                    if (!fullBoardData || !fullBoardData.columns) continue;
 
-                if (!deadlineCol) return;
+                    const deadlineCol = fullBoardData.columns.find((c: any) => 
+                        c.title.toLowerCase().includes('deadline') || 
+                        c.title.toLowerCase() === 'date' || 
+                        c.title.toLowerCase().includes('timeline')
+                    );
 
-                const items = board.groups?.flatMap((g: any) => 
-                    board.items?.filter((i: any) => i.group.id === g.id).map((i: any) => ({ ...i, groupName: g.title }))
-                ) || [];
+                    if (!deadlineCol) continue;
 
-                items.forEach((item: any) => {
-                    const dlVal = item.column_values?.find((v: any) => v.id === deadlineCol.id);
-                    if (dlVal && dlVal.value) {
-                        try {
-                            const parsed = JSON.parse(dlVal.value);
-                            // handle timeline (from, to) or date
-                            const dateStr = parsed.date || parsed.to || parsed.from;
-                            if (dateStr) {
-                                const parseDate = new Date(dateStr);
-                                if (!isNaN(parseDate.getTime())) {
-                                    allProjects.push({
-                                        id: item.id,
-                                        name: item.name,
-                                        client: item.groupName,
-                                        deadline: parseDate
-                                    });
+                    const items = fullBoardData.groups?.flatMap((g: any) => 
+                        fullBoardData.items?.filter((i: any) => i.group.id === g.id).map((i: any) => ({ ...i, groupName: g.title }))
+                    ) || [];
+
+                    items.forEach((item: any) => {
+                        const dlVal = item.column_values?.find((v: any) => v.id === deadlineCol.id);
+                        if (dlVal && dlVal.value) {
+                            try {
+                                const parsed = JSON.parse(dlVal.value);
+                                // handle timeline (from, to) or date
+                                const dateStr = parsed.date || parsed.to || parsed.from;
+                                if (dateStr) {
+                                    const parseDate = new Date(dateStr);
+                                    if (!isNaN(parseDate.getTime())) {
+                                        allProjects.push({
+                                            id: item.id,
+                                            name: item.name,
+                                            client: fullBoardData.name.replace(/- Workspace/i, '').trim(),
+                                            deadline: parseDate
+                                        });
+                                    }
                                 }
+                            } catch (e) {
+                                // ignore parsing errors
                             }
-                        } catch (e) {
-                            // ignore parsing errors
                         }
-                    }
-                });
-            });
+                    });
+                } catch (err) {
+                    console.warn(`Failed to fetch items for board ${board.id}`);
+                }
+            }
 
             setProjects(allProjects);
 
@@ -152,9 +164,9 @@ export default function AdminCalendar() {
             <div className="max-w-7xl mx-auto space-y-6">
                 
                 {/* Header Controls */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#151525] p-4 rounded-2xl border border-white/10">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#11111c] p-4 rounded-2xl border border-white/5">
                     <div className="flex items-center gap-4">
-                        <div className="flex items-center bg-[#0E0E1A] rounded-xl border border-white/5 p-1">
+                        <div className="flex items-center bg-[#07070b] rounded-xl border border-white/5 p-1">
                             <button onClick={handlePrevMonth} className="p-2 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-colors">
                                 <ChevronLeft className="w-5 h-5" />
                             </button>
@@ -165,10 +177,9 @@ export default function AdminCalendar() {
                                 <ChevronRight className="w-5 h-5" />
                             </button>
                         </div>
-                        <h2 className="text-2xl font-black text-white flex items-center gap-3">
-                            <CalendarIcon className="w-6 h-6 text-violet-400" />
-                            {format(currentDate, 'MMMM yyyy')}
-                        </h2>
+                            <h3 className="text-xl font-bold text-white">
+                                {format(currentDate, 'MMMM yyyy')}
+                            </h3>
                     </div>
 
                     {/* Legend */}
@@ -186,9 +197,9 @@ export default function AdminCalendar() {
                 </div>
 
                 {/* Calendar Grid */}
-                <div className="bg-[#151525] rounded-2xl border border-white/10 overflow-hidden">
+                <div className="bg-[#11111c] rounded-2xl border border-white/5 overflow-hidden">
                     {/* Days of Week */}
-                    <div className="grid grid-cols-7 border-b border-white/10 bg-[#0E0E1A]">
+                    <div className="grid grid-cols-7 border-b border-white/5 bg-[#07070b]">
                         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
                             <div key={day} className="py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
                                 {day}
@@ -200,7 +211,7 @@ export default function AdminCalendar() {
                     <div className="grid grid-cols-7 min-h-[600px] auto-rows-fr">
                         {isLoading ? (
                             <div className="col-span-7 flex flex-col items-center justify-center p-20 text-gray-500">
-                                <Loader2 className="w-8 h-8 animate-spin mb-4 text-violet-500" />
+                                <Loader2 className="w-8 h-8 animate-spin mb-4 text-emerald-500" />
                                 <p>Syncing team schedules & boards...</p>
                             </div>
                         ) : (
@@ -213,15 +224,15 @@ export default function AdminCalendar() {
                                     <div 
                                         key={day.toString()} 
                                         className={`
-                                            min-h-[120px] p-2 border-r border-b border-white/5 transition-colors
-                                            ${!isCurrentMonth ? 'bg-[#0E0E1A]/50 opacity-50' : 'hover:bg-white/[0.02]'}
+                                            min-h-[100px] p-2 border-r border-b border-white/5 transition-colors
+                                            ${!isCurrentMonth ? 'bg-[#07070b]/50 opacity-50' : 'hover:bg-white/[0.02]'}
                                             ${idx % 7 === 6 ? 'border-r-0' : ''}
                                         `}
                                     >
                                         <div className="flex items-center justify-between mb-2">
                                             <span className={`
                                                 w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold
-                                                ${today ? 'bg-violet-600 text-white' : (isCurrentMonth ? 'text-gray-300' : 'text-gray-600')}
+                                                ${today ? 'bg-emerald-600 text-white' : (isCurrentMonth ? 'text-gray-300' : 'text-gray-600')}
                                             `}>
                                                 {format(day, 'd')}
                                             </span>

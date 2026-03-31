@@ -13,6 +13,7 @@ import {
 import { PortalLayout } from '../components/shared/PortalLayout';
 import { PortalWorkspaceCard } from '../components/shared/PortalWorkspaceCard';
 import { EditorProjectSelectionView } from '../components/views/EditorProjectSelectionView';
+import { EditorCalendar } from '../components/views/EditorCalendar';
 import { getAllBoards, getBoardItems } from '../services/mondayService';
 import { supabase } from '../services/boardsService';
 import { FilePreviewModal, useProtectedPreview } from '../components/ui/FilePreviewModal';
@@ -143,6 +144,16 @@ function EditorPortalContent() {
                             <span className="text-xs font-medium truncate">{board.name.replace(/- Workspace/i, '').trim()}</span>
                         </button>
                     ))}
+
+                    <div className="pt-2 mt-2 border-t border-white/5">
+                        <button
+                            onClick={() => setSelectedBoard('calendar')}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${selectedBoard === 'calendar' ? 'bg-white/10 text-white shadow-lg shadow-white/5' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                        >
+                            <Calendar className={`w-5 h-5 transition-transform duration-300 ${selectedBoard === 'calendar' ? 'text-emerald-400' : 'opacity-50 group-hover:opacity-100'}`} />
+                            <span className="text-sm font-bold tracking-tight">My Calendar</span>
+                        </button>
+                    </div>
                 </div>
             }
             sidebarFooter={
@@ -282,6 +293,8 @@ function EditorPortalContent() {
                                     )}
                                 </div>
                             </motion.div>
+                        ) : selectedBoard === 'calendar' ? (
+                            <EditorCalendar boards={boards} onBack={() => setSelectedBoard(null)} />
                         ) : (
                             /* --- DETAIL VIEW --- */
                             <motion.div
