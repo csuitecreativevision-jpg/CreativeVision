@@ -60,13 +60,26 @@ export default function AdminCalendar() {
                 return isWorkspace && !isSubitem;
             });
             
+            console.log(`[Calendar Debug] Total boards fetched:`, allBoards?.length || 0);
+            console.log(`[Calendar Debug] Workspace boards filtered:`, workspaceBoards.length, workspaceBoards.map((b: any) => b.name));
+
             const allProjects: any[] = [];
             
             // Limit concurrent fetches to avoid hitting Monday limits
             for (const board of workspaceBoards) {
+                console.log(`[Calendar Debug] Starting fetch for board '${board.name}'...`);
                 try {
                     const fullBoardData = await getBoardItems(board.id);
-                    if (!fullBoardData || !fullBoardData.columns) continue;
+                    if (!fullBoardData) {
+                        console.log(`[Calendar Debug] Fetch returned null for '${board.name}'`);
+                        continue;
+                    }
+                    if (!fullBoardData.columns) {
+                        console.log(`[Calendar Debug] No columns returned for '${board.name}'`);
+                        continue;
+                    }
+
+                    console.log(`[Calendar Debug] Board '${board.name}' columns:`, fullBoardData.columns.map((c: any) => c.title));
 
                     const deadlineCol = fullBoardData.columns.find((c: any) => 
                         c.title.toLowerCase().includes('deadline') || 
@@ -74,7 +87,11 @@ export default function AdminCalendar() {
                         c.title.toLowerCase().includes('timeline')
                     );
 
-                    if (!deadlineCol) continue;
+                    if (!deadlineCol) {
+                        console.log(`[Calendar Debug] No deadline column found in '${board.name}'`);
+                        continue;
+                    }
+                    console.log(`[Calendar Debug] Found deadline col '${deadlineCol.title}' in '${board.name}'`);
 
                     const items = fullBoardData.groups?.flatMap((g: any) => 
                         fullBoardData.items?.filter((i: any) => i.group.id === g.id).map((i: any) => ({ ...i, groupName: g.title }))
@@ -101,13 +118,26 @@ export default function AdminCalendar() {
                             } catch (e) {
                                 // ignore parsing errors
                             }
+                        } else if (dlVal && (dlVal.text || dlVal.display_value)) {
+                            const dateStrValue = dlVal.text || dlVal.display_value;
+                            console.log(`[Calendar Debug] Item '${item.name}' has date string string:`, dateStrValue);
+                            const parseDate = new Date(dateStrValue);
+                            if (!isNaN(parseDate.getTime())) {
+                                allProjects.push({
+                                    id: item.id,
+                                    name: item.name,
+                                    client: fullBoardData.name.replace(/- Workspace/i, '').trim(),
+                                    deadline: parseDate
+                                });
+                            }
                         }
                     });
                 } catch (err) {
-                    console.warn(`Failed to fetch items for board ${board.id}`);
+                    console.warn(`Failed to fetch items for board ${board.id}`, err);
                 }
             }
 
+            console.log(`[Calendar Debug] Final Extracted Projects:`, allProjects);
             setProjects(allProjects);
 
         } catch (error) {

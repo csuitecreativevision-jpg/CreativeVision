@@ -45,12 +45,17 @@ export function EditorCalendar({ onBack, boards }: EditorCalendarProps) {
 
             // 2. Fetch Monday Projects & Extract Deadlines for assigned boards
             const allProjects: any[] = [];
+            console.log(`[EditorCalendar Debug] Processing ${boards.length} assigned boards...`);
             
             // Limit concurrent fetches to avoid hitting Monday limits
             for (const board of boards) {
+                console.log(`[EditorCalendar Debug] Fetching items for board:`, board.name);
                 try {
                     const fullBoardData = await getBoardItems(board.id);
-                    if (!fullBoardData || !fullBoardData.columns) continue;
+                    if (!fullBoardData || !fullBoardData.columns) {
+                        console.log(`[EditorCalendar Debug] No columns for board:`, board.name);
+                        continue;
+                    }
 
                     const deadlineCol = fullBoardData.columns.find((c: any) => 
                         c.title.toLowerCase().includes('deadline') || 
@@ -83,6 +88,17 @@ export function EditorCalendar({ onBack, boards }: EditorCalendarProps) {
                                 }
                             } catch (e) {
                                 // ignore
+                            }
+                        } else if (dlVal && (dlVal.text || dlVal.display_value)) {
+                            const dateStrValue = dlVal.text || dlVal.display_value;
+                            const parseDate = new Date(dateStrValue);
+                            if (!isNaN(parseDate.getTime())) {
+                                allProjects.push({
+                                    id: item.id,
+                                    name: item.name,
+                                    client: fullBoardData.name.replace(/- Workspace/i, '').trim(),
+                                    deadline: parseDate
+                                });
                             }
                         }
                     });

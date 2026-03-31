@@ -294,7 +294,7 @@ function EditorPortalContent() {
                                 </div>
                             </motion.div>
                         ) : selectedBoard === 'calendar' ? (
-                            <EditorCalendar boards={boards} onBack={() => setSelectedBoard(null)} />
+                            <EditorCalendar key="calendar" boards={boards} onBack={() => setSelectedBoard(null)} />
                         ) : (
                             /* --- DETAIL VIEW --- */
                             <motion.div
