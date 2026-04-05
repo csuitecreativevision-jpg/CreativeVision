@@ -13,7 +13,7 @@ import {
 import { PortalLayout } from '../components/shared/PortalLayout';
 import { PortalWorkspaceCard } from '../components/shared/PortalWorkspaceCard';
 import { EditorProjectSelectionView } from '../components/views/EditorProjectSelectionView';
-import { EditorCalendar } from '../components/views/EditorCalendar';
+import { PortalCalendar } from '../components/views/PortalCalendar';
 import { getAllBoards, getBoardItems } from '../services/mondayService';
 import { supabase } from '../services/boardsService';
 import { FilePreviewModal, useProtectedPreview } from '../components/ui/FilePreviewModal';
@@ -21,6 +21,7 @@ import { LeaveRequestModal } from '../components/views/LeaveRequestModal';
 import { useNavigate } from 'react-router-dom';
 import { RefreshProvider, useRefresh } from '../contexts/RefreshContext';
 import { TimeTracker } from '../components/shared/TimeTracker';
+import { NotificationBell } from '../components/shared/NotificationBell';
 
 function EditorPortalContent() {
     const navigate = useNavigate();
@@ -207,6 +208,11 @@ function EditorPortalContent() {
                         </button>
                     </div>
 
+                    {/* Notification Bell - Top Right */}
+                    <div className="absolute top-4 right-4 z-50">
+                        <NotificationBell />
+                    </div>
+
                     {/* Background Texture */}
                     <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none mix-blend-overlay" />
                     <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-[100px] pointer-events-none" />
@@ -294,7 +300,7 @@ function EditorPortalContent() {
                                 </div>
                             </motion.div>
                         ) : selectedBoard === 'calendar' ? (
-                            <EditorCalendar key="calendar" boards={boards} onBack={() => setSelectedBoard(null)} />
+                            <PortalCalendar key="calendar" boardIds={boards.map((b: any) => b.id)} portalType="editor" onBack={() => setSelectedBoard(null)} />
                         ) : (
                             /* --- DETAIL VIEW --- */
                             <motion.div

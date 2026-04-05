@@ -8,7 +8,8 @@ import {
     ArrowLeft,
     Sparkles,
     LogOut,
-    Menu
+    Menu,
+    Calendar
 } from 'lucide-react';
 import { PortalLayout } from '../components/shared/PortalLayout';
 import { PortalBoardCard } from '../components/shared/PortalBoardCard';
@@ -19,6 +20,8 @@ import { supabase } from '../lib/supabaseClient';
 import { FilePreviewModal, useProtectedPreview } from '../components/ui/FilePreviewModal';
 import { useNavigate } from 'react-router-dom';
 import { RefreshProvider, useRefresh } from '../contexts/RefreshContext';
+import { NotificationBell } from '../components/shared/NotificationBell';
+import { PortalCalendar } from '../components/views/PortalCalendar';
 
 function ClientPortalContent() {
     const navigate = useNavigate();
@@ -133,6 +136,14 @@ function ClientPortalContent() {
                         <span className="text-sm font-bold tracking-tight">Experience</span>
                     </button>
 
+                    <button
+                        onClick={() => setSelectedBoard('calendar' as any)}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${selectedBoard === 'calendar' ? 'bg-white/10 text-white shadow-lg shadow-white/5' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                    >
+                        <Calendar className={`w-5 h-5 transition-transform duration-300 ${selectedBoard === 'calendar' ? 'scale-110' : 'group-hover:scale-110'}`} />
+                        <span className="text-sm font-bold tracking-tight">Calendar</span>
+                    </button>
+
                     {boards.map((board) => (
                         <button
                             key={board.id}
@@ -186,6 +197,11 @@ function ClientPortalContent() {
                         >
                             <Menu className="w-6 h-6" />
                         </button>
+                    </div>
+
+                    {/* Notification Bell - Top Right */}
+                    <div className="absolute top-4 right-4 z-50">
+                        <NotificationBell />
                     </div>
 
                     {/* Background Texture */}
@@ -281,6 +297,8 @@ function ClientPortalContent() {
                                     )}
                                 </div>
                             </motion.div>
+                        ) : selectedBoard === 'calendar' ? (
+                            <PortalCalendar key="calendar" boardIds={boards.map((b: any) => b.id)} portalType="client" onBack={() => setSelectedBoard(null)} />
                         ) : (
                             <motion.div
                                 key="detail"

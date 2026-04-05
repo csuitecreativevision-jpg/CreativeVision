@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
+import { createNotification, createNotificationsForRole } from './notificationService';
 
 export interface LeaveRequest {
     id: string;
@@ -43,6 +44,15 @@ export async function createLeaveRequest(
             console.error('Error creating leave request:', error);
             return { success: false, error: error.message };
         }
+
+        // Notify all admins about the new leave request
+        createNotificationsForRole('admin', {
+            type: 'leave_request',
+            title: 'New Leave Request',
+            message: `${user_name} requested ${leave_type} leave from ${start_date} to ${end_date}.`,
+            source_type: 'leave_request',
+            source_id: data?.id
+        }).catch(err => console.error('Failed to notify admins:', err));
 
         return { success: true, data };
     } catch (error) {
@@ -101,6 +111,13 @@ export async function updateLeaveRequestStatus(
     status: 'pending' | 'approved' | 'rejected'
 ): Promise<{ success: boolean; error?: string }> {
     try {
+        // First fetch the leave request to get the user's email
+        const { data: leaveData } = await supabase
+            .from('leave_requests')
+            .select('user_email, user_name, leave_type')
+            .eq('id', id)
+            .single();
+
         const { error } = await supabase
             .from('leave_requests')
             .update({ status, updated_at: new Date().toISOString() })
@@ -109,6 +126,19 @@ export async function updateLeaveRequestStatus(
         if (error) {
             console.error('Error updating leave request status:', error);
             return { success: false, error: error.message };
+        }
+
+        // Notify the requesting editor about the decision
+        if (leaveData?.user_email) {
+            const statusEmoji = status === 'approved' ? '✅' : '❌';
+            createNotification({
+                user_email: leaveData.user_email,
+                type: 'leave_response',
+                title: `Leave Request ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+                message: `${statusEmoji} Your ${leaveData.leave_type} leave request has been ${status}.`,
+                source_type: 'leave_request',
+                source_id: id
+            }).catch(err => console.error('Failed to notify editor:', err));
         }
 
         return { success: true };

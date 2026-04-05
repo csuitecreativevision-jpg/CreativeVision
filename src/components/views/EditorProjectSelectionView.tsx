@@ -7,6 +7,7 @@ import { PremiumModal } from '../ui/PremiumModal';
 import { YouTubeModal } from '../ui/YouTubeModal';
 import { getCycleFromDate } from '../../features/performance-dashboard/utils/dateUtils';
 import { getBoardColumns, getAssetPublicUrl, normalizeMondayFileUrl } from '../../services/mondayService';
+import { checkDeadlineNotifications } from '../../services/notificationService';
 
 interface ProjectSelectionViewProps {
     boardData: any;
@@ -115,6 +116,15 @@ export const EditorProjectSelectionView = ({
     const [viewMode, setViewMode] = useState<'all' | 'cycles'>('cycles'); // NEW: View Mode
     const [expandedCycles, setExpandedCycles] = useState<Set<string>>(new Set()); // NEW: Expanded Cycles
     const [mirrorOptions, setMirrorOptions] = useState<Record<string, any[]>>({});
+
+    // Check for approaching deadlines when board data loads
+    useEffect(() => {
+        const email = localStorage.getItem('portal_user_email');
+        if (email && boardData?.items?.length && boardData?.columns?.length) {
+            checkDeadlineNotifications(email, boardData.items, boardData.columns)
+                .catch(err => console.error('[Deadline Check] Failed:', err));
+        }
+    }, [boardData?.items?.length]);
 
     // Derived main asset for download & preview
     const mainAsset = useMemo(() => {

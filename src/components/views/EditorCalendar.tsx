@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import { getBoardItems } from '../../services/mondayService';
+import { getAllBoards, getBoardItems } from '../../services/mondayService';
 import { 
     format, 
     addMonths, 
@@ -19,10 +19,10 @@ import { motion } from 'framer-motion';
 
 interface EditorCalendarProps {
     onBack: () => void;
-    boards: any[]; // The authorized boards for this editor
+    boards: any[]; // Kept for backwards compat, but we also fetch independently
 }
 
-export function EditorCalendar({ onBack, boards }: EditorCalendarProps) {
+export function EditorCalendar({ onBack, boards: parentBoards }: EditorCalendarProps) {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
     const [projects, setProjects] = useState<any[]>([]);
@@ -30,12 +30,12 @@ export function EditorCalendar({ onBack, boards }: EditorCalendarProps) {
 
     useEffect(() => {
         fetchCalendarData();
-    }, [currentDate, boards]);
+    }, [currentDate]);
 
     const fetchCalendarData = async () => {
         setIsLoading(true);
         try {
-            // 1. Fetch Approved Leave Requests (All team members to aid in planning)
+            // 1. Fetch Approved Leave Requests
             const { data: leavesData } = await supabase
                 .from('leave_requests')
                 .select('*')
@@ -43,24 +43,66 @@ export function EditorCalendar({ onBack, boards }: EditorCalendarProps) {
             
             if (leavesData) setLeaveRequests(leavesData);
 
-            // 2. Fetch Monday Projects & Extract Deadlines for assigned boards
-            const allProjects: any[] = [];
-            console.log(`[EditorCalendar Debug] Processing ${boards.length} assigned boards...`);
+            // 2. Determine which boards to scan for deadlines
+            // Get editor's allowed board IDs
+            const email = localStorage.getItem('portal_user_email');
+            let allowedBoardIds: string[] = [];
+            if (email) {
+                const { data: userData } = await supabase
+                    .from('users')
+                    .select('allowed_board_ids')
+                    .eq('email', email)
+                    .single();
+                if (userData?.allowed_board_ids) {
+                    allowedBoardIds = userData.allowed_board_ids;
+                }
+            }
+
+            // 3. Fetch ALL boards from Monday.com
+            const allBoards = await getAllBoards();
             
-            // Limit concurrent fetches to avoid hitting Monday limits
-            for (const board of boards) {
-                console.log(`[EditorCalendar Debug] Fetching items for board:`, board.name);
+            // Include workspace boards the editor has access to
+            const workspaceBoards = (allBoards || []).filter((b: any) => {
+                const name = b.name.toLowerCase();
+                const isWorkspace = name.includes('- workspace');
+                const isSubitem = b.type === 'sub_items_board' || name.includes('subitems');
+                const hasPermission = allowedBoardIds.length > 0 ? allowedBoardIds.includes(b.id) : false;
+                return isWorkspace && !isSubitem && hasPermission;
+            });
+
+            // Also include management/VE project boards that the editor might be on
+            const managementBoards = (allBoards || []).filter((b: any) => {
+                const name = b.name.toLowerCase();
+                return (
+                    name.includes('ve project') ||
+                    name.includes('video editing project') ||
+                    name.includes('management')
+                ) && !name.includes('subitems') && b.type !== 'sub_items_board';
+            });
+
+            // Combine and deduplicate
+            const boardMap = new Map<string, any>();
+            [...workspaceBoards, ...managementBoards].forEach(b => boardMap.set(b.id, b));
+            // Also add any parent-passed boards
+            parentBoards.forEach(b => boardMap.set(b.id, b));
+            const boardsToScan = Array.from(boardMap.values());
+
+            console.log(`[EditorCalendar] Scanning ${boardsToScan.length} boards for deadlines:`, boardsToScan.map((b: any) => b.name));
+
+            // 4. Extract deadlines from all boards
+            const allProjects: any[] = [];
+            
+            for (const board of boardsToScan) {
                 try {
                     const fullBoardData = await getBoardItems(board.id);
-                    if (!fullBoardData || !fullBoardData.columns) {
-                        console.log(`[EditorCalendar Debug] No columns for board:`, board.name);
-                        continue;
-                    }
+                    if (!fullBoardData?.columns) continue;
 
+                    // Find date/deadline/timeline column
                     const deadlineCol = fullBoardData.columns.find((c: any) => 
                         c.title.toLowerCase().includes('deadline') || 
                         c.title.toLowerCase() === 'date' || 
-                        c.title.toLowerCase().includes('timeline')
+                        c.title.toLowerCase().includes('timeline') ||
+                        c.type === 'date'
                     );
 
                     if (!deadlineCol) continue;
@@ -71,42 +113,68 @@ export function EditorCalendar({ onBack, boards }: EditorCalendarProps) {
 
                     items.forEach((item: any) => {
                         const dlVal = item.column_values?.find((v: any) => v.id === deadlineCol.id);
-                        if (dlVal && dlVal.value) {
+                        if (!dlVal) return;
+
+                        let dateObj: Date | null = null;
+
+                        // Try JSON parsing first (date columns store {date: "2024-01-15"})
+                        if (dlVal.value) {
                             try {
                                 const parsed = JSON.parse(dlVal.value);
                                 const dateStr = parsed.date || parsed.to || parsed.from;
                                 if (dateStr) {
-                                    const parseDate = new Date(dateStr);
-                                    if (!isNaN(parseDate.getTime())) {
-                                        allProjects.push({
-                                            id: item.id,
-                                            name: item.name,
-                                            client: fullBoardData.name.replace(/- Workspace/i, '').trim(),
-                                            deadline: parseDate
-                                        });
+                                    const d = new Date(dateStr);
+                                    if (!isNaN(d.getTime())) dateObj = d;
+                                }
+                            } catch (e) { /* not JSON */ }
+                        }
+                        
+                        // Fallback: text or display_value
+                        if (!dateObj) {
+                            const textVal = dlVal.text || dlVal.display_value;
+                            if (textVal) {
+                                const d = new Date(textVal);
+                                if (!isNaN(d.getTime())) dateObj = d;
+                            }
+                        }
+
+                        if (dateObj) {
+                            // For management boards, extract editor name via people/editor column
+                            let editorName = '';
+                            if (!board.name.toLowerCase().includes('- workspace')) {
+                                const editorCol = fullBoardData.columns.find((c: any) =>
+                                    c.title.toLowerCase().includes('editor') || c.type === 'people'
+                                );
+                                if (editorCol) {
+                                    const editorVal = item.column_values?.find((v: any) => v.id === editorCol.id);
+                                    editorName = editorVal?.text || editorVal?.display_value || '';
+                                }
+
+                                // If this is from a management board, only include items assigned to this editor
+                                const userName = localStorage.getItem('portal_user_name') || '';
+                                if (editorName && userName) {
+                                    const normalizedEditor = editorName.toLowerCase().trim();
+                                    const normalizedUser = userName.toLowerCase().trim();
+                                    if (!normalizedEditor.includes(normalizedUser) && !normalizedUser.includes(normalizedEditor)) {
+                                        return; // Skip — not this editor's project
                                     }
                                 }
-                            } catch (e) {
-                                // ignore
                             }
-                        } else if (dlVal && (dlVal.text || dlVal.display_value)) {
-                            const dateStrValue = dlVal.text || dlVal.display_value;
-                            const parseDate = new Date(dateStrValue);
-                            if (!isNaN(parseDate.getTime())) {
-                                allProjects.push({
-                                    id: item.id,
-                                    name: item.name,
-                                    client: fullBoardData.name.replace(/- Workspace/i, '').trim(),
-                                    deadline: parseDate
-                                });
-                            }
+
+                            allProjects.push({
+                                id: item.id,
+                                name: item.name,
+                                client: board.name.replace(/- Workspace/i, '').replace(/\s*\(.*?\)\s*/g, '').trim(),
+                                deadline: dateObj
+                            });
                         }
                     });
                 } catch (err) {
-                    console.warn(`Failed to fetch items for board ${board.id}`);
+                    console.warn(`[EditorCalendar] Failed to fetch board ${board.id}`, err);
                 }
             }
 
+            console.log(`[EditorCalendar] Found ${allProjects.length} projects with deadlines`);
             setProjects(allProjects);
 
         } catch (error) {

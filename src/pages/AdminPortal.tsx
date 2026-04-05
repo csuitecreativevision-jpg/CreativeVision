@@ -21,6 +21,7 @@ import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { RefreshProvider, useRefresh } from '../contexts/RefreshContext';
 import { getAllBoards, getAllFolders, getWorkspaceAnalytics, prefetchOverviewData } from '../services/mondayService';
 import { AdminChatbot } from '../components/admin/AdminChatbot';
+import { NotificationBell } from '../components/shared/NotificationBell';
 
 function AdminPortalContent() {
     const navigate = useNavigate();
@@ -217,6 +218,11 @@ function AdminPortalContent() {
                         >
                             <Menu className="w-6 h-6" />
                         </button>
+                    </div>
+
+                    {/* Notification Bell - Top Right */}
+                    <div className="absolute top-4 right-4 z-50">
+                        <NotificationBell />
                     </div>
 
                     {/* Content Area */}

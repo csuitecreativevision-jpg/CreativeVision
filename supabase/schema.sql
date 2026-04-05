@@ -100,4 +100,31 @@ ALTER TABLE leave_requests ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all access to leave_requests" ON leave_requests
     FOR ALL USING (true) WITH CHECK (true);
 
-COMMENT ON TABLE leave_requests IS 'Employee leave requests';
+COMMENT ON TABLE leave_requests IS 'Employee leave requests';
+
+-- ============================================
+-- Notifications Table
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_email TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'info' CHECK (type IN ('info', 'success', 'warning', 'leave_request', 'leave_response', 'assignment', 'project_complete')),
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT false,
+    source_type TEXT,           -- 'leave_request' | 'project' | 'system'
+    source_id TEXT,             -- FK to the related entity
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_email ON notifications(user_email);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
+
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all access to notifications" ON notifications
+    FOR ALL USING (true) WITH CHECK (true);
+
+COMMENT ON TABLE notifications IS 'User notifications for leave requests, project assignments, and system alerts';

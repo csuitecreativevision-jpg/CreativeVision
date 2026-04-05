@@ -3,6 +3,8 @@ import { Loader2, PlayCircle, FileText, Eye, Check } from 'lucide-react';
 import { useUpdateItemValue, useUpdateSourceColumn } from '../../hooks/useMondayData';
 import { normalizeMondayFileUrl } from '../../services/mondayService';
 import { MondayItem, MondayColumn } from '../../types/monday';
+import { createNotification, createNotificationsForRole } from '../../services/notificationService';
+import { supabase } from '../../lib/supabaseClient';
 
 interface BoardCellProps {
     item: MondayItem;
@@ -315,6 +317,56 @@ export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dro
             }
 
             await onUpdate();
+
+            // ─── Notification Triggers on Status Change ─────────────────────────
+            const isStatusColumn = column.title.toLowerCase().includes('status') || column.type === 'status' || column.type === 'color';
+            if (isStatusColumn) {
+                const val = newValue.toLowerCase();
+
+                // 1. PROJECT COMPLETED → Notify client
+                const isCompleted = val.includes('done') || val.includes('completed') || val.includes('approved') && !val.includes('1st');
+                if (isCompleted) {
+                    // Find client users whose allowed_board_ids include this board
+                    (async () => {
+                        try {
+                            if (!boardId) return;
+                            const { data: clientUsers } = await supabase
+                                .from('users')
+                                .select('email, name, allowed_board_ids')
+                                .eq('role', 'client');
+
+                            const matchedClients = clientUsers?.filter(u =>
+                                u.allowed_board_ids?.includes(boardId)
+                            ) || [];
+
+                            for (const client of matchedClients) {
+                                await createNotification({
+                                    user_email: client.email,
+                                    type: 'project_complete',
+                                    title: 'Project Completed! 🎉',
+                                    message: `Your project "${item.name}" has been marked as ${newValue}.`,
+                                    source_type: 'project',
+                                    source_id: item.id
+                                });
+                            }
+                        } catch (err) {
+                            console.error('[Notification] Failed to notify client:', err);
+                        }
+                    })();
+                }
+
+                // 2. APPROVAL NEEDED → Notify all admins
+                const needsApproval = val.includes('approval') || val.includes('review') || val.includes('q&a');
+                if (needsApproval) {
+                    createNotificationsForRole('admin', {
+                        type: 'info',
+                        title: 'Project Needs Approval',
+                        message: `"${item.name}" has been moved to ${newValue} and requires review.`,
+                        source_type: 'project',
+                        source_id: item.id
+                    }).catch(err => console.error('[Notification] Failed to notify admins:', err));
+                }
+            }
         } catch (err) {
             console.error(err);
             alert("Failed to update value");

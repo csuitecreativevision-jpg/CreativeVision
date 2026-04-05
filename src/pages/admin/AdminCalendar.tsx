@@ -1,189 +1,44 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminPageLayout } from '../../components/layout/AdminPageLayout';
-import { supabase } from '../../lib/supabaseClient';
-import { getAllBoards, getBoardItems } from '../../services/mondayService';
-import { 
-    format, 
-    addMonths, 
-    subMonths, 
-    startOfMonth, 
-    endOfMonth, 
-    startOfWeek, 
-    endOfWeek, 
-    eachDayOfInterval, 
-    isSameMonth, 
-    isSameDay, 
-    isToday 
-} from 'date-fns';
-import { ChevronLeft, ChevronRight, Loader2, Clock, Briefcase, UserX } from 'lucide-react';
+import { getAllBoards } from '../../services/mondayService';
+import { Loader2 } from 'lucide-react';
+import { PortalCalendar } from '../../components/views/PortalCalendar';
 
 export default function AdminCalendar() {
-    const [currentDate, setCurrentDate] = useState(new Date());
-    const [timeLogs, setTimeLogs] = useState<any[]>([]);
-    const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
-    const [projects, setProjects] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [boardIds, setBoardIds] = useState<string[]>([]);
+    const [isResolved, setIsResolved] = useState(false);
 
     useEffect(() => {
-        fetchCalendarData();
-    }, [currentDate]);
+        resolveBoards();
+    }, []);
 
-    const fetchCalendarData = async () => {
-        setIsLoading(true);
+    const resolveBoards = async () => {
         try {
-            // 1. Fetch Time Logs for the month
-            const startStr = startOfWeek(startOfMonth(currentDate)).toISOString();
-            const endStr = endOfWeek(endOfMonth(currentDate)).toISOString();
-
-            const { data: logsData } = await supabase
-                .from('time_logs')
-                .select('*')
-                .gte('time_in', startStr)
-                .lte('time_in', endStr);
-            
-            if (logsData) setTimeLogs(logsData);
-
-            // 2. Fetch Approved Leave Requests
-            const { data: leavesData } = await supabase
-                .from('leave_requests')
-                .select('*')
-                .eq('status', 'approved');
-            
-            if (leavesData) setLeaveRequests(leavesData);
-
-            // 3. Fetch Monday Projects & Extract Deadlines
             const allBoards = await getAllBoards();
-            const workspaceBoards = (allBoards || []).filter((b: any) => {
+            
+            // Collect workspace boards + management/VE project boards
+            const ids = new Set<string>();
+            (allBoards || []).forEach((b: any) => {
                 const name = b.name.toLowerCase();
-                const isWorkspace = name.includes('- workspace');
                 const isSubitem = b.type === 'sub_items_board' || name.includes('subitems');
-                return isWorkspace && !isSubitem;
-            });
-            
-            console.log(`[Calendar Debug] Total boards fetched:`, allBoards?.length || 0);
-            console.log(`[Calendar Debug] Workspace boards filtered:`, workspaceBoards.length, workspaceBoards.map((b: any) => b.name));
+                if (isSubitem) return;
 
-            const allProjects: any[] = [];
-            
-            // Limit concurrent fetches to avoid hitting Monday limits
-            for (const board of workspaceBoards) {
-                console.log(`[Calendar Debug] Starting fetch for board '${board.name}'...`);
-                try {
-                    const fullBoardData = await getBoardItems(board.id);
-                    if (!fullBoardData) {
-                        console.log(`[Calendar Debug] Fetch returned null for '${board.name}'`);
-                        continue;
-                    }
-                    if (!fullBoardData.columns) {
-                        console.log(`[Calendar Debug] No columns returned for '${board.name}'`);
-                        continue;
-                    }
+                const isWorkspace = name.includes('- workspace');
+                const isManagement = name.includes('ve project') ||
+                    name.includes('video editing project') ||
+                    name.includes('management');
 
-                    console.log(`[Calendar Debug] Board '${board.name}' columns:`, fullBoardData.columns.map((c: any) => c.title));
-
-                    const deadlineCol = fullBoardData.columns.find((c: any) => 
-                        c.title.toLowerCase().includes('deadline') || 
-                        c.title.toLowerCase() === 'date' || 
-                        c.title.toLowerCase().includes('timeline')
-                    );
-
-                    if (!deadlineCol) {
-                        console.log(`[Calendar Debug] No deadline column found in '${board.name}'`);
-                        continue;
-                    }
-                    console.log(`[Calendar Debug] Found deadline col '${deadlineCol.title}' in '${board.name}'`);
-
-                    const items = fullBoardData.groups?.flatMap((g: any) => 
-                        fullBoardData.items?.filter((i: any) => i.group.id === g.id).map((i: any) => ({ ...i, groupName: g.title }))
-                    ) || [];
-
-                    items.forEach((item: any) => {
-                        const dlVal = item.column_values?.find((v: any) => v.id === deadlineCol.id);
-                        if (dlVal && dlVal.value) {
-                            try {
-                                const parsed = JSON.parse(dlVal.value);
-                                // handle timeline (from, to) or date
-                                const dateStr = parsed.date || parsed.to || parsed.from;
-                                if (dateStr) {
-                                    const parseDate = new Date(dateStr);
-                                    if (!isNaN(parseDate.getTime())) {
-                                        allProjects.push({
-                                            id: item.id,
-                                            name: item.name,
-                                            client: fullBoardData.name.replace(/- Workspace/i, '').trim(),
-                                            deadline: parseDate
-                                        });
-                                    }
-                                }
-                            } catch (e) {
-                                // ignore parsing errors
-                            }
-                        } else if (dlVal && (dlVal.text || dlVal.display_value)) {
-                            const dateStrValue = dlVal.text || dlVal.display_value;
-                            console.log(`[Calendar Debug] Item '${item.name}' has date string string:`, dateStrValue);
-                            const parseDate = new Date(dateStrValue);
-                            if (!isNaN(parseDate.getTime())) {
-                                allProjects.push({
-                                    id: item.id,
-                                    name: item.name,
-                                    client: fullBoardData.name.replace(/- Workspace/i, '').trim(),
-                                    deadline: parseDate
-                                });
-                            }
-                        }
-                    });
-                } catch (err) {
-                    console.warn(`Failed to fetch items for board ${board.id}`, err);
+                if (isWorkspace || isManagement) {
+                    ids.add(b.id);
                 }
-            }
+            });
 
-            console.log(`[Calendar Debug] Final Extracted Projects:`, allProjects);
-            setProjects(allProjects);
-
-        } catch (error) {
-            console.error('Failed to fetch calendar data:', error);
+            setBoardIds(Array.from(ids));
+        } catch (err) {
+            console.error('[AdminCalendar] Failed to resolve boards:', err);
         } finally {
-            setIsLoading(false);
+            setIsResolved(true);
         }
-    };
-
-    const handlePrevMonth = () => setCurrentDate(subMonths(currentDate, 1));
-    const handleNextMonth = () => setCurrentDate(addMonths(currentDate, 1));
-    const handleToday = () => setCurrentDate(new Date());
-
-    // Generate Days Grid
-    const days = useMemo(() => {
-        const start = startOfWeek(startOfMonth(currentDate));
-        const end = endOfWeek(endOfMonth(currentDate));
-        return eachDayOfInterval({ start, end });
-    }, [currentDate]);
-
-    const getDayEvents = (day: Date) => {
-        const dayLogs = timeLogs.filter(log => {
-            if (!log.time_in) return false;
-            const logDate = new Date(log.time_in);
-            return !isNaN(logDate.getTime()) && isSameDay(logDate, day);
-        });
-        
-        // Unique users who logged time today
-        const activeUsers = Array.from(new Set(dayLogs.map(l => l.user_name || l.user_email?.split('@')[0])));
-
-        const dayLeaves = leaveRequests.filter(leave => {
-            if (!leave.start_date || !leave.end_date) return false;
-            const start = new Date(leave.start_date);
-            const end = new Date(leave.end_date);
-            if (isNaN(start.getTime()) || isNaN(end.getTime())) return false;
-            
-            // zero out times for comparison
-            start.setHours(0,0,0,0);
-            end.setHours(23,59,59,999);
-            const check = new Date(day);
-            return check >= start && check <= end;
-        });
-
-        const dayDeadlines = projects.filter(p => !isNaN(p.deadline.getTime()) && isSameDay(p.deadline, day));
-
-        return { activeUsers, dayLeaves, dayDeadlines };
     };
 
     return (
@@ -191,113 +46,18 @@ export default function AdminCalendar() {
             title="Team Calendar"
             subtitle="Overview of schedules, availability, and upcoming deadlines"
         >
-            <div className="max-w-7xl mx-auto space-y-6">
-                
-                {/* Header Controls */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#11111c] p-4 rounded-2xl border border-white/5">
-                    <div className="flex items-center gap-4">
-                        <div className="flex items-center bg-[#07070b] rounded-xl border border-white/5 p-1">
-                            <button onClick={handlePrevMonth} className="p-2 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-colors">
-                                <ChevronLeft className="w-5 h-5" />
-                            </button>
-                            <button onClick={handleToday} className="px-4 py-2 font-bold text-sm text-gray-300 hover:text-white transition-colors">
-                                Today
-                            </button>
-                            <button onClick={handleNextMonth} className="p-2 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-colors">
-                                <ChevronRight className="w-5 h-5" />
-                            </button>
-                        </div>
-                            <h3 className="text-xl font-bold text-white">
-                                {format(currentDate, 'MMMM yyyy')}
-                            </h3>
-                    </div>
-
-                    {/* Legend */}
-                    <div className="flex items-center gap-4 text-xs font-medium">
-                        <div className="flex items-center gap-1.5 text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-full">
-                            <Clock className="w-3.5 h-3.5" /> Working
-                        </div>
-                        <div className="flex items-center gap-1.5 text-orange-400 bg-orange-500/10 px-3 py-1.5 rounded-full">
-                            <UserX className="w-3.5 h-3.5" /> On Leave
-                        </div>
-                        <div className="flex items-center gap-1.5 text-rose-400 bg-rose-500/10 px-3 py-1.5 rounded-full">
-                            <Briefcase className="w-3.5 h-3.5" /> Deadline
-                        </div>
-                    </div>
+            {!isResolved ? (
+                <div className="flex items-center justify-center py-20">
+                    <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
                 </div>
-
-                {/* Calendar Grid */}
-                <div className="bg-[#11111c] rounded-2xl border border-white/5 overflow-hidden">
-                    {/* Days of Week */}
-                    <div className="grid grid-cols-7 border-b border-white/5 bg-[#07070b]">
-                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                            <div key={day} className="py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                {day}
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Days Grid */}
-                    <div className="grid grid-cols-7 min-h-[600px] auto-rows-fr">
-                        {isLoading ? (
-                            <div className="col-span-7 flex flex-col items-center justify-center p-20 text-gray-500">
-                                <Loader2 className="w-8 h-8 animate-spin mb-4 text-emerald-500" />
-                                <p>Syncing team schedules & boards...</p>
-                            </div>
-                        ) : (
-                            days.map((day, idx) => {
-                                const { activeUsers, dayLeaves, dayDeadlines } = getDayEvents(day);
-                                const isCurrentMonth = isSameMonth(day, currentDate);
-                                const today = isToday(day);
-
-                                return (
-                                    <div 
-                                        key={day.toString()} 
-                                        className={`
-                                            min-h-[100px] p-2 border-r border-b border-white/5 transition-colors
-                                            ${!isCurrentMonth ? 'bg-[#07070b]/50 opacity-50' : 'hover:bg-white/[0.02]'}
-                                            ${idx % 7 === 6 ? 'border-r-0' : ''}
-                                        `}
-                                    >
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className={`
-                                                w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold
-                                                ${today ? 'bg-emerald-600 text-white' : (isCurrentMonth ? 'text-gray-300' : 'text-gray-600')}
-                                            `}>
-                                                {format(day, 'd')}
-                                            </span>
-                                        </div>
-
-                                        <div className="space-y-1.5 overflow-y-auto max-h-[100px] no-scrollbar">
-                                            {/* Deadlines */}
-                                            {dayDeadlines.map((p, i) => (
-                                                <div key={`dl-${i}`} className="text-[10px] font-bold px-2 py-1 rounded border bg-rose-500/10 border-rose-500/20 text-rose-400 truncate w-full" title={`${p.name} (${p.client})`}>
-                                                    🎯 {p.name}
-                                                </div>
-                                            ))}
-
-                                            {/* Leaves */}
-                                            {dayLeaves.map((l, i) => (
-                                                <div key={`lv-${i}`} className="text-[10px] font-bold px-2 py-1 rounded border bg-orange-500/10 border-orange-500/20 text-orange-400 truncate w-full" title={`${l.user_name} - ${l.leave_type}`}>
-                                                    🏖️ {l.user_name.split(' ')[0]} ({l.leave_type})
-                                                </div>
-                                            ))}
-
-                                            {/* Active Users (Time Logs) */}
-                                            {activeUsers.length > 0 && (
-                                                <div className="text-[10px] font-bold px-2 py-1 rounded border bg-emerald-500/10 border-emerald-500/20 text-emerald-400 truncate w-full" title={activeUsers.join(', ')}>
-                                                    💻 {activeUsers.length} active
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })
-                        )}
-                    </div>
-                </div>
-
-            </div>
+            ) : (
+                <PortalCalendar
+                    boardIds={boardIds}
+                    portalType="admin"
+                    showTimeLogs={true}
+                    embedded={true}
+                />
+            )}
         </AdminPageLayout>
     );
 }

@@ -19,6 +19,8 @@ import { getAllBoards, getBoardColumns, getBoardGroups, submitProjectAssignment 
 import { RichTextEditor } from '../../components/ui/RichTextEditor';
 import { announceAssignment } from '../../services/discordService';
 import { getAllCheckers, Checker } from '../../services/boardsService';
+import { createNotification } from '../../services/notificationService';
+import { supabase } from '../../lib/supabaseClient';
 
 import { SelectionModal } from '../../components/ui/SelectionModal';
 
@@ -272,6 +274,58 @@ export default function AdminProjectAssignment() {
                         deadline: project.deadline ? new Date(project.deadline).toLocaleString() : undefined,
                         instructions: project.instructions
                     }).catch(err => console.error("Discord Announcement failed for", project.projectName, err));
+
+                    // Notify the assigned editor via notification bell
+                    try {
+                        const editorName = project.editor.trim();
+                        
+                        // Find the workspace board ID for this editor from availableTeam
+                        const teamEntry = availableTeam.find(t => t.name === editorName);
+                        const workspaceBoardId = teamEntry?.id;
+                        
+
+
+                        if (workspaceBoardId) {
+                            // Find the user whose allowed_board_ids contains this workspace board ID
+                            const { data: allEditorUsers, error: fetchErr } = await supabase
+                                .from('users')
+                                .select('email, name, allowed_board_ids')
+                                .eq('role', 'editor');
+
+                            if (fetchErr) {
+                                console.error('[Notification] Failed to fetch editor users:', fetchErr);
+                            } else {
+
+                                
+                                // Find user who has this workspace board in their allowed_board_ids
+                                const matchedUser = allEditorUsers?.find(u => 
+                                    u.allowed_board_ids?.includes(workspaceBoardId)
+                                );
+
+                                if (matchedUser?.email) {
+                                    const deadlineStr = project.deadline
+                                        ? ` | Deadline: ${new Date(project.deadline).toLocaleDateString()}`
+                                        : '';
+                                    await createNotification({
+                                        user_email: matchedUser.email,
+                                        type: 'assignment',
+                                        title: 'New Project Assigned',
+                                        message: `You've been assigned "${project.projectName}" for ${project.client || 'N/A'}${deadlineStr}.`,
+                                        source_type: 'project',
+                                        source_id: project.projectName
+                                    });
+                                } else {
+                                    console.warn(`[Notification] ⚠️ No user has board "${workspaceBoardId}" in allowed_board_ids. Users:`, 
+                                        allEditorUsers?.map(u => ({ name: u.name, boards: u.allowed_board_ids }))
+                                    );
+                                }
+                            }
+                        } else {
+                            console.warn(`[Notification] ⚠️ Could not find board ID for editor "${editorName}" in availableTeam:`, availableTeam.map(t => t.name));
+                        }
+                    } catch (notifErr) {
+                        console.error('[Notification] Failed to notify editor:', notifErr);
+                    }
                 }
             }
 
