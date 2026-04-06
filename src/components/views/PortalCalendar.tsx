@@ -1,18 +1,18 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { getBoardItems } from '../../services/mondayService';
-import { 
-    format, 
-    addMonths, 
-    subMonths, 
-    startOfMonth, 
-    endOfMonth, 
-    startOfWeek, 
-    endOfWeek, 
-    eachDayOfInterval, 
-    isSameMonth, 
-    isSameDay, 
-    isToday 
+import {
+    format,
+    addMonths,
+    subMonths,
+    startOfMonth,
+    endOfMonth,
+    startOfWeek,
+    endOfWeek,
+    eachDayOfInterval,
+    isSameMonth,
+    isSameDay,
+    isToday
 } from 'date-fns';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Loader2, ArrowLeft, Briefcase, UserX, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -67,7 +67,7 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
             // 3. Fetch deadlines ONLY from the provided board IDs
             const allProjects: any[] = [];
             const uniqueIds = [...new Set(boardIds)];
-            
+
             console.log(`[Calendar] Scanning ${uniqueIds.length} boards for deadlines`);
 
             for (const bid of uniqueIds) {
@@ -76,16 +76,16 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
                     if (!fullBoardData?.columns) continue;
 
                     // Find date/deadline/timeline column
-                    const deadlineCol = fullBoardData.columns.find((c: any) => 
-                        c.title.toLowerCase().includes('deadline') || 
-                        c.title.toLowerCase() === 'date' || 
+                    const deadlineCol = fullBoardData.columns.find((c: any) =>
+                        c.title.toLowerCase().includes('deadline') ||
+                        c.title.toLowerCase() === 'date' ||
                         c.title.toLowerCase().includes('timeline') ||
                         c.type === 'date'
                     );
 
                     if (!deadlineCol) continue;
 
-                    const items = fullBoardData.groups?.flatMap((g: any) => 
+                    const items = fullBoardData.groups?.flatMap((g: any) =>
                         fullBoardData.items?.filter((i: any) => i.group.id === g.id).map((i: any) => ({ ...i, groupName: g.title }))
                     ) || [];
 
@@ -122,7 +122,7 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
                                 }
                             } catch (e) { /* not JSON */ }
                         }
-                        
+
                         // Fallback: text or display_value
                         if (!dateObj) {
                             const textVal = dlVal.text || dlVal.display_value;
@@ -176,8 +176,8 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
             const start = new Date(leave.start_date);
             const end = new Date(leave.end_date);
             if (isNaN(start.getTime()) || isNaN(end.getTime())) return false;
-            start.setHours(0,0,0,0);
-            end.setHours(23,59,59,999);
+            start.setHours(0, 0, 0, 0);
+            end.setHours(23, 59, 59, 999);
             const check = new Date(day);
             return check >= start && check <= end;
         });
@@ -274,8 +274,8 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
                             const today = isToday(day);
 
                             return (
-                                <div 
-                                    key={day.toString()} 
+                                <div
+                                    key={day.toString()}
                                     className={`
                                         min-h-[100px] p-2 border-r border-b border-white/5 transition-colors
                                         ${!isCurrentMonth ? 'bg-[#07070b]/50 opacity-50' : 'hover:bg-white/[0.02]'}

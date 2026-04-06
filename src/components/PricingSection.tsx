@@ -9,33 +9,16 @@ import { SelectionModal } from './ui/SelectionModal';
 interface PricingSectionProps {
     id?: string;
     className?: string;
-    onShortFormSelect?: () => void;
+    onTypeSelect?: (type: 'short' | 'long' | 'mixed') => void;
 }
 
-export default function PricingSection({ id, className, onShortFormSelect }: PricingSectionProps) {
+export default function PricingSection({ id, className, onTypeSelect }: PricingSectionProps) {
     const [showSelectionModal, setShowSelectionModal] = useState(false);
 
     const handleSelection = (option: 'long' | 'short' | 'mixed') => {
-        const planName = 'Trial'; // Default context
-        console.log(`Selected ${option} for plan ${planName}`);
-
-        if (option === 'mixed') {
-            setShowSelectionModal(false);
-            alert("Redirecting to Custom Plan inquiry...");
-        } else if (option === 'short') {
-            // Short Form -> Trigger Parent Navigation to Pricing Page Carousel
-            setShowSelectionModal(false);
-            if (onShortFormSelect) {
-                onShortFormSelect();
-            }
-        } else {
-            // Long Form -> Redirect to Calendar (Trial) or Alert
-            setShowSelectionModal(false);
-            if (planName === 'Trial') {
-                window.open('https://calendar.google.com/calendar/render?action=TEMPLATE&text=Trial+Plan', '_blank');
-            } else {
-                alert(`Proceeding with ${planName} - ${option} form`);
-            }
+        setShowSelectionModal(false);
+        if (onTypeSelect) {
+            onTypeSelect(option);
         }
     };
 

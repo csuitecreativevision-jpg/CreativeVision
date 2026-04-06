@@ -6,11 +6,12 @@ import { useIsMobile } from '../hooks/useIsMobile';
 
 interface PlanShowcaseProps {
     packageData: PricingPackage;
+    calendarLink: string;
     onNext: () => void;
     onSelect?: () => void;
 }
 
-export default function PlanShowcase({ packageData, onNext, onSelect }: PlanShowcaseProps) {
+export default function PlanShowcase({ packageData, calendarLink, onNext, onSelect }: PlanShowcaseProps) {
     const isMobile = useIsMobile();
 
     // Animation variants
@@ -139,13 +140,20 @@ export default function PlanShowcase({ packageData, onNext, onSelect }: PlanShow
                     <div className="flex flex-col gap-3 md:gap-4 relative z-10 shrink-0">
                         <MagneticButton className="w-full">
                             <button
-                                onClick={onNext}
+                                onClick={() => window.open(calendarLink, '_blank')}
                                 className="w-full py-3 md:py-4 rounded-xl md:rounded-2xl text-black font-bold text-sm md:text-lg hover:brightness-110 transition-all flex items-center justify-center gap-2 md:gap-3 shadow-lg group-hover:scale-[1.02] active:scale-[0.98]"
                                 style={{ background: packageData.themeColor }}
                             >
-                                Explore Next Level <ChevronRight className="w-4 h-4 md:w-5 h-5" />
+                                Schedule Consultation <ChevronRight className="w-4 h-4 md:w-5 h-5" />
                             </button>
                         </MagneticButton>
+
+                        <button
+                            onClick={onNext}
+                            className="w-full py-2 flex items-center justify-center gap-2 text-white/70 hover:text-white transition-colors text-xs md:text-sm"
+                        >
+                            Explore Next Level <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
 
                         {onSelect && (
                             <button

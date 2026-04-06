@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { packages } from '../data/pricingData';
+import { shortFormPackages, longFormPackages } from '../data/pricingData';
 import PricingSection from '../components/PricingSection';
 import PlanShowcase from '../components/PlanShowcase';
 import PricingGrid from '../components/PricingGrid';
@@ -11,8 +11,15 @@ interface StartProjectPageProps {
 
 export default function StartProjectPage({ onBack }: StartProjectPageProps) {
     const [step, setStep] = useState(0);
+    const [selectedType, setSelectedType] = useState<'short' | 'long' | 'mixed' | null>(null);
     const navScrollRef = useRef<HTMLDivElement>(null);
     const activePillRef = useRef<HTMLButtonElement>(null);
+
+    const calendarLinks = {
+        short: 'https://calendar.app.google/JCpJfNRwgAEq73217',
+        long: 'https://calendar.app.google/QWFbKx47UMHYHb9y8',
+        mixed: 'https://calendar.app.google/JCpJfNRwgAEq73217'
+    };
 
     // Auto-scroll the top navigation container so the active pill is centered
     useEffect(() => {
@@ -29,6 +36,7 @@ export default function StartProjectPage({ onBack }: StartProjectPageProps) {
             onBack();
         } else {
             setStep(0);
+            setSelectedType(null);
         }
     };
 
@@ -37,34 +45,52 @@ export default function StartProjectPage({ onBack }: StartProjectPageProps) {
     };
 
     const handleSelectPackage = () => {
-        // Jump to grid (last step)
-        setStep(packages.length + 1);
+        const currentPackages = selectedType === 'long' ? longFormPackages : shortFormPackages;
+        setStep(currentPackages.length + 1);
     };
 
-    // Determine current content
     let content;
+    const currentPackages = selectedType === 'long' ? longFormPackages : shortFormPackages;
+
     if (step === 0) {
         // Intro
         content = (
             <PricingSection
                 className="h-full"
-                onShortFormSelect={handleNext}
+                onTypeSelect={(type) => {
+                    setSelectedType(type);
+                    setStep(1);
+                }}
             />
         );
-    } else if (step > 0 && step <= packages.length) {
+    } else if (selectedType === 'mixed') {
+        content = (
+            <div className="flex flex-col items-center justify-center h-full text-center px-4 max-w-4xl mx-auto">
+                <h2 className="text-3xl md:text-5xl lg:text-7xl font-bold text-white mb-6">Custom Strategy</h2>
+                <p className="text-gray-400 text-base md:text-xl max-w-2xl mx-auto mb-10">We create tailored dual-strategy content plans for maximum cross-platform impact. Schedule a call so we can build a package perfectly fitted to your goals.</p>
+                <button
+                    onClick={() => window.open(calendarLinks.mixed, '_blank')}
+                    className="px-8 py-4 bg-white text-black font-bold text-lg rounded-full hover:bg-gray-200 transition-all hover:scale-105"
+                >
+                    Contact Us
+                </button>
+            </div>
+        );
+    } else if (step > 0 && step <= currentPackages.length) {
         // Plan Showcase
         const packageIndex = step - 1;
-        const pkg = packages[packageIndex];
+        const pkg = currentPackages[packageIndex];
         content = (
             <PlanShowcase
                 packageData={pkg}
+                calendarLink={calendarLinks[selectedType!]}
                 onNext={handleNext}
                 onSelect={handleSelectPackage}
             />
         );
     } else {
         // Grid
-        content = <PricingGrid />;
+        content = <PricingGrid packages={currentPackages} calendarLink={calendarLinks[selectedType!]} />;
     }
 
     return (
@@ -89,7 +115,7 @@ export default function StartProjectPage({ onBack }: StartProjectPageProps) {
                         <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-[#050511] to-transparent pointer-events-none z-10 md:hidden rounded-r-full" />
 
                         <AnimatePresence>
-                            {step > 0 && (
+                            {step > 0 && selectedType !== 'mixed' && (
                                 <motion.div
                                     ref={navScrollRef}
                                     initial={{ opacity: 0, scale: 0.9, y: -10 }}
@@ -98,7 +124,7 @@ export default function StartProjectPage({ onBack }: StartProjectPageProps) {
                                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                                     className="flex items-center p-1.5 bg-[#050511]/60 backdrop-blur-2xl border border-white/10 rounded-full shadow-2xl overflow-x-auto no-scrollbar max-w-full"
                                 >
-                                    {packages.map((pkg, idx) => (
+                                    {currentPackages.map((pkg, idx) => (
                                         <motion.button
                                             key={pkg.name}
                                             ref={step === idx + 1 ? activePillRef as any : null}
@@ -129,16 +155,16 @@ export default function StartProjectPage({ onBack }: StartProjectPageProps) {
                                     <div className="shrink-0 w-px h-6 bg-white/15 mx-1 md:mx-2" />
 
                                     <motion.button
-                                        ref={step === packages.length + 1 ? activePillRef as any : null}
+                                        ref={step === currentPackages.length + 1 ? activePillRef as any : null}
                                         whileHover={{ scale: 1.05 }}
                                         whileTap={{ scale: 0.95 }}
-                                        onClick={() => setStep(packages.length + 1)}
-                                        className={`shrink-0 px-4 md:px-6 py-2 rounded-full text-sm font-semibold transition-colors duration-300 relative ${step === packages.length + 1
+                                        onClick={() => setStep(currentPackages.length + 1)}
+                                        className={`shrink-0 px-4 md:px-6 py-2 rounded-full text-sm font-semibold transition-colors duration-300 relative ${step === currentPackages.length + 1
                                             ? 'text-white'
                                             : 'text-white/60 hover:text-white hover:bg-white/5'
                                             }`}
                                     >
-                                        {step === packages.length + 1 && (
+                                        {step === currentPackages.length + 1 && (
                                             <motion.div
                                                 layoutId="active-plan-pill"
                                                 className="absolute inset-0 rounded-full z-0 border border-white/30 bg-white/15 backdrop-blur-md"

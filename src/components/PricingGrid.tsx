@@ -2,20 +2,18 @@
 import { Sparkles, Check } from 'lucide-react';
 import { MagneticButton } from './ui/MagneticButton';
 import { ScrollReveal } from './ui/ScrollReveal';
-import { packages } from '../data/pricingData';
+import { PricingPackage } from '../data/pricingData';
 
 interface PricingGridProps {
     id?: string;
     className?: string;
+    packages: PricingPackage[];
+    calendarLink: string;
 }
 
-export default function PricingGrid({ id, className }: PricingGridProps) {
-    const handlePlanClick = (pkg: typeof packages[0]) => {
-        if (pkg.name === 'Trial') {
-            window.open('https://calendar.google.com/calendar/render?action=TEMPLATE&text=Trial+Plan', '_blank');
-        } else {
-            alert(`Proceeding with ${pkg.name} plan`);
-        }
+export default function PricingGrid({ id, className, packages, calendarLink }: PricingGridProps) {
+    const handlePlanClick = (_pkg: PricingPackage) => {
+        window.open(calendarLink, '_blank');
     };
 
     return (
@@ -70,7 +68,7 @@ export default function PricingGrid({ id, className }: PricingGridProps) {
                                     </div>
 
                                     <div className="space-y-1 mb-3 flex-grow overflow-y-auto no-scrollbar min-h-0">
-                                        {packages[index].features.map((feat, i) => (
+                                        {pkg.features.map((feat, i) => (
                                             <div key={i} className="flex items-start gap-1.5 text-[9px] md:text-[10px] lg:text-[11px] text-gray-300">
                                                 <Check className="w-2.5 h-2.5 md:w-3 md:h-3 text-green-400 shrink-0 mt-[2px]" />
                                                 <span className="leading-tight">{feat}</span>
