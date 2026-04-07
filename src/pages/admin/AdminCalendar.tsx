@@ -28,7 +28,7 @@ export default function AdminCalendar() {
                     name.includes('video editing project') ||
                     name.includes('management');
 
-                if (isWorkspace || isManagement) {
+                if (isWorkspace) {
                     ids.add(b.id);
                 }
             });

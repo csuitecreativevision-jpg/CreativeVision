@@ -136,7 +136,7 @@ export async function mondayRequest(query: string, variables: any = {}, retries 
 
 
 // --- Caching Helper (IndexedDB + Supabase) ---
-const CACHE_TTL_MS = 1000 * 60 * 5; // 5 Minutes
+const CACHE_TTL_MS = 1000 * 60 * 30; // 30 Minutes
 
 
 // Request Coalescing Map to prevent duplicate in-flight requests
@@ -920,7 +920,15 @@ export async function getAggregatedAnalytics() {
 
     // 2. Fetch items for these boards
     const boardIds = analyticsBoards.map((b: any) => b.id);
-    const boardsWithItems = await getMultipleBoardItems(boardIds);
+    const CHUNK_SIZE = 3;
+    const boardsWithItems: any[] = [];
+    for (let i = 0; i < boardIds.length; i += CHUNK_SIZE) {
+        const chunk = boardIds.slice(i, i + CHUNK_SIZE);
+        const results = await Promise.all(
+            chunk.map(id => getMultipleBoardItems([id]).catch(() => []))
+        );
+        boardsWithItems.push(...results.flat());
+    }
 
     // 3. Aggregate Data
     const editorStats: Record<string, { name: string, videos: number, revisions: number, ratings: number[] }> = {};
@@ -1011,7 +1019,7 @@ export async function getWorkspaceAnalytics(allowedBoardIds?: string[]) {
         ? `_${allowedBoardIds.sort().join('_')}`
         : '_all';
     const ANALYTICS_CACHE_KEY = `workspace_analytics${boardKeySuffix}`;
-    const CACHE_TTL_MS = 1000 * 60 * 5; // 5 Minutes
+    const CACHE_TTL_MS = 1000 * 60 * 30; // 30 Minutes
 
     try {
         // Retrieve from IDB

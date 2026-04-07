@@ -36,9 +36,11 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
     const [projects, setProjects] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
+    const boardIdsKey = useMemo(() => [...new Set(boardIds)].sort().join(','), [boardIds]);
+
     useEffect(() => {
         fetchCalendarData();
-    }, [currentDate, boardIds.join(',')]);
+    }, [currentDate, boardIdsKey]);
 
     const fetchCalendarData = async () => {
         setIsLoading(true);
@@ -150,8 +152,14 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
                 }
             }
 
-            console.log(`[Calendar] Found ${allProjects.length} projects with deadlines`);
-            setProjects(allProjects);
+            const seen = new Set<string>();
+            const dedupedProjects = allProjects.filter(p => {
+                if (seen.has(p.id)) return false;
+                seen.add(p.id);
+                return true;
+            });
+            console.log(`[Calendar] Found ${dedupedProjects.length} projects with deadlines (deduped from ${allProjects.length})`);
+            setProjects(dedupedProjects);
 
         } catch (error) {
             console.error('Failed to fetch calendar data:', error);
