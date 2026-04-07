@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabaseClient';
 import { getCycleDates, isDateInCycle } from '../features/performance-dashboard/utils/dateUtils';
 import { idbGet, idbSet } from './idbService';
 
+// Background refresh lock — prevents concurrent stale-refresh upserts for the same key
+const backgroundRefreshing = new Set<string>();
 
 export interface ApplicationData {
     fullName: string;
@@ -159,7 +161,7 @@ async function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>, meta:
                 // Store in IDB (async) - don't await strictly to speed up response
                 idbSet(key, { data: freshData, timestamp: Date.now() }).catch(e => console.error("IDB Set Error", e));
 
-                // Store in Supabase
+                // Store in Supabase (intentional — user-triggered forceSync, no lock needed)
                 supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
                 return freshData;
             }
@@ -176,11 +178,16 @@ async function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>, meta:
                     }
 
                     // Stale IDB cache — return it now, background refresh
+                    // Lock prevents duplicate concurrent upserts for the same key
                     console.log(`[Cache] IDB Stale for ${key}, refreshing in background...`);
-                    fetcher().then(freshData => {
-                        idbSet(key, { data: freshData, timestamp: Date.now() });
-                        supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
-                    }).catch(err => console.error("Background sync failed", err));
+                    if (!backgroundRefreshing.has(key)) {
+                        backgroundRefreshing.add(key);
+                        fetcher().then(freshData => {
+                            idbSet(key, { data: freshData, timestamp: Date.now() });
+                            supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
+                        }).catch(err => console.error("Background sync failed", err))
+                        .finally(() => backgroundRefreshing.delete(key));
+                    }
 
                     return localCache.data;
                 }
@@ -200,11 +207,16 @@ async function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>, meta:
 
                     if (isStale) {
                         // Background Sync
+                        // Lock prevents duplicate concurrent upserts for the same key
                         console.log(`[Cache] Supabase Stale for ${key}, refreshing...`);
-                        fetcher().then(freshData => {
-                            idbSet(key, { data: freshData, timestamp: Date.now() });
-                            supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
-                        }).catch(err => console.error("Background sync failed", err));
+                        if (!backgroundRefreshing.has(key)) {
+                            backgroundRefreshing.add(key);
+                            fetcher().then(freshData => {
+                                idbSet(key, { data: freshData, timestamp: Date.now() });
+                                supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
+                            }).catch(err => console.error("Background sync failed", err))
+                            .finally(() => backgroundRefreshing.delete(key));
+                        }
                     }
                     return data.data;
                 }
@@ -1111,8 +1123,6 @@ async function getWorkspaceAnalyticsFresh(allowedBoardIds?: string[]) {
 
         if (!priceColId) {
             console.warn(`[Analytics] No Price column found for board: ${board.name}`);
-            // Log all columns to see what's available
-            // console.log(`[Analytics] Available columns for ${board.name}:`, board.columns?.map((c: any) => `${c.title} (${c.id})`));
         } else {
             console.log(`[Analytics] Found Price column '${priceCol.title}' (${priceCol.id}) for board: ${board.name}`);
         }
@@ -1235,8 +1245,6 @@ async function getWorkspaceAnalyticsFresh(allowedBoardIds?: string[]) {
                         console.log(`[Analytics] Selected Revision Column: '${revisionsCol.title}' (${revisionsCol.id}) Type: ${revisionsCol.type}`);
                     }
                     const revVal = item.column_values?.find((cv: any) => cv.id === revisionsCol.id);
-
-                    // console.log(`[Analytics] Item: ${item.name}, RevCol Type: ${revisionsCol.type}, Val:`, revVal);
 
                     // Handle Mirror Columns (display_value) or Regular (text)
                     const rawRev = revVal?.display_value || revVal?.text;
@@ -1637,6 +1645,3 @@ async function getApprovalItemsFresh(forceSync: boolean = false) {
 
     return approvalItems;
 }
-
-
-
