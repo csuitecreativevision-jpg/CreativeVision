@@ -144,7 +144,7 @@ const CACHE_TTL_MS = 1000 * 60 * 30; // 30 Minutes
 // Request Coalescing Map to prevent duplicate in-flight requests
 const pendingRequests = new Map<string, Promise<any>>();
 
-async function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>, meta: boolean = true, forceSync: boolean = false): Promise<T> {
+async function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>, meta: boolean = true, forceSync: boolean = false, onFresh?: (data: T) => void): Promise<T> {
     const table = meta ? 'cache_monday_meta' : 'cache_monday_board_items';
     const idColumn = meta ? 'key' : 'board_id';
 
@@ -185,6 +185,7 @@ async function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>, meta:
                         fetcher().then(freshData => {
                             idbSet(key, { data: freshData, timestamp: Date.now() });
                             supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
+                            onFresh?.(freshData);
                         }).catch(err => console.error("Background sync failed", err))
                         .finally(() => backgroundRefreshing.delete(key));
                     }
@@ -214,6 +215,7 @@ async function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>, meta:
                             fetcher().then(freshData => {
                                 idbSet(key, { data: freshData, timestamp: Date.now() });
                                 supabase.from(table).upsert({ [idColumn]: key, data: freshData, updated_at: new Date() }).then();
+                                onFresh?.(freshData);
                             }).catch(err => console.error("Background sync failed", err))
                             .finally(() => backgroundRefreshing.delete(key));
                         }
@@ -563,7 +565,7 @@ export async function getAllWorkspaces() {
     }, true);
 }
 
-export async function getBoardItems(boardId: string, forceSync: boolean = false) {
+export async function getBoardItems(boardId: string, forceSync: boolean = false, onFresh?: (data: any) => void) {
     return getCachedOrFetch(boardId, async () => {
         let allItems: any[] = [];
         let cursor: string | null = null;
@@ -685,7 +687,7 @@ export async function getBoardItems(boardId: string, forceSync: boolean = false)
             board.items = allItems;
         }
         return board;
-    }, false, forceSync); // meta=false -> cache_monday_board_items
+    }, false, forceSync, onFresh); // meta=false -> cache_monday_board_items
 }
 
 export async function getBoardColumns(boardId: string) {

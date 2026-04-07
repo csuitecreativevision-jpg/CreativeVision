@@ -74,7 +74,10 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
 
             for (const bid of uniqueIds) {
                 try {
-                    const fullBoardData = await getBoardItems(bid);
+                    const fullBoardData = await getBoardItems(bid, false, (freshData) => {
+                        // Background refresh completed — re-run calendar fetch to pick up new deadlines
+                        fetchCalendarData();
+                    });
                     if (!fullBoardData?.columns) continue;
 
                     // Find date/deadline/timeline column
