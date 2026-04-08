@@ -3,10 +3,12 @@ import { AdminPageLayout } from '../../components/layout/AdminPageLayout';
 import { getAllBoards } from '../../services/mondayService';
 import { Loader2 } from 'lucide-react';
 import { PortalCalendar } from '../../components/views/PortalCalendar';
+import { useNavigate } from 'react-router-dom';
 
 export default function AdminCalendar() {
     const [boardIds, setBoardIds] = useState<string[]>([]);
     const [isResolved, setIsResolved] = useState(false);
+    const navigate = useNavigate();
 
     useEffect(() => {
         resolveBoards();
@@ -54,8 +56,23 @@ export default function AdminCalendar() {
                 <PortalCalendar
                     boardIds={boardIds}
                     portalType="admin"
-                    showTimeLogs={true}
                     embedded={true}
+                    onGoToItem={(boardId, itemId, boardName) => {
+                        const nameLower = (boardName || '').toLowerCase();
+                        let targetRoute = '/admin-portal/boards'; // fallback
+                        
+                        if (nameLower.includes('fulfillment') || nameLower.includes('client') || nameLower.includes('delivery')) {
+                            targetRoute = '/admin-portal/clients';
+                        } else if (nameLower.includes('workspace') || nameLower.includes('editor') || nameLower.includes('project')) {
+                            targetRoute = '/admin-portal/team';
+                        } else {
+                            // If it falls back to boards, use local storage.
+                            localStorage.setItem('admin_selected_board_id', boardId);
+                            localStorage.setItem('admin_initial_item_id', itemId);
+                        }
+
+                        navigate(targetRoute, { state: { boardId, itemId } });
+                    }}
                 />
             )}
         </AdminPageLayout>

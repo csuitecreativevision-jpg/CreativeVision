@@ -70,7 +70,6 @@ export default function AdminBoards() {
     }, [selectedBoardId]);
 
     // Permissions Fetch
-    // Permissions Fetch
     useEffect(() => {
         const checkUser = async () => {
             const email = localStorage.getItem('portal_user_email');
@@ -138,6 +137,27 @@ export default function AdminBoards() {
         }
     }, [previewFile]);
 
+    // Handle Scroll to Initial Item (from AdminCalendar)
+    useEffect(() => {
+        const initialItemId = localStorage.getItem('admin_initial_item_id');
+        if (initialItemId && boardData && boardData.id === selectedBoardId && !isBoardItemsLoading) {
+            // Need a tiny timeout to ensure DOM is fully rendered
+            const timer = setTimeout(() => {
+                const element = document.getElementById(`item-${initialItemId}`);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // Optional: flash animation
+                    element.classList.add('bg-custom-bright/20');
+                    setTimeout(() => {
+                        element.classList.remove('bg-custom-bright/20');
+                        element.classList.add('transition-colors', 'duration-1000');
+                    }, 2000);
+                    localStorage.removeItem('admin_initial_item_id');
+                }
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [boardData, selectedBoardId, isBoardItemsLoading]);
 
     async function refreshBoardsAndFolders(background = false) {
         if (!background) setLoading(true);
@@ -543,7 +563,7 @@ export default function AdminBoards() {
                                                                 boardData.items
                                                                     .filter((i: any) => i.group.id === group.id)
                                                                     .map((item: any) => (
-                                                                        <tr key={item.id} className="group/row hover:bg-white/[0.02] transition-colors">
+                                                                        <tr id={`item-${item.id}`} key={item.id} className="group/row hover:bg-white/[0.02] transition-colors">
                                                                             <td className="py-2 px-4 text-sm font-medium text-gray-200 sticky left-0 bg-[#0e0e1a] group-hover/row:bg-[#131325] transition-colors z-10 border-r border-white/5 shadow-[1px_0_0_rgba(255,255,255,0.05)]">
                                                                                 <div className="flex items-center gap-2 max-w-[250px]">
                                                                                     <div className="w-1 h-8 rounded-full bg-gradient-to-b from-transparent via-custom-bright/50 to-transparent opacity-0 group-hover/row:opacity-100 absolute left-0 top-1/2 -translate-y-1/2 transition-opacity" />

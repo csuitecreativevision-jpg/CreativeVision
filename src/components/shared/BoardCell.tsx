@@ -388,7 +388,7 @@ export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dro
 
     // Status / Dropdown Rendering OR Mirror Status
     // We treat Priority and Client as "Status" for visual rendering (Chips)
-    if (column.type === 'color' || column.type === 'status' || isMirrorStatus) {
+    if (column.type === 'color' || column.type === 'status' || column.type === 'dropdown' || isMirrorStatus) {
         let currentOption = options.find(o => o.label === displayValue);
 
         // Manual Color Override for Mirror Statuses if options are missing

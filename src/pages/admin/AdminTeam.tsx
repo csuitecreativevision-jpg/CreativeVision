@@ -7,19 +7,40 @@ import { getAllBoards, getBoardItems } from '../../services/mondayService';
 import { supabase } from '../../lib/supabaseClient';
 import { FilePreviewModal, useProtectedPreview } from '../../components/ui/FilePreviewModal';
 import { useRefresh } from '../../contexts/RefreshContext';
+import { useLocation } from 'react-router-dom';
 
 export default function AdminTeam() {
     // State
     const [loading, setLoading] = useState(true);
     const [boards, setBoards] = useState<any[]>([]);
     const [selectedBoard, setSelectedBoard] = useState<any | null>(null);
+    const [isProcessingNavigation, setIsProcessingNavigation] = useState(false);
     const { previewFile, isLoading: isPreviewLoading, setPreviewFile, closePreview } = useProtectedPreview();
     const { refreshKey, triggerRefresh } = useRefresh();
+    const location = useLocation();
+    const [initialItemId, setInitialItemId] = useState<string | undefined>(undefined);
 
     // Fetch Data on mount and when refreshKey changes
     useEffect(() => {
         loadTeamBoards();
     }, [refreshKey]);
+
+    useEffect(() => {
+        if (location.state?.boardId && location.state?.itemId) {
+            setIsProcessingNavigation(true);
+            const { boardId, itemId } = location.state;
+            getBoardItems(boardId, true).then(fullBoardData => {
+                setSelectedBoard(fullBoardData);
+                setInitialItemId(itemId);
+            }).catch(e => {
+                console.error("Failed to load navigated board", e);
+            }).finally(() => {
+                setIsProcessingNavigation(false);
+            });
+            // Clear state so reload doesn't trigger it again
+            window.history.replaceState({}, document.title);
+        }
+    }, [location.state]);
 
     const loadTeamBoards = async () => {
         setLoading(true);
@@ -81,7 +102,21 @@ export default function AdminTeam() {
     return (
         <div className="flex-1 flex flex-col h-full bg-[#050511] overflow-hidden relative">
 
-            {/* Background Texture - Removed for performance */}
+            {/* Navigation Overlay */}
+            <AnimatePresence>
+                {isProcessingNavigation && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 z-50 bg-[#050511] flex flex-col items-center justify-center"
+                    >
+                        <Loader2 className="w-12 h-12 animate-spin text-custom-bright mb-4" />
+                        <h2 className="text-xl font-bold text-white mb-2 tracking-tight">Accessing Project</h2>
+                        <p className="text-sm font-medium text-gray-500 animate-pulse">Loading workspace tools and data...</p>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             <AnimatePresence mode="wait">
                 {!selectedBoard ? (
@@ -151,6 +186,7 @@ export default function AdminTeam() {
                                             ][index % 5]}
                                             onClick={async () => {
                                                 try {
+                                                    setInitialItemId(undefined);
                                                     // Optimistic Load: Use cached data first
                                                     const fullBoardData = await getBoardItems(board.id, false);
                                                     setSelectedBoard(fullBoardData);
@@ -188,7 +224,10 @@ export default function AdminTeam() {
                         {/* Detail Header */}
                         <div className="h-20 px-8 flex items-center gap-4 border-b border-white/5 bg-[#0a0a16] flex-shrink-0 z-20">
                             <button
-                                onClick={() => setSelectedBoard(null)}
+                                onClick={() => {
+                                    setSelectedBoard(null);
+                                    setInitialItemId(undefined);
+                                }}
                                 className="p-3 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-all group"
                             >
                                 <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
@@ -211,6 +250,7 @@ export default function AdminTeam() {
                                     refreshBoardDetails={handleRefresh}
                                     setPreviewFile={setPreviewFile}
                                     useYouTubeModal={true}
+                                    initialItemId={initialItemId}
                                 />
                             </div>
                         </div>

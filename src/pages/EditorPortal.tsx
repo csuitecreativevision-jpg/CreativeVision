@@ -29,6 +29,8 @@ function EditorPortalContent() {
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const { refreshKey, triggerRefresh } = useRefresh();
     const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+    const [initialItemId, setInitialItemId] = useState<string | undefined>(undefined);
+    const [isProcessingNavigation, setIsProcessingNavigation] = useState(false);
 
     // State
     const [loading, setLoading] = useState(true);
@@ -118,7 +120,10 @@ function EditorPortalContent() {
             sidebarContent={
                 <div className="space-y-1">
                     <button
-                        onClick={() => setSelectedBoard(null)}
+                        onClick={() => {
+                            setSelectedBoard(null);
+                            setInitialItemId(undefined);
+                        }}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${!selectedBoard ? 'bg-white/10 text-white shadow-lg shadow-white/5' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
                     >
                         <LayoutDashboard className={`w-5 h-5 transition-transform duration-300 ${!selectedBoard ? 'scale-110' : 'group-hover:scale-110'}`} />
@@ -130,6 +135,7 @@ function EditorPortalContent() {
                             key={board.id}
                             onClick={async () => {
                                 setLoading(true);
+                                setInitialItemId(undefined);
                                 try {
                                     const fullBoardData = await getBoardItems(board.id);
                                     setSelectedBoard(fullBoardData);
@@ -148,7 +154,10 @@ function EditorPortalContent() {
 
                     <div className="pt-2 mt-2 border-t border-white/5">
                         <button
-                            onClick={() => setSelectedBoard('calendar')}
+                            onClick={() => {
+                                setSelectedBoard('calendar');
+                                setInitialItemId(undefined);
+                            }}
                             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${selectedBoard === 'calendar' ? 'bg-white/10 text-white shadow-lg shadow-white/5' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
                         >
                             <Calendar className={`w-5 h-5 transition-transform duration-300 ${selectedBoard === 'calendar' ? 'text-emerald-400' : 'opacity-50 group-hover:opacity-100'}`} />
@@ -198,6 +207,23 @@ function EditorPortalContent() {
             }
             mainContent={
                 <div className="flex-1 flex flex-col h-full bg-[#050511] overflow-hidden relative">
+
+                    {/* Navigation Overlay */}
+                    <AnimatePresence>
+                        {isProcessingNavigation && (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="absolute inset-0 z-50 bg-[#050511] flex flex-col items-center justify-center"
+                            >
+                                <Loader2 className="w-12 h-12 animate-spin text-custom-bright mb-4" />
+                                <h2 className="text-xl font-bold text-white mb-2 tracking-tight">Accessing Project</h2>
+                                <p className="text-sm font-medium text-gray-500 animate-pulse">Loading project data...</p>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
                     {/* Mobile Menu Trigger */}
                     <div className="absolute top-4 left-4 z-50 lg:hidden">
                         <button
@@ -279,6 +305,7 @@ function EditorPortalContent() {
                                                     ][index % 5]}
                                                     onClick={async () => {
                                                         setLoading(true);
+                                                        setInitialItemId(undefined);
                                                         try {
                                                             const fullBoardData = await getBoardItems(board.id, true);
                                                             setSelectedBoard(fullBoardData);
@@ -300,7 +327,27 @@ function EditorPortalContent() {
                                 </div>
                             </motion.div>
                         ) : selectedBoard === 'calendar' ? (
-                            <PortalCalendar key="calendar" boardIds={boards.map((b: any) => b.id)} portalType="editor" onBack={() => setSelectedBoard(null)} />
+                            <PortalCalendar 
+                                key="calendar" 
+                                boardIds={boards.map((b: any) => b.id)} 
+                                portalType="editor" 
+                                onBack={() => {
+                                    setSelectedBoard(null);
+                                    setInitialItemId(undefined);
+                                }}
+                                onGoToItem={async (boardId, itemId) => {
+                                    setIsProcessingNavigation(true);
+                                    try {
+                                        const fullBoardData = await getBoardItems(boardId, true);
+                                        setInitialItemId(itemId);
+                                        setSelectedBoard(fullBoardData);
+                                    } catch (e) {
+                                        console.error("Failed to load board for item", e);
+                                    } finally {
+                                        setIsProcessingNavigation(false);
+                                    }
+                                }}
+                            />
                         ) : (
                             /* --- DETAIL VIEW --- */
                             <motion.div
@@ -314,7 +361,10 @@ function EditorPortalContent() {
                                 {/* Detail Header */}
                                 <div className="h-24 px-8 flex items-center gap-6 border-b border-white/5 bg-[#0a0a16] flex-shrink-0">
                                     <button
-                                        onClick={() => setSelectedBoard(null)}
+                                        onClick={() => {
+                                            setSelectedBoard(null);
+                                            setInitialItemId(undefined);
+                                        }}
                                         className="p-3 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-all group"
                                     >
                                         <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
@@ -339,6 +389,7 @@ function EditorPortalContent() {
                                             refreshBoardDetails={handleRefresh}
                                             setPreviewFile={setPreviewFile}
                                             useYouTubeModal={true}
+                                            initialItemId={initialItemId}
                                         />
                                     </div>
                                 </div>

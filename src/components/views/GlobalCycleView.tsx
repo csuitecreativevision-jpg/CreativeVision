@@ -274,6 +274,7 @@ export const GlobalCycleView = ({ boardData, selectedBoardId, refreshBoardDetail
                         {filteredItems.map((item: any, idx: number) => (
                             <motion.div
                                 key={item.id}
+                                id={`item-${item.id}`}
                                 initial={{ opacity: 0, scale: 0.95 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 transition={{ delay: idx * 0.05, duration: 0.3 }}
@@ -397,6 +398,7 @@ export const GlobalCycleView = ({ boardData, selectedBoardId, refreshBoardDetail
                                                             {cycleGroups[cycleKey].map((item: any, idx: number) => (
                                                                 <motion.div
                                                                     key={item.id}
+                                                                    id={`item-${item.id}`}
                                                                     initial={{ opacity: 0, scale: 0.95 }}
                                                                     animate={{ opacity: 1, scale: 1 }}
                                                                     transition={{ delay: idx * 0.05 + 0.1 }}

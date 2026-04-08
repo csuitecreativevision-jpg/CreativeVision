@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import { getBoardItems } from '../../services/mondayService';
+import { getBoardItems, getWorkspaceBoards } from '../../services/mondayService';
 import {
     format,
     addMonths,
@@ -14,8 +14,9 @@ import {
     isSameDay,
     isToday
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Loader2, ArrowLeft, Briefcase, UserX, Clock } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Loader2, ArrowLeft, Briefcase, UserX, Clock, X, ArrowRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { BoardCell } from '../shared/BoardCell';
 
 interface PortalCalendarProps {
     onBack?: () => void;
@@ -27,14 +28,18 @@ interface PortalCalendarProps {
     showTimeLogs?: boolean;
     /** When true, renders without header/back button (for embedding in AdminPageLayout) */
     embedded?: boolean;
+    /** Callback to handle routing to a specific item inside the portal */
+    onGoToItem?: (boardId: string, itemId: string, boardName?: string) => void;
 }
 
-export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = false, embedded = false }: PortalCalendarProps) {
+export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = false, embedded = false, onGoToItem }: PortalCalendarProps) {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
     const [timeLogs, setTimeLogs] = useState<any[]>([]);
     const [projects, setProjects] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [selectedDeadline, setSelectedDeadline] = useState<any | null>(null);
+    const [selectedLeave, setSelectedLeave] = useState<any | null>(null);
 
     const boardIdsKey = useMemo(() => [...new Set(boardIds)].sort().join(','), [boardIds]);
 
@@ -51,7 +56,24 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
                     .from('leave_requests')
                     .select('*')
                     .eq('status', 'approved');
-                if (leavesData) setLeaveRequests(leavesData);
+
+                if (leavesData) {
+                    try {
+                        const { data: usersData } = await supabase.from('users').select('email, workspace_id');
+                        const wBoards = await getWorkspaceBoards();
+
+                        const enrichedLeaves = leavesData.map(l => {
+                            const u = usersData?.find(user => user.email === l.user_email);
+                            const wBoard = u?.workspace_id ? wBoards.find((b: any) => b.id === u.workspace_id) : null;
+                            const workspaceName = wBoard ? wBoard.name.replace(/[-\s]*workspace/gi, '').trim() : 'Team Member';
+                            return { ...l, workspaceName };
+                        });
+                        setLeaveRequests(enrichedLeaves);
+                    } catch (e) {
+                        console.warn('Failed to enrich leave requests with workspace names', e);
+                        setLeaveRequests(leavesData);
+                    }
+                }
             }
 
             // 2. Fetch Time Logs (admin only)
@@ -137,16 +159,50 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
                             }
                         }
 
+                        // Check for Approved status & get primary Status label
+                        let isApproved = false;
+                        let statusLabel = 'Unknown Status';
+
+                        // find primary status column id
+                        const statusColIds = fullBoardData.columns?.filter((c: any) => c.title.toLowerCase().includes('status')).map((c: any) => c.id) || [];
+                        const primaryStatusVal = item.column_values?.find((v: any) => statusColIds.includes(v.id));
+                        if (primaryStatusVal) {
+                            statusLabel = (primaryStatusVal.text || primaryStatusVal.display_value || '').trim() || 'Unknown Status';
+                        }
+
+                        // find primary type column id
+                        let typeLabel = '';
+                        const typeColIds = fullBoardData.columns?.filter((c: any) => c.title.toLowerCase() === 'type').map((c: any) => c.id) || [];
+                        const primaryTypeVal = item.column_values?.find((v: any) => typeColIds.includes(v.id));
+                        if (primaryTypeVal) {
+                            typeLabel = (primaryTypeVal.text || primaryTypeVal.display_value || '').trim() || '';
+                        }
+
+                        item.column_values?.forEach((v: any) => {
+                            const t = (v.text || v.display_value || '').toLowerCase().trim();
+                            if (t === 'approved (cv)' || t === '(client) approved' || t === 'approved') {
+                                isApproved = true;
+                            }
+                        });
+
                         if (dateObj) {
                             allProjects.push({
                                 id: item.id,
                                 name: item.name,
                                 client: fullBoardData.name
-                                    .replace(/- Workspace/i, '')
-                                    .replace(/fulfillment board/i, '')
+                                    .replace(/[-\s]*workspace/i, '')
+                                    .replace(/[-\s]*editor/i, '')
+                                    .replace(/[-\s]*fulfillment board/i, '')
                                     .replace(/\s*\(.*?\)\s*/g, '')
                                     .trim(),
-                                deadline: dateObj
+                                deadline: dateObj,
+                                boardId: bid,
+                                boardName: fullBoardData.name,
+                                isApproved,
+                                status: statusLabel,
+                                type: typeLabel,
+                                rawItem: item,
+                                rawColumns: fullBoardData.columns
                             });
                         }
                     });
@@ -303,14 +359,28 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
                                     </div>
 
                                     <div className="space-y-1.5 overflow-y-auto max-h-[80px] no-scrollbar">
-                                        {dayDeadlines.map((p, i) => (
-                                            <div key={`dl-${i}`} className="text-[10px] font-bold px-2 py-1 rounded border bg-rose-500/10 border-rose-500/20 text-rose-400 truncate w-full" title={`${p.name} (${p.client})`}>
-                                                🎯 {p.name}
-                                            </div>
-                                        ))}
+                                        {dayDeadlines.map((p, idx) => {
+                                            const userName = (localStorage.getItem('portal_user_name') || '').toLowerCase().trim();
+                                            const isOwn = ['editor', 'client'].includes(portalType || '') || (userName ? p.client.toLowerCase().includes(userName) || userName.includes(p.client.toLowerCase()) : false);
+                                            return (
+                                                <div
+                                                    key={`dl-${idx}`}
+                                                    onClick={() => setSelectedDeadline(p)}
+                                                    className={`text-[10px] font-bold px-2 py-1 rounded border bg-rose-500/10 border-rose-500/20 text-rose-400 truncate w-full cursor-pointer hover:bg-rose-500/20 transition-colors ${p.isApproved ? 'line-through opacity-50' : ''}`}
+                                                    title={`${p.name} (${isOwn ? 'Assigned Project' : p.client}) - ${p.status}${p.type ? ` [${p.type}]` : ''}`}
+                                                >
+                                                    🎯 {p.name}
+                                                </div>
+                                            );
+                                        })}
 
                                         {dayLeaves.map((l, i) => (
-                                            <div key={`lv-${i}`} className="text-[10px] font-bold px-2 py-1 rounded border bg-orange-500/10 border-orange-500/20 text-orange-400 truncate w-full" title={`${l.user_name} - ${l.leave_type}`}>
+                                            <div
+                                                key={`lv-${i}`}
+                                                onClick={() => setSelectedLeave(l)}
+                                                className="text-[10px] font-bold px-2 py-1 rounded border bg-orange-500/10 border-orange-500/20 text-orange-400 truncate w-full cursor-pointer hover:bg-orange-500/20 transition-colors"
+                                                title={`${l.user_name} (${l.workspaceName || 'Team Member'}) - ${l.leave_type}`}
+                                            >
                                                 🏖️ {l.user_name.split(' ')[0]}
                                             </div>
                                         ))}
@@ -327,6 +397,231 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
                     )}
                 </div>
             </div>
+
+            {/* Modal */}
+            <AnimatePresence>
+                {selectedDeadline && (
+                    <>
+                        {/* Backdrop */}
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setSelectedDeadline(null)}
+                            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+                        />
+
+                        {/* Modal Content */}
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                                className="bg-[#1A1A2E] border border-white/10 rounded-2xl shadow-2xl w-full max-w-md flex flex-col pointer-events-auto overflow-hidden"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {/* Header */}
+                                <div className="p-6 border-b border-white/10 flex items-center justify-between bg-white/5">
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <Briefcase className="w-6 h-6 text-rose-400 flex-shrink-0" />
+                                        <h3 className="text-xl font-bold text-white truncate">{selectedDeadline.name}</h3>
+                                    </div>
+                                    <button
+                                        onClick={() => setSelectedDeadline(null)}
+                                        className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-white flex-shrink-0"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
+
+                                {/* Body */}
+                                <div className="p-6 space-y-6">
+                                    <div className="space-y-1">
+                                        {(() => {
+                                            const isTeam = (selectedDeadline.boardName || '').toLowerCase().includes('workspace') || (selectedDeadline.boardName || '').toLowerCase().includes('editor');
+                                            const userName = (localStorage.getItem('portal_user_name') || '').toLowerCase().trim();
+                                            const isOwn = ['editor', 'client'].includes(portalType || '') || (userName ? selectedDeadline.client.toLowerCase().includes(userName) || userName.includes(selectedDeadline.client.toLowerCase()) : false);
+
+                                            let label = 'Client'; 2
+                                            if (isTeam) {
+                                                label = isOwn ? 'My Workspace' : 'Team';
+                                            } else if (isOwn) {
+                                                label = 'My Project';
+                                            }
+
+                                            return (
+                                                <>
+                                                    <p className="text-xs text-gray-500 uppercase tracking-widest font-bold">
+                                                        {label}
+                                                    </p>
+                                                    <p className="text-white font-medium text-lg">
+                                                        {isOwn ? 'Assigned Project' : selectedDeadline.client}
+                                                    </p>
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
+
+                                    <div className="flex flex-col gap-2">
+                                        <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/5">
+                                            <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Deadline</p>
+                                            <p className="text-rose-400 font-bold flex items-center gap-2">
+                                                <CalendarIcon className="w-4 h-4" />
+                                                {format(selectedDeadline.deadline, 'MMMM d, yyyy')}
+                                            </p>
+                                        </div>
+
+                                        {(() => {
+                                            const statusCol = selectedDeadline.rawColumns?.find((c: any) => c.title.toLowerCase().includes('status'));
+                                            return statusCol ? (
+                                                <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/5">
+                                                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Status</p>
+                                                    <div className="flex justify-end pointer-events-none">
+                                                        <BoardCell
+                                                            item={selectedDeadline.rawItem}
+                                                            column={statusCol}
+                                                            boardId={selectedDeadline.boardId}
+                                                            allColumns={selectedDeadline.rawColumns}
+                                                            onUpdate={() => { }}
+                                                            onPreview={() => { }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ) : null;
+                                        })()}
+
+                                        {(() => {
+                                            const typeCol = selectedDeadline.rawColumns?.find((c: any) => c.title.toLowerCase() === 'type');
+                                            return typeCol ? (
+                                                <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/5">
+                                                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Type</p>
+                                                    <div className="flex justify-end pointer-events-none">
+                                                        <BoardCell
+                                                            item={selectedDeadline.rawItem}
+                                                            column={typeCol}
+                                                            boardId={selectedDeadline.boardId}
+                                                            allColumns={selectedDeadline.rawColumns}
+                                                            onUpdate={() => { }}
+                                                            onPreview={() => { }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ) : null;
+                                        })()}
+                                    </div>
+
+                                    <div className="pt-4 flex gap-4">
+                                        {onGoToItem ? (
+                                            <button
+                                                onClick={() => {
+                                                    onGoToItem(selectedDeadline.boardId, selectedDeadline.id, selectedDeadline.boardName);
+                                                    setSelectedDeadline(null);
+                                                }}
+                                                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-bold transition-colors"
+                                            >
+                                                Go to Item
+                                                <ArrowRight className="w-4 h-4" />
+                                            </button>
+                                        ) : (
+                                            <a
+                                                href={`https://creativevision.monday.com/boards/${selectedDeadline.boardId}/pulses/${selectedDeadline.id}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-bold transition-colors"
+                                                onClick={() => setSelectedDeadline(null)}
+                                            >
+                                                Go to Item
+                                                <ArrowRight className="w-4 h-4" />
+                                            </a>
+                                        )}
+                                    </div>
+                                </div>
+                            </motion.div>
+                        </div>
+                    </>
+                )}
+            </AnimatePresence>
+
+            {/* Leave Modal */}
+            <AnimatePresence>
+                {selectedLeave && (
+                    <>
+                        {/* Backdrop */}
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setSelectedLeave(null)}
+                            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60]"
+                        />
+
+                        {/* Modal Content */}
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 pointer-events-none">
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                                className="bg-[#1A1A2E] border border-white/10 rounded-2xl shadow-2xl w-full max-w-md flex flex-col pointer-events-auto overflow-hidden"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {/* Header */}
+                                <div className="p-6 border-b border-white/10 flex items-center justify-between bg-white/5">
+                                    <div className="flex items-center gap-4 overflow-hidden">
+                                        <div className="w-12 h-12 rounded-2xl bg-orange-500/20 flex flex-col items-center justify-center flex-shrink-0 border border-orange-500/30 shadow-inner">
+                                            <span className="text-2xl pt-1">🏖️</span>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-orange-500 uppercase tracking-widest font-bold mb-1">Leave Request</p>
+                                            <h3 className="text-xl font-bold text-white truncate">{selectedLeave.user_name}</h3>
+                                            {selectedLeave.workspaceName && (
+                                                <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider">{selectedLeave.workspaceName}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => setSelectedLeave(null)}
+                                        className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-white flex-shrink-0"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
+
+                                {/* Body */}
+                                <div className="p-6 space-y-4">
+                                    <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/5">
+                                        <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Leave Type</p>
+                                        <p className="text-orange-400 font-bold whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]">
+                                            {selectedLeave.leave_type}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/5">
+                                        <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Duration</p>
+                                        <div className="flex flex-col items-end">
+                                            <p className="text-white font-bold text-sm">
+                                                {format(new Date(selectedLeave.start_date), 'MMM d, yyyy')}
+                                            </p>
+                                            <p className="text-gray-500 text-xs text-right mt-1 font-medium">
+                                                to {format(new Date(selectedLeave.end_date), 'MMM d, yyyy')}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {selectedLeave.reason && (
+                                        <div className="p-5 rounded-xl bg-white/[0.03] border border-white/5 space-y-3">
+                                            <p className="text-sm font-medium text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                                                Reason
+                                            </p>
+                                            <p className="text-gray-300 text-sm whitespace-pre-wrap leading-relaxed bg-[#13131f] p-4 rounded-lg border border-white/[0.02]">
+                                                {selectedLeave.reason}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            </motion.div>
+                        </div>
+                    </>
+                )}
+            </AnimatePresence>
         </div>
     );
 
