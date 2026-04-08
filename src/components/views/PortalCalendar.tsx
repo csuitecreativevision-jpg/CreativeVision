@@ -14,7 +14,7 @@ import {
     isSameDay,
     isToday
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Loader2, ArrowLeft, Briefcase, UserX, Clock, X, ArrowRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Loader2, ArrowLeft, Briefcase, UserX, Clock, X, ArrowRight, Target, Coffee, Laptop } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BoardCell } from '../shared/BoardCell';
 
@@ -52,20 +52,29 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
         try {
             // 1. Fetch Approved Leave Requests (editors/admins see team leaves)
             if (portalType !== 'client') {
-                const { data: leavesData } = await supabase
+                const query = supabase
                     .from('leave_requests')
                     .select('*')
                     .eq('status', 'approved');
 
+                if (portalType === 'editor') {
+                    const userEmail = localStorage.getItem('portal_user_email');
+                    if (userEmail) {
+                        query.eq('user_email', userEmail);
+                    }
+                }
+
+                const { data: leavesData } = await query;
+
                 if (leavesData) {
                     try {
-                        const { data: usersData } = await supabase.from('users').select('email, workspace_id');
+                        const { data: usersData } = await supabase.from('users').select('email, workspace_id, allowed_board_ids');
                         const wBoards = await getWorkspaceBoards();
 
                         const enrichedLeaves = leavesData.map(l => {
                             const u = usersData?.find(user => user.email === l.user_email);
-                            const wBoard = u?.workspace_id ? wBoards.find((b: any) => b.id === u.workspace_id) : null;
-                            const workspaceName = wBoard ? wBoard.name.replace(/[-\s]*workspace/gi, '').trim() : 'Team Member';
+                            const wBoard = u ? wBoards.find((b: any) => b.id === u.workspace_id || (u.allowed_board_ids && u.allowed_board_ids.includes(b.id))) : null;
+                            const workspaceName = wBoard ? wBoard.name.replace(/[-\s]*workspace.*/gi, '').trim() : null;
                             return { ...l, workspaceName };
                         });
                         setLeaveRequests(enrichedLeaves);
@@ -369,25 +378,38 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
                                                     className={`text-[10px] font-bold px-2 py-1 rounded border bg-rose-500/10 border-rose-500/20 text-rose-400 truncate w-full cursor-pointer hover:bg-rose-500/20 transition-colors ${p.isApproved ? 'line-through opacity-50' : ''}`}
                                                     title={`${p.name} (${isOwn ? 'Assigned Project' : p.client}) - ${p.status}${p.type ? ` [${p.type}]` : ''}`}
                                                 >
-                                                    🎯 {p.name}
+                                                    <div className="flex items-center gap-1.5 overflow-hidden">
+                                                        <Target className="w-3 h-3 flex-shrink-0" />
+                                                        <span className="truncate">{p.name}</span>
+                                                    </div>
                                                 </div>
                                             );
                                         })}
 
-                                        {dayLeaves.map((l, i) => (
-                                            <div
-                                                key={`lv-${i}`}
-                                                onClick={() => setSelectedLeave(l)}
-                                                className="text-[10px] font-bold px-2 py-1 rounded border bg-orange-500/10 border-orange-500/20 text-orange-400 truncate w-full cursor-pointer hover:bg-orange-500/20 transition-colors"
-                                                title={`${l.user_name} (${l.workspaceName || 'Team Member'}) - ${l.leave_type}`}
-                                            >
-                                                🏖️ {l.user_name.split(' ')[0]}
-                                            </div>
-                                        ))}
+                                        {dayLeaves.map((l, i) => {
+                                            const isMyLeave = l.user_email === localStorage.getItem('portal_user_email');
+                                            const displayLabel = isMyLeave ? 'Your Leave' : (l.workspaceName || l.user_name.split(' ')[0]);
+                                            return (
+                                                <div
+                                                    key={`lv-${i}`}
+                                                    onClick={() => setSelectedLeave(l)}
+                                                    className="text-[10px] font-bold px-2 py-1 rounded border bg-orange-500/10 border-orange-500/20 text-orange-400 truncate w-full cursor-pointer hover:bg-orange-500/20 transition-colors"
+                                                    title={`${l.user_name} (${l.workspaceName || 'Team Member'}) - ${l.leave_type}`}
+                                                >
+                                                    <div className="flex items-center gap-1.5 overflow-hidden">
+                                                        <Coffee className="w-3 h-3 flex-shrink-0" />
+                                                        <span className="truncate">{displayLabel}</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
 
                                         {showTimeLogs && activeUsers.length > 0 && (
                                             <div className="text-[10px] font-bold px-2 py-1 rounded border bg-emerald-500/10 border-emerald-500/20 text-emerald-400 truncate w-full" title={activeUsers.join(', ')}>
-                                                💻 {activeUsers.length} active
+                                                <div className="flex items-center gap-1.5 overflow-hidden">
+                                                    <Laptop className="w-3 h-3 flex-shrink-0" />
+                                                    <span className="truncate">{activeUsers.length} active</span>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
@@ -519,7 +541,7 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
                                                 }}
                                                 className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-bold transition-colors"
                                             >
-                                                Go to Item
+                                                Go to Project
                                                 <ArrowRight className="w-4 h-4" />
                                             </button>
                                         ) : (
@@ -530,7 +552,7 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
                                                 className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-bold transition-colors"
                                                 onClick={() => setSelectedDeadline(null)}
                                             >
-                                                Go to Item
+                                                Go to Project
                                                 <ArrowRight className="w-4 h-4" />
                                             </a>
                                         )}
@@ -568,14 +590,15 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
                                 <div className="p-6 border-b border-white/10 flex items-center justify-between bg-white/5">
                                     <div className="flex items-center gap-4 overflow-hidden">
                                         <div className="w-12 h-12 rounded-2xl bg-orange-500/20 flex flex-col items-center justify-center flex-shrink-0 border border-orange-500/30 shadow-inner">
-                                            <span className="text-2xl pt-1">🏖️</span>
+                                            <Coffee className="w-6 h-6 text-orange-400" />
                                         </div>
                                         <div>
                                             <p className="text-xs text-orange-500 uppercase tracking-widest font-bold mb-1">Leave Request</p>
-                                            <h3 className="text-xl font-bold text-white truncate">{selectedLeave.user_name}</h3>
-                                            {selectedLeave.workspaceName && (
-                                                <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider">{selectedLeave.workspaceName}</p>
-                                            )}
+                                            <h3 className="text-xl font-bold text-white truncate">
+                                                {selectedLeave.user_email === localStorage.getItem('portal_user_email')
+                                                    ? 'Your Leave'
+                                                    : (selectedLeave.workspaceName || selectedLeave.user_name)}
+                                            </h3>
                                         </div>
                                     </div>
                                     <button
