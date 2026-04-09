@@ -118,6 +118,13 @@ export async function mondayRequest(query: string, variables: any = {}, retries 
                 return mondayRequest(query, variables, retries - 1, backoff);
             }
 
+            // ColumnValueException is a data error — do not retry, surface immediately
+            const columnError = json.errors.find((e: any) => e.extensions?.code === 'ColumnValueException');
+            if (columnError) {
+                console.warn('Monday ColumnValueException (non-retryable):', columnError.message);
+                throw new Error(JSON.stringify(json.errors));
+            }
+
             console.error("Monday API Errors:", json.errors);
             throw new Error(JSON.stringify(json.errors));
         }
@@ -1406,8 +1413,27 @@ export async function submitProjectAssignment(
                 }
 
                 if (matchedUser) {
-                    columnValues[peopleCol.id] = { personsAndTeams: [{ id: Number(matchedUser.id), kind: "person" }] };
-                    console.log(`Successfully mapped editor '${data.editor}' to Monday ID: ${matchedUser.id}`);
+                    // Verify the user is actually a board member before assigning
+                    try {
+                        const boardMembersQuery = `query { boards(ids: [${boardId}]) { owners { id } subscribers { id } } }`;
+                        const boardMembersData = await mondayRequest(boardMembersQuery);
+                        const board = boardMembersData?.boards?.[0];
+                        const memberIds = new Set([
+                            ...(board?.owners || []).map((u: any) => String(u.id)),
+                            ...(board?.subscribers || []).map((u: any) => String(u.id))
+                        ]);
+
+                        if (memberIds.size > 0 && !memberIds.has(String(matchedUser.id))) {
+                            console.warn(`Editor '${data.editor}' (ID: ${matchedUser.id}) is not a member of board ${boardId}. Skipping people column assignment.`);
+                        } else {
+                            columnValues[peopleCol.id] = { personsAndTeams: [{ id: Number(matchedUser.id), kind: "person" }] };
+                            console.log(`Successfully mapped editor '${data.editor}' to Monday ID: ${matchedUser.id}`);
+                        }
+                    } catch (memberErr) {
+                        // If board member check fails, attempt the assignment anyway
+                        console.warn('Could not verify board membership, attempting assignment:', memberErr);
+                        columnValues[peopleCol.id] = { personsAndTeams: [{ id: Number(matchedUser.id), kind: "person" }] };
+                    }
                 } else {
                     console.warn(`Could not find Monday User ID for editor: ${data.editor}. Available users: `, allUsers.map((u: any) => u.name).join(', '));
                 }

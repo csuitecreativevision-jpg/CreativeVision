@@ -182,6 +182,25 @@ export async function createNotificationsForRole(
     }
 }
 
+// ─── Delete All Notifications ─────────────────────────────────────────────
+export async function deleteAllNotifications(email: string): Promise<{ success: boolean; error?: string }> {
+    try {
+        const { error } = await supabase
+            .from('notifications')
+            .delete()
+            .eq('user_email', email);
+
+        if (error) {
+            console.error('Error deleting all notifications:', error);
+            return { success: false, error: error.message };
+        }
+
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to delete all notifications' };
+    }
+}
+
 // ─── Realtime Subscription ──────────────────────────────────────────────
 export function subscribeToNotifications(
     email: string,

@@ -18,6 +18,7 @@ import {
     markAsRead,
     markAllAsRead,
     deleteNotification,
+    deleteAllNotifications,
     subscribeToNotifications,
     type Notification
 } from '../../services/notificationService';
@@ -174,6 +175,14 @@ export function NotificationBell() {
         }
     };
 
+    const handleDismissAll = async () => {
+        const result = await deleteAllNotifications(userEmail);
+        if (result.success) {
+            setNotifications([]);
+            setUnreadCount(0);
+        }
+    };
+
     // ─── Render ─────────────────────────────────────────────────────────
 
     return (
@@ -237,6 +246,15 @@ export function NotificationBell() {
                                         title="Mark all as read"
                                     >
                                         <CheckCheck className="w-4 h-4" />
+                                    </button>
+                                )}
+                                {notifications.length > 0 && (
+                                    <button
+                                        onClick={handleDismissAll}
+                                        className="p-1.5 rounded-lg hover:bg-white/5 text-gray-500 hover:text-red-400 transition-colors"
+                                        title="Dismiss all"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
                                     </button>
                                 )}
                                 <button
