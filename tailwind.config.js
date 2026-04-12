@@ -5,6 +5,8 @@ export default {
     extend: {
       fontFamily: {
         'poppins': ['Poppins', 'sans-serif'],
+        'display': ['"Playfair Display"', 'ui-serif', 'Georgia', 'serif'],
+        'sans': ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       colors: {
         'custom-dark': '#00034d',

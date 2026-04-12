@@ -2,7 +2,6 @@ import { Suspense, lazy, useEffect, useState } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { BackgroundLayout } from './components/layout/BackgroundLayout';
 import { CinematicOverlay } from './components/ui/CinematicOverlay';
-import { Preloader } from './components/ui/Preloader';
 import { MainChatbot } from './components/MainChatbot';
 
 // Lazy Load Pages
@@ -11,6 +10,8 @@ const HireUsPage = lazy(() => import('./pages/HireUsPage'));
 const JoinPage = lazy(() => import('./pages/JoinPage'));
 const StartProjectPage = lazy(() => import('./pages/StartProjectPage'));
 const ThankYouPage = lazy(() => import('./pages/ThankYouPage'));
+const PortfolioPage = lazy(() => import('./pages/PortfolioPage'));
+const PricingPage = lazy(() => import('./pages/PricingPage'));
 const PortalPage = lazy(() => import('./pages/PortalPage'));
 const PortalRouter = lazy(() => import('./pages/PortalRouter'));
 const AdminPortal = lazy(() => import('./pages/AdminPortal'));
@@ -60,11 +61,15 @@ export default function App() {
 
   return (
     <BackgroundLayout>
-      {location.pathname !== '/portal' && location.pathname !== '/admin-dashboard' && <Preloader />}
+      {/* Preloader removed */}
       <CinematicOverlay />
 
       {/* Global Floating Secret Portal Trigger - Bottom Left */}
-      {location.pathname !== '/portal' && location.pathname !== '/admin-dashboard' && (
+      {location.pathname !== '/portal' &&
+       location.pathname !== '/admin-dashboard' &&
+       !location.pathname.startsWith('/admin-portal') &&
+       !location.pathname.startsWith('/editor-portal') &&
+       !location.pathname.startsWith('/client-portal') && (
         <>
           <div className="fixed left-6 bottom-6 z-50 opacity-10 hover:opacity-40 transition-opacity duration-300">
             <img
@@ -81,7 +86,7 @@ export default function App() {
       )}
 
       {/* Main Routing */}
-      <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-black text-white"><Preloader /></div>}>
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-black text-white" />}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/hire" element={<HireUsPage onBack={handleBack} />} />
@@ -92,6 +97,8 @@ export default function App() {
             navigate('/', { state: { target: 'services' } });
           }} />} />
           <Route path="/thank-you" element={<ThankYouPage onBack={handleBack} />} />
+          <Route path="/portfolio" element={<PortfolioPage />} />
+          <Route path="/pricing/:type" element={<PricingPage />} />
           <Route path="/portal" element={<PortalPage />} />
           <Route path="/admin-dashboard" element={<PortalRouter />} />
           <Route path="/admin-portal" element={<AdminPortal />}>

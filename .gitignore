@@ -25,5 +25,6 @@ dist-ssr
 .env
 .agents
 .agent
+.cv-concept
 
 test_discord.js

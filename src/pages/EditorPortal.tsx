@@ -167,18 +167,16 @@ function EditorPortalContent() {
                 </div>
             }
             sidebarFooter={
-                <div className="pt-4 border-t border-white/5">
+                <div className="space-y-1">
                     <TimeTracker />
                     {currentUserName && (
-                        <div className="px-2 py-2 mb-2">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400 font-bold text-xs ring-1 ring-emerald-500/20">
-                                    {currentUserName.charAt(0)}
-                                </div>
-                                <div className="flex-1 overflow-hidden">
-                                    <div className="text-white text-xs font-bold truncate">{currentUserName}</div>
-                                    <div className="text-[10px] text-gray-500 capitalize">Editor Account</div>
-                                </div>
+                        <div className="flex items-center gap-3 px-3 py-2.5 mb-1">
+                            <div className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold text-xs flex-shrink-0">
+                                {currentUserName.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="overflow-hidden">
+                                <div className="text-white text-xs font-semibold truncate">{currentUserName}</div>
+                                <div className="text-[10px] text-emerald-500/60 uppercase tracking-widest font-medium">Editor</div>
                             </div>
                         </div>
                     )}
@@ -187,21 +185,27 @@ function EditorPortalContent() {
                             href={`https://discord.com/channels/1157004682905014292/${discordThreadId}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 hover:border-indigo-500/40 transition-all group mb-2"
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:text-indigo-400 hover:bg-indigo-500/5 transition-all duration-200"
                         >
-                            <svg viewBox="0 0 127.14 96.36" className="w-5 h-5 fill-current">
+                            <svg viewBox="0 0 127.14 96.36" className="w-4 h-4 fill-current flex-shrink-0">
                                 <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.71,32.65-1.82,56.6.48,80.21a105.73,105.73,0,0,0,32.17,16.15,77.7,77.7,0,0,0,6.89-11.11,68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1,105.25,105.25,0,0,0,32.19-16.14c2.72-27.42-4.59-51.1-19.34-72.14ZM42.45,65.69C36.18,65.69,31,60,31,53s5.07-12.73,11.41-12.73S54,46,53.86,53,48.79,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5.07-12.73,11.44-12.73S96.23,46,96.12,53,91.06,65.69,84.71,65.69Z" />
                             </svg>
-                            <span className="text-sm font-bold">Discord Workspace</span>
+                            <span className="text-[13px] font-medium">Discord Workspace</span>
                         </a>
                     )}
-                    <button onClick={() => setIsLeaveModalOpen(true)} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-emerald-500/10 hover:text-emerald-400 text-gray-400 transition-colors group mb-2 border border-transparent hover:border-emerald-500/20">
-                        <Calendar className="w-5 h-5" />
-                        <span className="text-sm font-medium">Request Leave</span>
+                    <button
+                        onClick={() => setIsLeaveModalOpen(true)}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:text-emerald-400 hover:bg-emerald-500/5 transition-all duration-200"
+                    >
+                        <Calendar className="w-4 h-4 flex-shrink-0" />
+                        <span className="text-[13px] font-medium">Request Leave</span>
                     </button>
-                    <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-500/10 hover:text-red-400 text-gray-400 transition-colors group">
-                        <LogOut className="w-5 h-5" />
-                        <span className="text-sm font-medium">Log Out</span>
+                    <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:text-red-400 hover:bg-red-500/5 transition-all duration-200"
+                    >
+                        <LogOut className="w-4 h-4 flex-shrink-0" />
+                        <span className="text-[13px] font-medium">Log Out</span>
                     </button>
                 </div>
             }

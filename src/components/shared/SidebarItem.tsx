@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { motion } from 'framer-motion';
 
 interface SidebarItemProps {
     icon: ReactNode;
@@ -6,32 +7,58 @@ interface SidebarItemProps {
     active?: boolean;
     onClick?: () => void;
     isClientItem?: boolean;
+    indent?: boolean;
 }
 
-export const SidebarItem = ({ icon, label, active = false, onClick, isClientItem = false }: SidebarItemProps) => (
-    <button
+export const SidebarItem = ({ icon, label, active = false, onClick, isClientItem = false, indent = false }: SidebarItemProps) => (
+    <motion.button
         onClick={onClick}
-        className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300 group relative overflow-hidden ${active
-            ? 'bg-[#1E1B2E] text-white shadow-lg shadow-black/20'
-            : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
-            }`}
+        whileTap={{ scale: 0.97 }}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative ${
+            indent ? 'pl-3' : ''
+        } ${
+            active
+                ? 'text-white'
+                : 'text-gray-500 hover:text-gray-200'
+        }`}
     >
-        {/* Active Indicator Glow (Left) */}
-        {active && <div className="absolute left-0 top-0 bottom-0 w-1 bg-violet-600/50 blur-[8px]" />}
+        {/* Active background pill */}
+        {active && (
+            <motion.div
+                layoutId={isClientItem ? 'client-active-pill' : 'active-pill'}
+                className="absolute inset-0 rounded-xl bg-gradient-to-r from-violet-600/20 to-indigo-600/10 border border-violet-500/20"
+                initial={false}
+                transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+            />
+        )}
 
-        <div className={`transition-colors duration-300 ${active ? 'text-violet-400' : 'text-gray-500 group-hover:text-gray-300'}`}>
+        {/* Hover background */}
+        {!active && (
+            <div className="absolute inset-0 rounded-xl bg-white/0 group-hover:bg-white/[0.04] transition-colors duration-200" />
+        )}
+
+        {/* Left accent bar */}
+        {active && (
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(139,92,246,0.8)]" />
+        )}
+
+        {/* Icon */}
+        <span className={`relative z-10 flex-shrink-0 transition-colors duration-200 ${
+            active ? 'text-violet-400' : 'text-gray-600 group-hover:text-gray-400'
+        }`}>
             {icon}
-        </div>
+        </span>
 
-        <span className={`text-[13px] font-medium tracking-wide whitespace-nowrap overflow-hidden text-ellipsis ${active ? 'font-semibold' : ''}`}>{label}</span>
+        {/* Label */}
+        <span className={`relative z-10 text-[13px] tracking-wide whitespace-nowrap overflow-hidden text-ellipsis transition-colors duration-200 ${
+            active ? 'font-semibold text-white' : 'font-medium text-gray-500 group-hover:text-gray-300'
+        }`}>
+            {label}
+        </span>
 
-        {/* Active Dot (Right) */}
-        {active && !isClientItem && (
-            <div className="ml-auto w-1.5 h-1.5 rounded-full bg-violet-500 shadow-[0_0_8px_2px_rgba(139,92,246,0.6)]" />
+        {/* Active dot */}
+        {active && (
+            <div className="relative z-10 ml-auto w-1.5 h-1.5 rounded-full bg-violet-400 shadow-[0_0_6px_rgba(139,92,246,0.9)] flex-shrink-0" />
         )}
-
-        {isClientItem && (
-            <div className={`ml-auto w-1.5 h-1.5 rounded-full ${active ? 'bg-emerald-500' : 'bg-gray-700 group-hover:bg-gray-500'}`} />
-        )}
-    </button>
+    </motion.button>
 );
