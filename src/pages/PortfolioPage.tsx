@@ -176,6 +176,7 @@ export default function PortfolioPage() {
       </motion.div>
 
       {/* Grid */}
+
       <main className="relative z-10 px-6 md:px-10 pb-32 max-w-[1600px] mx-auto w-full">
         <AnimatePresence mode="wait">
           <motion.div 

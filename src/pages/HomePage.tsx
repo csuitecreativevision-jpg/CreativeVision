@@ -321,27 +321,28 @@ function Scene3() {
           ))}
         </div>
 
-        {/* Logos */}
+        {/* Client Names */}
         <motion.div 
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
           viewport={{ amount: 0.3 }}
-          transition={{ duration: 1, delay: 0.6 }}
-          className="flex flex-wrap justify-center items-center gap-8 md:gap-16 lg:gap-24 px-4"
+          transition={{ duration: 0.8, delay: 0.6 }}
+          className="w-full px-4 md:px-0"
         >
-          {[
-            { src: "https://storage.googleapis.com/aistudio-build-prod-attachments/09172425-a131-4a55-b461-82d271638686/RFX_Logo_1.png", alt: "RFX Logo" },
-            { src: "https://storage.googleapis.com/aistudio-build-prod-attachments/09172425-a131-4a55-b461-82d271638686/Kala_Capital_Partners_Logo_1.png", alt: "Kala Capital Partners Logo" },
-            { src: "https://storage.googleapis.com/aistudio-build-prod-attachments/09172425-a131-4a55-b461-82d271638686/Kerns_Marketing_Logo_1.png", alt: "Kerns Marketing Logo" }
-          ].map((logo, i) => (
-            <img 
-              key={i}
-              src={logo.src}
-              alt={logo.alt}
-              className="h-12 md:h-16 lg:h-20 object-contain opacity-40 hover:opacity-100 transition-opacity grayscale hover:grayscale-0"
-              referrerPolicy="no-referrer"
-            />
-          ))}
+          <p className="text-[10px] text-white/25 font-medium uppercase tracking-[0.25em] text-center mb-3">Clients & Partners</p>
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              { name: 'RFX',                  style: 'tracking-[0.3em] text-2xl md:text-3xl lg:text-4xl font-black uppercase' },
+              { name: 'Kala Capital Partners', style: 'tracking-[0.08em] text-base md:text-lg lg:text-xl font-bold uppercase' },
+              { name: 'Kerns Marketing',       style: 'tracking-[0.12em] text-lg md:text-xl lg:text-2xl font-bold uppercase' },
+            ].map((client, i) => (
+              <div key={i} className="glass-panel rounded-2xl flex items-center justify-center py-8 md:py-10 px-4 md:px-8 group cursor-default">
+                <span className={`${client.style} text-white/40 group-hover:text-white transition-colors duration-500`}>
+                  {client.name}
+                </span>
+              </div>
+            ))}
+          </div>
         </motion.div>
       </div>
     </section>
