@@ -4,16 +4,29 @@ import { ArrowLeft, Play, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const PORTFOLIO_ITEMS = [
-  { id: 1, category: "long-form", type: "Long Form", vid: "https://www.youtube.com/embed/DFsizBNcfIA?autoplay=1&mute=1&loop=1&playlist=DFsizBNcfIA&controls=0&rel=0&modestbranding=1&playsinline=1&disablekb=1", ytId: "DFsizBNcfIA", featured: true },
-  { id: 2, category: "long-form", type: "Long Form", vid: "https://www.youtube.com/embed/4iQHoaFQr8E?autoplay=1&mute=1&loop=1&playlist=4iQHoaFQr8E&controls=0&rel=0&modestbranding=1&playsinline=1&disablekb=1", ytId: "4iQHoaFQr8E", featured: false },
-  { id: 3, category: "long-form", type: "Long Form", vid: "https://www.youtube.com/embed/sRM0RiUAvLg?autoplay=1&mute=1&loop=1&playlist=sRM0RiUAvLg&controls=0&rel=0&modestbranding=1&playsinline=1&disablekb=1", ytId: "sRM0RiUAvLg", featured: false },
-  { id: 4, category: "long-form", type: "Long Form", vid: "https://www.youtube.com/embed/WrCfTCyATGU?autoplay=1&mute=1&loop=1&playlist=WrCfTCyATGU&controls=0&rel=0&modestbranding=1&playsinline=1&disablekb=1", ytId: "WrCfTCyATGU", featured: false },
-  { id: 5, category: "long-form", type: "Long Form", vid: "https://www.youtube.com/embed/d1lVFDIV8Mg?autoplay=1&mute=1&loop=1&playlist=d1lVFDIV8Mg&controls=0&rel=0&modestbranding=1&playsinline=1&disablekb=1", ytId: "d1lVFDIV8Mg", featured: false },
-  { id: 6, category: "short-form", type: "Short Form", vid: "https://www.youtube.com/embed/n4ha0vyW7Vc?autoplay=1&mute=1&loop=1&playlist=n4ha0vyW7Vc&controls=0&rel=0&modestbranding=1&playsinline=1&disablekb=1", ytId: "n4ha0vyW7Vc", featured: true },
-  { id: 7, category: "short-form", type: "Short Form", vid: "https://www.youtube.com/embed/g7EigqBCJco?autoplay=1&mute=1&loop=1&playlist=g7EigqBCJco&controls=0&rel=0&modestbranding=1&playsinline=1&disablekb=1", ytId: "g7EigqBCJco", featured: false },
+  // Long Form
+  { id: 1,  category: "long-form",  type: "Long Form",  ytId: "DFsizBNcfIA",  landscape: true,  featured: true },
+  { id: 2,  category: "long-form",  type: "Long Form",  ytId: "4iQHoaFQr8E",  landscape: true,  featured: false },
+  { id: 3,  category: "long-form",  type: "Long Form",  ytId: "sRM0RiUAvLg",  landscape: true,  featured: false },
+  { id: 4,  category: "long-form",  type: "Long Form",  ytId: "WrCfTCyATGU",  landscape: true,  featured: false },
+  { id: 5,  category: "long-form",  type: "Long Form",  ytId: "d1lVFDIV8Mg",  landscape: true,  featured: false },
+  { id: 6,  category: "long-form",  type: "Long Form",  ytId: "dkhEOaGboGg",  landscape: true,  featured: false },
+  // Short Form
+  { id: 7,  category: "short-form", type: "Short Form", ytId: "n4ha0vyW7Vc",  landscape: false, featured: true  },
+  { id: 8,  category: "short-form", type: "Short Form", ytId: "g7EigqBCJco",  landscape: false, featured: false },
+  { id: 9,  category: "short-form", type: "Short Form", ytId: "l42-Sp68dLo",  landscape: false, featured: false },
+  { id: 10, category: "short-form", type: "Short Form", ytId: "2lIv1gi_aLg",  landscape: false, featured: false },
+  { id: 11, category: "long-form",  type: "Long Form",  ytId: "fEJw0Zg9yQA",  landscape: true,  featured: false },
+  { id: 12, category: "short-form", type: "Short Form", ytId: "JSgyhmA3X78",  landscape: false, featured: false },
+  { id: 13, category: "short-form", type: "Short Form", ytId: "KXNxPS2JJWY",  landscape: false, featured: false },
+  { id: 14, category: "short-form", type: "Short Form", ytId: "GP54C67DM2Q",  landscape: false, featured: false },
+  { id: 15, category: "short-form", type: "Short Form", ytId: "iDqPyKDiBos",  landscape: false, featured: false },
 ];
 
 const VideoCard: React.FC<{ item: typeof PORTFOLIO_ITEMS[0], i: number, onClick: () => void }> = ({ item, i, onClick }) => {
+  const embedUrl = `https://www.youtube.com/embed/${item.ytId}?autoplay=1&mute=1&loop=1&playlist=${item.ytId}&controls=0&rel=0&modestbranding=1&playsinline=1&disablekb=1`;
+  const aspectClass = item.landscape ? 'aspect-video' : 'aspect-[9/16]';
+
   return (
     <div className="group relative cursor-pointer" onClick={onClick}>
       {/* Ambient Blurred Background */}
@@ -27,9 +40,7 @@ const VideoCard: React.FC<{ item: typeof PORTFOLIO_ITEMS[0], i: number, onClick:
 
       {/* Main Card */}
       <div
-        className={`relative z-10 rounded-3xl overflow-hidden border border-white/10 bg-white/[0.02] backdrop-blur-sm group-hover:border-white/20 transition-all duration-500 ${
-          item.category === 'short-form' ? 'aspect-[9/16]' : 'aspect-video'
-        }`}
+        className={`relative z-10 rounded-3xl overflow-hidden border border-white/10 bg-white/[0.02] backdrop-blur-sm group-hover:border-white/20 transition-all duration-500 ${aspectClass}`}
       >
         {/* Play Button Overlay */}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-500 scale-90 group-hover:scale-100 z-20">
@@ -39,7 +50,7 @@ const VideoCard: React.FC<{ item: typeof PORTFOLIO_ITEMS[0], i: number, onClick:
         </div>
 
         <iframe
-          src={item.vid}
+          src={embedUrl}
           title="Portfolio Video"
           frameBorder="0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -51,7 +62,7 @@ const VideoCard: React.FC<{ item: typeof PORTFOLIO_ITEMS[0], i: number, onClick:
         {/* Subtle gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#050508]/60 via-[#050508]/10 to-transparent pointer-events-none z-10" />
         
-        {/* Subtle inner shadow to frame the video without darkening it entirely */}
+        {/* Subtle inner shadow */}
         <div className="absolute inset-0 shadow-[inset_0_0_60px_rgba(0,0,0,0.4)] pointer-events-none z-10" />
       </div>
     </div>
@@ -199,9 +210,13 @@ export default function PortfolioPage() {
               </div>
             )}
 
-            {PORTFOLIO_ITEMS.filter(item => item.category === 'short-form' && (activeFilter === 'all' || activeFilter === 'short-form')).map((item, i) => (
-              <VideoCard key={item.id} item={item} i={i} onClick={() => setActiveVideo(item)} />
-            ))}
+            {(activeFilter === 'all' || activeFilter === 'short-form') && (
+              <div className="col-span-full grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-5">
+                {PORTFOLIO_ITEMS.filter(item => item.category === 'short-form').map((item, i) => (
+                  <VideoCard key={item.id} item={item} i={i} onClick={() => setActiveVideo(item)} />
+                ))}
+              </div>
+            )}
           </motion.div>
         </AnimatePresence>
       </main>
