@@ -10,6 +10,10 @@ export default function PricingPage() {
   const navigate = useNavigate();
   
   const currentType = (type as 'short-form' | 'long-form' | 'mixed') || 'short-form';
+
+  const calendarUrl = currentType === 'short-form'
+    ? 'https://calendar.app.google/JCpJfNRwgAEq73217'
+    : 'https://calendar.app.google/QWFbKx47UMHYHb9y8';
   const availableTiers = currentType === 'short-form' 
     ? ['trial', 'bronze', 'silver', 'gold', 'platinum'] 
     : currentType === 'long-form'
@@ -282,7 +286,7 @@ export default function PricingPage() {
                 </p>
                 
                 <button 
-                  onClick={() => window.open('https://calendly.com', '_blank')}
+                  onClick={() => window.open('https://calendar.app.google/QWFbKx47UMHYHb9y8', '_blank')}
                   className="group relative inline-flex items-center gap-3 px-10 py-5 rounded-full bg-white text-black font-bold text-lg hover:bg-white/90 transition-all overflow-hidden shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:shadow-[0_0_40px_rgba(255,255,255,0.5)]"
                 >
                   <span className="relative">Schedule a Consultation</span>
@@ -426,7 +430,10 @@ export default function PricingPage() {
                     ))}
                   </ul>
 
-                  <button className={`w-full py-5 rounded-2xl text-black font-bold text-lg transition-transform hover:scale-[1.02] flex items-center justify-center gap-2 mb-6 ${currentPlan.theme.primary}`}>
+                  <button
+                    onClick={() => window.open(calendarUrl, '_blank')}
+                    className={`w-full py-5 rounded-2xl text-black font-bold text-lg transition-transform hover:scale-[1.02] flex items-center justify-center gap-2 mb-6 ${currentPlan.theme.primary}`}
+                  >
                     Schedule Consultation <ChevronRight className="w-5 h-5" />
                   </button>
 
