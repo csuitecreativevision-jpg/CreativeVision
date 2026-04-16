@@ -104,20 +104,20 @@ function AdminPortalContent() {
                     <SidebarItem icon={<LayoutDashboard className="w-5 h-5" />} label="Overview" active={activeTab === 'Overview'} onClick={() => navigate('/admin-portal/overview')} />
                     {currentUserRole === 'admin' && (
                         <>
-                                <SidebarDropdown
-                                    icon={<LayoutList className="w-5 h-5" />}
-                                    label="Management Hub"
-                                    active={
-                                        activeTab === 'Assign Project' ||
-                                        activeTab === 'Approvals' ||
-                                        activeTab === 'Leave Approvals' ||
-                                        activeTab === 'Team Calendar' ||
-                                        activeTab === 'Analytics' ||
-                                        activeTab === 'Time Tracking' ||
-                                        activeTab === 'Deployments' ||
-                                        activeTab === 'Users'
-                                    }
-                                >
+                            <SidebarDropdown
+                                icon={<LayoutList className="w-5 h-5" />}
+                                label="Management Hub"
+                                active={
+                                    activeTab === 'Assign Project' ||
+                                    activeTab === 'Approvals' ||
+                                    activeTab === 'Leave Approvals' ||
+                                    activeTab === 'Team Calendar' ||
+                                    activeTab === 'Analytics' ||
+                                    activeTab === 'Time Tracking' ||
+                                    activeTab === 'Deployments' ||
+                                    activeTab === 'Users'
+                                }
+                            >
                                 <SidebarItem
                                     icon={<FilePlus className="w-4 h-4" />}
                                     label="Assign Project"
@@ -193,13 +193,13 @@ function AdminPortalContent() {
             sidebarFooter={
                 <div className="space-y-1">
                     {currentUserName && (
-                        <div className="flex items-center gap-3 px-3 py-2.5 mb-1">
-                            <div className="w-7 h-7 rounded-lg bg-violet-500/15 border border-violet-500/20 flex items-center justify-center text-violet-400 font-bold text-xs flex-shrink-0">
+                        <div className="flex items-center gap-2.5 px-3 py-2.5 mb-1">
+                            <div className="w-7 h-7 rounded-lg bg-violet-500/12 border border-violet-500/20 flex items-center justify-center text-violet-300 font-bold text-xs flex-shrink-0">
                                 {currentUserName.charAt(0).toUpperCase()}
                             </div>
                             <div className="overflow-hidden">
-                                <div className="text-white text-xs font-semibold truncate">{currentUserName}</div>
-                                <div className="text-[10px] text-violet-500/70 uppercase tracking-widest font-medium">{currentUserRole}</div>
+                                <div className="text-white/80 text-[12px] font-semibold truncate">{currentUserName}</div>
+                                <div className="text-[9px] tracking-widest font-medium" style={{ color: 'rgba(139,92,246,0.5)' }}>{currentUserRole.toUpperCase()}</div>
                             </div>
                         </div>
                     )}
@@ -218,11 +218,12 @@ function AdminPortalContent() {
                     <div className="absolute top-4 left-4 z-50 lg:hidden">
                         <button
                             onClick={() => setIsMobileSidebarOpen(true)}
-                            className="p-2 rounded-lg bg-black/40 backdrop-blur-md border border-white/10 text-white hover:bg-white/10 transition-colors"
+                            className="p-2 rounded-lg glass-panel text-white hover:bg-white/10 transition-colors"
                         >
                             <Menu className="w-6 h-6" />
                         </button>
                     </div>
+
 
                     {/* Notification Bell - Top Right */}
                     <div className="absolute top-4 right-4 z-50">

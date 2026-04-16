@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { AdminPageLayout } from '../../components/layout/AdminPageLayout';
-import { AnalyticCard } from '../../components/analytics/AnalyticCard';
 import { AnalyticAreaChart } from '../../components/analytics/AnalyticAreaChart';
 import { AnalyticBarChart } from '../../components/analytics/AnalyticBarChart';
 import { AnalyticPieChart } from '../../components/analytics/AnalyticPieChart';
 import { AnalyticsFilterModal } from '../../components/analytics/AnalyticsFilterModal';
-import { Play, Filter, Users, Calendar, Settings2 } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Play, Filter, Users, Calendar, Settings2, TrendingUp, Loader2, BarChart2, PieChart, RefreshCw } from 'lucide-react';
 
 import { getWorkspaceAnalytics } from '../../services/mondayService';
 import { getCache, setCache } from '../../services/cacheService';
@@ -334,23 +334,19 @@ export default function AdminAnalytics({ embedded = false, allowedBoardIds }: Ad
         return result;
     };
 
+    // ── KPI values ──────────────────────────────────────────────────────────
     const monthlyTrendData = getMonthlyTrendData();
     const editorBreakdownData = getEditorBreakdownData();
     const projectTypeData = getProjectTypeData();
     const projectStatusData = getProjectStatusData();
     const revisionsChartData = getRevisionsData();
 
-    // Calculate total value for the selected scope (For KPI)
     const getSelectedCycleTotal = () => {
         const sourceData = viewMode === 'productivity' ? cycleData : paymentData;
         if (!sourceData) return 0;
-
-        // If specific cycle
         if (selectedCycle && sourceData[selectedCycle]) {
             return Object.values(sourceData[selectedCycle]).reduce((acc: number, val: any) => acc + (val as number), 0);
         }
-
-        // If "All Cycles" (Aggregate filtered)
         let total = 0;
         filteredCycles.forEach(cycle => {
             if (sourceData[cycle]) {
@@ -360,183 +356,271 @@ export default function AdminAnalytics({ embedded = false, allowedBoardIds }: Ad
         return total;
     };
 
-    const totalValueInCycle = getSelectedCycleTotal(); // Now represents Total in Scope
+    const totalValueInCycle = getSelectedCycleTotal();
     const activeEditorsCount = editorBreakdownData.length;
 
-    const formatCurrency = (val: number) => {
-        return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(val);
-    };
+
+    const formatCurrency = (val: number) =>
+        new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(val);
 
     const getFilterLabel = () => {
-        if (!dateFilter) return "Loading...";
+        if (!dateFilter) return 'Loading...';
         const { year, month, cycle } = dateFilter;
-
         if (cycle) return cycle;
-        if (month) return `${new Date(2000, month - 1).toLocaleString('default', { month: 'long' })} ${year} (All Cycles)`;
+        if (month) return `${new Date(2000, month - 1).toLocaleString('default', { month: 'long' })} ${year}`;
         return `${year} (Full Year)`;
     };
 
-    const Controls = (
-        <div className="flex items-center gap-3">
-            {/* View Toggle */}
-            <div className="bg-[#0e0e1a] p-1 rounded-xl border border-white/10 flex items-center">
+    // ── Shared panel wrapper ─────────────────────────────────────────────────
+    const Panel = ({
+        icon, iconColor, title, subtitle, delay = 0, children,
+    }: {
+        icon: React.ReactNode; iconColor: string; title: string; subtitle?: string;
+        delay?: number; children: React.ReactNode;
+    }) => (
+        <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="bg-white/[0.018] border border-white/[0.06] rounded-2xl overflow-hidden"
+        >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.05]">
+                <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{ background: `${iconColor}14`, border: `1px solid ${iconColor}22` }}>
+                        <span style={{ color: iconColor }}>{icon}</span>
+                    </div>
+                    <div>
+                        <h3 className="text-[13px] font-bold text-white/80">{title}</h3>
+                        {subtitle && <p className="text-[10px] text-white/25 font-medium mt-0.5">{subtitle}</p>}
+                    </div>
+                </div>
+            </div>
+            <div className="p-1">{children}</div>
+        </motion.div>
+    );
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-96">
+                <Loader2 className="w-5 h-5 text-violet-400/50 animate-spin" />
+            </div>
+        );
+    }
+
+    // ── Header action area ───────────────────────────────────────────────────
+    const HeaderActions = (
+        <div className="flex items-center gap-2">
+            {/* Production / Earnings toggle */}
+            <div className="flex bg-white/[0.04] border border-white/[0.07] rounded-xl p-0.5">
                 <button
                     onClick={() => setViewMode('productivity')}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'productivity'
-                        ? 'bg-violet-500 text-white shadow-lg'
-                        : 'text-gray-400 hover:text-white'}`}
+                    className={`px-3.5 py-1.5 rounded-[10px] text-xs font-bold transition-all duration-150 ${
+                        viewMode === 'productivity'
+                            ? 'bg-violet-500 text-white shadow-md'
+                            : 'text-white/40 hover:text-white'
+                    }`}
                 >
                     Production
                 </button>
                 <button
                     onClick={() => setViewMode('earnings')}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'earnings'
-                        ? 'bg-emerald-500 text-white shadow-lg'
-                        : 'text-gray-400 hover:text-white'}`}
+                    className={`px-3.5 py-1.5 rounded-[10px] text-xs font-bold transition-all duration-150 ${
+                        viewMode === 'earnings'
+                            ? 'bg-emerald-500 text-white shadow-md'
+                            : 'text-white/40 hover:text-white'
+                    }`}
                 >
                     Earnings
                 </button>
             </div>
 
+            {/* Filter button */}
+            <button
+                onClick={() => setIsFilterModalOpen(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-white/[0.04] border border-white/[0.07] rounded-xl text-xs font-semibold text-white/55 hover:text-white transition-all duration-150"
+            >
+                <Calendar className="w-3.5 h-3.5 text-violet-400" />
+                <span className="truncate max-w-[160px]">{getFilterLabel()}</span>
+            </button>
+
+            {/* Refresh */}
             <button
                 onClick={loadData}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white text-sm font-bold transition-all"
+                className="p-2 bg-white/[0.04] border border-white/[0.07] rounded-xl text-white/35 hover:text-white transition-all duration-150"
             >
-                <Filter className="w-4 h-4" />
-                Refresh
+                <RefreshCw className="w-3.5 h-3.5" />
             </button>
         </div>
     );
 
-    const Content = (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    const content = (
+        <div className="space-y-5">
 
-            {/* Controls & KPIs */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-                {/* Configuration Button (Unified) */}
-                <div className="bg-[#0e0e1a] p-6 rounded-2xl border border-white/5 flex flex-col justify-center space-y-3 relative group hover:border-violet-500/30 transition-colors cursor-pointer" onClick={() => setIsFilterModalOpen(true)}>
-                    <label className="text-gray-400 text-sm font-bold flex items-center gap-2 mb-2 group-hover:text-violet-400 transition-colors">
-                        <Settings2 className="w-4 h-4" />
-                        Analytics Configuration
-                    </label>
-
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <div className="text-white font-bold text-lg truncate pr-4">
-                                {getFilterLabel()}
-                            </div>
-                            <div className="text-xs text-gray-500 font-medium mt-1">
-                                Click to change Year, Month, or Cycle
-                            </div>
-                        </div>
-                        <div className="p-2 rounded-xl bg-white/5 group-hover:bg-violet-500/10 transition-colors">
-                            <Calendar className="w-5 h-5 text-gray-400 group-hover:text-violet-400 transition-colors" />
-                        </div>
+            {/* KPI row */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* Primary metric */}
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.05, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                    className="relative flex flex-col justify-between p-5 bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden cursor-pointer group"
+                    onClick={() => setIsFilterModalOpen(true)}
+                >
+                    <div className="absolute top-0 left-6 right-6 h-[1px]"
+                        style={{ background: `linear-gradient(to right, transparent, ${viewMode === 'productivity' ? '#8b5cf6' : '#10b981'}66, transparent)` }} />
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-4"
+                        style={{ background: viewMode === 'productivity' ? '#8b5cf614' : '#10b98114', border: `1px solid ${viewMode === 'productivity' ? '#8b5cf625' : '#10b98125'}` }}>
+                        {viewMode === 'productivity'
+                            ? <Play className="w-3.5 h-3.5" style={{ color: '#8b5cf6' }} />
+                            : <TrendingUp className="w-3.5 h-3.5" style={{ color: '#10b981' }} />}
                     </div>
-                </div>
+                    <div>
+                        <div className="text-[28px] font-black text-white leading-none tracking-tight mb-1">
+                            {viewMode === 'productivity' ? totalValueInCycle : formatCurrency(totalValueInCycle)}
+                        </div>
+                        <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: viewMode === 'productivity' ? '#8b5cf680' : '#10b98180' }}>
+                            {viewMode === 'productivity' ? 'Total Videos' : 'Total Payout'}
+                        </div>
+                        <div className="text-[10px] text-white/20 mt-0.5 font-medium">{getFilterLabel()}</div>
+                    </div>
+                </motion.div>
 
-                {/* KPI: Primary Metric */}
-                <AnalyticCard
-                    title={viewMode === 'productivity' ? "Total Videos Produced" : "Total Payout"}
-                    value={viewMode === 'productivity' ? totalValueInCycle : formatCurrency(totalValueInCycle)}
-                    icon={viewMode === 'productivity' ? <Play className="w-5 h-5" /> : <span className="font-bold text-emerald-400">₱</span>}
-                    trend={{ value: 0, label: selectedCycle || "Monthly Total", isPositive: true }}
-                    delay={0.1}
-                />
+                {/* Active editors */}
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                    className="relative flex flex-col justify-between p-5 bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden"
+                >
+                    <div className="absolute top-0 left-6 right-6 h-[1px]" style={{ background: 'linear-gradient(to right, transparent, #10b98166, transparent)' }} />
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-4" style={{ background: '#10b98114', border: '1px solid #10b98125' }}>
+                        <Users className="w-3.5 h-3.5" style={{ color: '#10b981' }} />
+                    </div>
+                    <div>
+                        <div className="text-[28px] font-black text-white leading-none tracking-tight mb-1">{activeEditorsCount}</div>
+                        <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#10b98180' }}>Active Editors</div>
+                        <div className="text-[10px] text-white/20 mt-0.5 font-medium">Contributing this cycle</div>
+                    </div>
+                </motion.div>
 
-                {/* KPI: Active Editors */}
-                <AnalyticCard
-                    title="Active Editors"
-                    value={activeEditorsCount}
-                    icon={<Users className="w-5 h-5" />}
-                    trend={{ value: 0, label: 'contributing this cycle', isPositive: true }}
-                    delay={0.2}
-                />
+                {/* Filter config card */}
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.15, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                    className="relative flex flex-col justify-between p-5 bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden cursor-pointer group hover:border-violet-500/20 transition-all duration-150"
+                    onClick={() => setIsFilterModalOpen(true)}
+                >
+                    <div className="absolute top-0 left-6 right-6 h-[1px]" style={{ background: 'linear-gradient(to right, transparent, #8b5cf666, transparent)' }} />
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-4" style={{ background: '#8b5cf614', border: '1px solid #8b5cf625' }}>
+                        <Settings2 className="w-3.5 h-3.5" style={{ color: '#8b5cf6' }} />
+                    </div>
+                    <div>
+                        <div className="text-[14px] font-bold text-white/80 leading-tight mb-1 truncate">{getFilterLabel()}</div>
+                        <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#8b5cf680' }}>Active Filter</div>
+                        <div className="text-[10px] text-white/20 mt-0.5 font-medium group-hover:text-violet-400/50 transition-colors">Click to change →</div>
+                    </div>
+                </motion.div>
             </div>
 
-            {/* Charts Section */}
-            <div className="flex flex-col gap-8 mt-8">
+            {/* Area chart — yearly trend */}
+            <Panel
+                icon={<TrendingUp className="w-3.5 h-3.5" />}
+                iconColor={viewMode === 'productivity' ? '#8b5cf6' : '#10b981'}
+                title={viewMode === 'productivity' ? 'Production Trend' : 'Earnings Trend'}
+                subtitle={`${dateFilter?.year || new Date().getFullYear()} vs ${(dateFilter?.year || new Date().getFullYear()) - 1}`}
+                delay={0.2}
+            >
+                <AnalyticAreaChart
+                    title=""
+                    data={monthlyTrendData}
+                    dataKey="value"
+                    compareDataKey="previousValue"
+                    xAxisKey="name"
+                    color={viewMode === 'productivity' ? '#8b5cf6' : '#10b981'}
+                    compareColor="#334155"
+                    delay={0}
+                    height={260}
+                    valuePrefix={viewMode === 'earnings' ? '₱' : ''}
+                />
+            </Panel>
 
-                {/* 1. Yearly Trend (Area Chart) */}
-                <div className="w-full">
-                    <AnalyticAreaChart
-                        title={viewMode === 'productivity' ? `Yearly Production: ${dateFilter?.year || new Date().getFullYear()} vs ${dateFilter?.year ? dateFilter.year - 1 : new Date().getFullYear() - 1}` : `Yearly Income: ${dateFilter?.year || new Date().getFullYear()} vs ${dateFilter?.year ? dateFilter.year - 1 : new Date().getFullYear() - 1}`}
-                        data={monthlyTrendData}
-                        dataKey="value"
-                        compareDataKey="previousValue"
-                        xAxisKey="name"
-                        color={viewMode === 'productivity' ? "#8b5cf6" : "#10b981"}
-                        compareColor="#64748b"
-                        delay={0.3}
-                        height={300}
-                        valuePrefix={viewMode === 'earnings' ? "₱" : ""}
+            {/* Editor breakdown bar chart */}
+            <Panel
+                icon={<BarChart2 className="w-3.5 h-3.5" />}
+                iconColor={viewMode === 'productivity' ? '#8b5cf6' : '#10b981'}
+                title={viewMode === 'productivity' ? 'Editor Output' : 'Editor Earnings'}
+                subtitle={selectedCycle || getFilterLabel()}
+                delay={0.25}
+            >
+                <AnalyticBarChart
+                    title=""
+                    data={editorBreakdownData}
+                    dataKey="value"
+                    xAxisKey="name"
+                    color={viewMode === 'productivity' ? '#8b5cf6' : '#10b981'}
+                    delay={0}
+                    layout="vertical"
+                    height={Math.max(300, editorBreakdownData.length * 48)}
+                    valuePrefix={viewMode === 'earnings' ? '₱' : ''}
+                />
+            </Panel>
+
+            {/* Type + Status side by side */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <Panel
+                    icon={<PieChart className="w-3.5 h-3.5" />}
+                    iconColor="#3b82f6"
+                    title="Project Types"
+                    subtitle="By content category"
+                    delay={0.3}
+                >
+                    <AnalyticPieChart
+                        title="ProjectTypes"
+                        data={projectTypeData}
+                        delay={0}
+                        height={320}
+                        bare
                     />
-                </div>
+                </Panel>
 
-                {/* 2. Editor Breakdown (Bar Chart) - Full Width */}
-                <div className="w-full">
-                    <AnalyticBarChart
-                        title={
-                            selectedCycle
-                                ? (viewMode === 'productivity' ? `Top Editors: ${selectedCycle}` : `Editor Earnings: ${selectedCycle}`)
-                                : (dateFilter?.month
-                                    ? (viewMode === 'productivity' ? `Top Editors: ${new Date(2000, dateFilter.month - 1).toLocaleString('default', { month: 'long' })}` : `Editor Earnings: ${new Date(2000, dateFilter.month - 1).toLocaleString('default', { month: 'long' })}`)
-                                    : (viewMode === 'productivity' ? `Editor Breakdown` : `Earnings Breakdown`)
-                                )
-                        }
-                        data={editorBreakdownData}
-                        dataKey="value"
-                        xAxisKey="name"
-                        color={viewMode === 'productivity' ? "#8b5cf6" : "#10b981"}
-                        delay={0.4}
-                        layout="vertical"
-                        height={400}
-                        valuePrefix={viewMode === 'earnings' ? "₱" : ""}
+                <Panel
+                    icon={<PieChart className="w-3.5 h-3.5" />}
+                    iconColor="#f59e0b"
+                    title="Project Status"
+                    subtitle="By workflow stage"
+                    delay={0.35}
+                >
+                    <AnalyticPieChart
+                        title="ProjectStatus"
+                        data={projectStatusData.data}
+                        delay={0}
+                        height={320}
+                        colors={projectStatusData.colors}
+                        bare
                     />
-                </div>
-
-                {/* 3. Distributions: Type + Status (Side by Side) */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* Project Type Distribution (Pie Chart) */}
-                    <div className="w-full">
-                        <AnalyticPieChart
-                            title="Project Type Distribution"
-                            data={projectTypeData}
-                            delay={0.5}
-                            height={400}
-                        />
-                    </div>
-
-                    {/* Project Status Distribution (Pie Chart) */}
-                    <div className="w-full">
-                        <AnalyticPieChart
-                            title="Project Status Distribution"
-                            data={projectStatusData.data}
-                            delay={0.55}
-                            height={400}
-                            colors={projectStatusData.colors} // Custom mapped colors
-                        />
-                    </div>
-                </div>
-
-                {/* 4. Revisions Chart (Bar Chart) */}
-                <div className="w-full">
-                    <AnalyticBarChart
-                        title="Revision Rates per Editor"
-                        data={revisionsChartData}
-                        dataKey="value"
-                        xAxisKey="name"
-                        color="#f59e0b" // Amber/Orange for caution/revisions
-                        delay={0.6}
-                        layout="vertical"
-                        height={400}
-                        valuePrefix=""
-                        emptyMessage="No revisions found for editors yet"
-                    />
-                </div>
+                </Panel>
             </div>
 
+            {/* Revisions bar chart */}
+            <Panel
+                icon={<RefreshCw className="w-3.5 h-3.5" />}
+                iconColor="#f59e0b"
+                title="Revision Rates"
+                subtitle="Per editor"
+                delay={0.4}
+            >
+                <AnalyticBarChart
+                    title=""
+                    data={revisionsChartData}
+                    dataKey="value"
+                    xAxisKey="name"
+                    color="#f59e0b"
+                    delay={0}
+                    layout="vertical"
+                    height={Math.max(280, revisionsChartData.length * 48)}
+                    valuePrefix=""
+                    emptyMessage="No revisions found for editors yet"
+                />
+            </Panel>
 
             <AnalyticsFilterModal
                 isOpen={isFilterModalOpen}
@@ -550,44 +634,36 @@ export default function AdminAnalytics({ embedded = false, allowedBoardIds }: Ad
                     cycle: dateFilter?.cycle || ''
                 }}
             />
-        </div >
+        </div>
     );
-
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-96">
-                <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
-            </div>
-        );
-    }
 
     if (embedded) {
         return (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                {/* Replicate AdminPageLayout Header Styling */}
+            <div className="space-y-6">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight mb-2">
-                            {viewMode === 'productivity' ? "Editor Performance" : "Editor Earnings"}
+                        <h1 className="text-3xl font-black text-white tracking-tight">
+                            {viewMode === 'productivity' ? 'Editor Performance' : 'Editor Earnings'}
                         </h1>
-                        <p className="text-gray-400 max-w-2xl">
-                            {viewMode === 'productivity' ? "Videos produced per editor per cycle." : "Total earnings per editor per cycle."}
+                        <p className="text-sm text-white/40 mt-1">
+                            {viewMode === 'productivity' ? 'Videos produced per editor per cycle.' : 'Total earnings per editor per cycle.'}
                         </p>
                     </div>
-                    <div>{Controls}</div>
+                    {HeaderActions}
                 </div>
-                {Content}
+                {content}
             </div>
         );
     }
 
     return (
         <AdminPageLayout
-            title={viewMode === 'productivity' ? "Editor Performance" : "Editor Earnings"}
-            subtitle={viewMode === 'productivity' ? "Videos produced per editor per cycle." : "Total earnings per editor per cycle."}
-            action={Controls}
+            label="Admin"
+            title={viewMode === 'productivity' ? 'Analytics' : 'Earnings'}
+            subtitle={viewMode === 'productivity' ? 'Production output across editors and cycles' : 'Payout breakdown across editors and cycles'}
+            action={HeaderActions}
         >
-            {Content}
+            {content}
         </AdminPageLayout>
     );
 }

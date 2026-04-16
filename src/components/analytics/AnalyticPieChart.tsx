@@ -8,50 +8,35 @@ interface AnalyticPieChartProps {
     colors?: string[];
     height?: number;
     delay?: number;
+    /** When true, renders without the dark card wrapper — use inside a Panel */
+    bare?: boolean;
 }
 
 const DEFAULT_COLORS = [
-    '#8b5cf6', // Violet-500
-    '#ec4899', // Pink-500
-    '#10b981', // Emerald-500
-    '#f59e0b', // Amber-500
-    '#3b82f6', // Blue-500
-    '#6366f1', // Indigo-500
-    '#ef4444', // Red-500
-    '#14b8a6', // Teal-500
+    '#8b5cf6',
+    '#ec4899',
+    '#10b981',
+    '#f59e0b',
+    '#3b82f6',
+    '#6366f1',
+    '#ef4444',
+    '#14b8a6',
 ];
 
 const renderActiveShape = (props: any) => {
     const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent } = props;
-
     return (
         <g>
-            <text x={cx} y={cy} dy={-4} textAnchor="middle" fill="#fff" className="text-xl font-bold">
+            <text x={cx} y={cy} dy={-4} textAnchor="middle" fill="#fff" style={{ fontSize: 13, fontWeight: 700 }}>
                 {payload.name}
             </text>
-            <text x={cx} y={cy} dy={16} textAnchor="middle" fill="#94a3b8" className="text-sm font-medium">
+            <text x={cx} y={cy} dy={14} textAnchor="middle" fill="#94a3b8" style={{ fontSize: 11 }}>
                 {`${(percent * 100).toFixed(0)}%`}
             </text>
-            <Sector
-                cx={cx}
-                cy={cy}
-                innerRadius={innerRadius}
-                outerRadius={outerRadius + 8}
-                startAngle={startAngle}
-                endAngle={endAngle}
-                fill={fill}
-                cornerRadius={4}
-            />
-            <Sector
-                cx={cx}
-                cy={cy}
-                startAngle={startAngle}
-                endAngle={endAngle}
-                innerRadius={innerRadius - 6}
-                outerRadius={innerRadius - 2}
-                fill={fill}
-                cornerRadius={2}
-            />
+            <Sector cx={cx} cy={cy} innerRadius={innerRadius} outerRadius={outerRadius + 6}
+                startAngle={startAngle} endAngle={endAngle} fill={fill} cornerRadius={4} />
+            <Sector cx={cx} cy={cy} startAngle={startAngle} endAngle={endAngle}
+                innerRadius={innerRadius - 5} outerRadius={innerRadius - 2} fill={fill} cornerRadius={2} />
         </g>
     );
 };
@@ -61,113 +46,121 @@ export const AnalyticPieChart = ({
     data,
     colors = DEFAULT_COLORS,
     height = 400,
-    delay = 0
+    delay = 0,
+    bare = false,
 }: AnalyticPieChartProps) => {
     const [activeIndex, setActiveIndex] = useState(0);
-
-    const onPieEnter = (_: any, index: number) => {
-        setActiveIndex(index);
-    };
+    const gradientBase = title.replace(/\s+/g, '');
 
     const CustomTooltip = ({ active, payload }: any) => {
         if (active && payload && payload.length) {
+            const color = colors[data.findIndex(d => d.name === payload[0].name) % colors.length];
             return (
-                <div className="bg-[#1a1a2e]/90 border border-white/10 p-4 rounded-2xl shadow-2xl backdrop-blur-xl ring-1 ring-white/20">
-                    <div className="flex items-center gap-2 mb-2">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: payload[0].payload.fill }} />
-                        <p className="text-gray-300 text-xs font-bold uppercase tracking-wider">{payload[0].name}</p>
+                <div className="bg-[#0a0a14]/95 border border-white/10 px-4 py-3 rounded-xl shadow-2xl backdrop-blur-xl">
+                    <div className="flex items-center gap-2 mb-1.5">
+                        <div className="w-2 h-2 rounded-full" style={{ background: color }} />
+                        <p className="text-white/50 text-[10px] font-bold uppercase tracking-widest">{payload[0].name}</p>
                     </div>
-                    <p className="text-white text-2xl font-black tracking-tight">
-                        {new Intl.NumberFormat('en-US').format(payload[0].value)}
-                    </p>
-                    <p className="text-gray-500 text-xs mt-1 font-medium">
-                        Projects
-                    </p>
+                    <p className="text-white text-xl font-black">{new Intl.NumberFormat('en-US').format(payload[0].value)}</p>
+                    <p className="text-white/25 text-[10px] mt-0.5 font-medium">projects</p>
                 </div>
             );
         }
         return null;
     };
 
+    // ── The chart itself (shared between bare and card modes) ──────────────────
+    const LEGEND_H = 56;
+    const pieAreaH = height - LEGEND_H;     // height available for the donut
+    const pieCy = Math.round(pieAreaH / 2); // center of donut within that zone
+
+    const chart = (
+        <div style={{ height, width: '100%' }}>
+            {data.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                        <defs>
+                            {data.map((_, i) => {
+                                const color = colors[i % colors.length];
+                                return (
+                                    <linearGradient id={`${gradientBase}-g${i}`} x1="0" y1="0" x2="0" y2="1" key={i}>
+                                        <stop offset="0%" stopColor={color} stopOpacity={1} />
+                                        <stop offset="100%" stopColor={color} stopOpacity={0.55} />
+                                    </linearGradient>
+                                );
+                            })}
+                        </defs>
+                        <Pie
+                            activeIndex={activeIndex}
+                            activeShape={renderActiveShape}
+                            data={data}
+                            cx="50%"
+                            cy={pieCy}
+                            innerRadius={70}
+                            outerRadius={Math.min(110, pieCy - 8)}
+                            paddingAngle={3}
+                            dataKey="value"
+                            onMouseEnter={(_, i) => setActiveIndex(i)}
+                            stroke="none"
+                        >
+                            {data.map((_, i) => (
+                                <Cell key={i} fill={`url(#${gradientBase}-g${i})`} stroke="rgba(0,0,0,0)" />
+                            ))}
+                        </Pie>
+                        <Tooltip content={<CustomTooltip />} />
+                        {/* Legend anchored below the pie area */}
+                        <foreignObject x="0" y={pieAreaH} width="100%" height={LEGEND_H}>
+                            <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 px-4">
+                                {data.map((entry, i) => (
+                                    <div key={i} className="flex items-center gap-1.5 cursor-pointer" onMouseEnter={() => setActiveIndex(i)}>
+                                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: colors[i % colors.length] }} />
+                                        <span className={`text-[11px] font-semibold transition-colors ${i === activeIndex ? 'text-white' : 'text-white/35'}`}>
+                                            {entry.name}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </foreignObject>
+                    </PieChart>
+                </ResponsiveContainer>
+            ) : (
+                <div className="flex flex-col items-center justify-center h-full text-white/15 gap-3">
+                    <div className="w-10 h-10 rounded-full border-2 border-white/10 border-t-white/25 animate-spin" />
+                    <p className="text-xs font-medium">No data available</p>
+                </div>
+            )}
+        </div>
+    );
+
+    // ── Bare mode: no card wrapper, just the chart ─────────────────────────────
+    if (bare) {
+        return (
+            <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay, ease: [0.22, 1, 0.36, 1] }}
+                className="px-2 py-3"
+            >
+                {chart}
+            </motion.div>
+        );
+    }
+
+    // ── Card mode: full standalone card ───────────────────────────────────────
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay, ease: "easeOut" }}
-            className="w-full bg-[#0e0e1a] border border-white/5 rounded-[2rem] p-6 md:p-8 relative overflow-hidden group hover:border-violet-500/10 transition-colors duration-500"
+            transition={{ duration: 0.6, delay, ease: 'easeOut' }}
+            className="w-full bg-[#0e0e1a] border border-white/5 rounded-[2rem] p-6 md:p-8 relative overflow-hidden"
         >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-8">
-                <h3 className="text-lg font-bold text-white tracking-tight uppercase flex items-center gap-3">
-                    <div className="w-1 h-6 bg-violet-500 rounded-full" />
-                    {title}
-                </h3>
-            </div>
-
-            {/* Chart */}
-            <div style={{ height: height, width: '100%' }}>
-                {data.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                            <defs>
-                                {data.map((_, index) => {
-                                    const color = colors[index % colors.length];
-                                    const gradientId = `pieGradient-${title.replace(/\s+/g, '')}-${index}`;
-                                    return (
-                                        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1" key={`grad-${index}`}>
-                                            <stop offset="0%" stopColor={color} stopOpacity={1} />
-                                            <stop offset="100%" stopColor={color} stopOpacity={0.5} />
-                                        </linearGradient>
-                                    );
-                                })}
-                            </defs>
-                            <Pie
-                                activeIndex={activeIndex}
-                                activeShape={renderActiveShape}
-                                data={data}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={80}
-                                outerRadius={120}
-                                paddingAngle={4}
-                                dataKey="value"
-                                onMouseEnter={onPieEnter}
-                                stroke="none"
-                            >
-                                {data.map((_, index) => (
-                                    <Cell
-                                        key={`cell-${index}`}
-                                        fill={`url(#pieGradient-${title.replace(/\s+/g, '')}-${index})`}
-                                        stroke="rgba(0,0,0,0)"
-                                    />
-                                ))}
-                            </Pie>
-                            <Tooltip content={<CustomTooltip />} />
-                            {/* Custom Legend Layout */}
-                            <foreignObject x="0" y={height - 60} width="100%" height="60">
-                                <div className="flex flex-wrap justify-center gap-4 px-4">
-                                    {data.map((entry, index) => (
-                                        <div key={index} className="flex items-center gap-2 cursor-pointer transition-opacity hover:opacity-80" onMouseEnter={() => setActiveIndex(index)}>
-                                            <div className="w-3 h-3 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.5)]" style={{ background: `linear-gradient(180deg, ${colors[index % colors.length]} 0%, ${colors[index % colors.length]}80 100%)` }} />
-                                            <span className={`text-xs font-bold ${index === activeIndex ? 'text-white' : 'text-gray-500'}`}>
-                                                {entry.name}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </foreignObject>
-                        </PieChart>
-                    </ResponsiveContainer>
-                ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-gray-500/50 space-y-4">
-                        <div className="w-16 h-16 rounded-full border-4 border-gray-800 border-t-gray-700 animate-spin-slow" />
-                        <div className="text-center">
-                            <p className="text-sm font-bold text-gray-500">No Distribution Data</p>
-                            <p className="text-xs opacity-50 mt-1">Data will appear once projects have assigned types</p>
-                        </div>
-                    </div>
-                )}
-            </div>
+            {title && (
+                <div className="flex items-center gap-3 mb-8">
+                    <div className="w-1 h-5 bg-violet-500 rounded-full" />
+                    <h3 className="text-sm font-bold text-white uppercase tracking-widest">{title}</h3>
+                </div>
+            )}
+            {chart}
         </motion.div>
     );
 };

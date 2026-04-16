@@ -114,7 +114,8 @@ export const EditorProjectSelectionView = ({
     }, [initialItemId, boardData]);
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
     const [viewMode, setViewMode] = useState<'all' | 'cycles'>('cycles'); // NEW: View Mode
-    const [expandedCycles, setExpandedCycles] = useState<Set<string>>(new Set()); // NEW: Expanded Cycles
+    const [expandedCycles, setExpandedCycles] = useState<Set<string>>(new Set());
+    const [statusFilter, setStatusFilter] = useState('All');
     const [mirrorOptions, setMirrorOptions] = useState<Record<string, any[]>>({});
 
     // Check for approaching deadlines when board data loads
@@ -344,12 +345,57 @@ export const EditorProjectSelectionView = ({
         fetchMirrorSourceColumns();
     }, [boardData.columns]);
 
+    // Helper to resolve status value — checks text first, then display_value (mirror columns)
+    const resolveStatusVal = (item: any, statusCol: any): string => {
+        if (!statusCol) return '';
+        const colVal = item.column_values.find((v: any) => v.id === statusCol.id);
+        if (!colVal) return '';
+        return colVal.text || colVal.display_value || '';
+    };
+
+    const getStatusText = (item: any) => {
+        const statusCol = boardData.columns?.find((c: any) =>
+            c.title.toLowerCase().includes('status')
+        );
+        if (!statusCol) return '';
+        return resolveStatusVal(item, statusCol);
+    };
+
+    // Helper to get Status Color
+    const getStatusColor = (item: any) => {
+        const statusCol = boardData.columns?.find((c: any) =>
+            c.title.toLowerCase().includes('status')
+        );
+        if (!statusCol) return item.groupColor || '#8b5cf6';
+
+        try {
+            const val = resolveStatusVal(item, statusCol);
+            const settings = JSON.parse(statusCol.settings_str || '{}');
+            if (val && settings.labels && settings.labels_colors) {
+                const labelKey = Object.keys(settings.labels).find(k => settings.labels[k] === val);
+                if (labelKey && settings.labels_colors[labelKey]) {
+                    return settings.labels_colors[labelKey].color;
+                }
+            }
+        } catch (e) { }
+        return item.groupColor || '#8b5cf6';
+    };
+
     // Data Processing
     const allItems = useMemo(() => {
         return boardData.groups?.flatMap((g: any) =>
             boardData.items?.filter((i: any) => i.group.id === g.id).map((i: any) => ({ ...i, groupColor: g.color }))
         ) || [];
     }, [boardData]);
+
+    const uniqueStatuses = useMemo(() => {
+        const statuses = new Set<string>();
+        allItems.forEach((i: any) => {
+            const s = getStatusText(i);
+            if (s) statuses.add(s);
+        });
+        return Array.from(statuses).sort();
+    }, [allItems, boardData]);
 
     // Filtering & Sorting
     const filteredItems = useMemo(() => {
@@ -360,6 +406,10 @@ export const EditorProjectSelectionView = ({
             items = items.filter((i: any) => i.name.toLowerCase().includes(lowerTerm));
         }
 
+        if (statusFilter !== 'All') {
+            items = items.filter((i: any) => getStatusText(i) === statusFilter);
+        }
+
         items.sort((a: any, b: any) => {
             const dateA = new Date(a.created_at).getTime();
             const dateB = new Date(b.created_at).getTime();
@@ -367,7 +417,7 @@ export const EditorProjectSelectionView = ({
         });
 
         return items;
-    }, [allItems, searchTerm, sortOrder]);
+    }, [allItems, searchTerm, sortOrder, statusFilter, boardData]);
 
     // --- CYCLE LOGIC (Ported) ---
 
@@ -456,31 +506,7 @@ export const EditorProjectSelectionView = ({
         return getCycleEarnings(filteredItems);
     }, [filteredItems, boardData.columns]);
 
-    // Helper to get Status Color
-    const getStatusColor = (item: any) => {
-        const statusCol = boardData.columns?.find((c: any) => c.title.toLowerCase().includes('status'));
-        if (!statusCol) return item.groupColor || '#8b5cf6';
 
-        // Parse Settings for Colors
-        try {
-            const val = item.column_values.find((v: any) => v.id === statusCol.id)?.text;
-            const settings = JSON.parse(statusCol.settings_str || '{}');
-            if (val && settings.labels && settings.labels_colors) {
-                const labelKey = Object.keys(settings.labels).find(k => settings.labels[k] === val);
-                if (labelKey && settings.labels_colors[labelKey]) {
-                    return settings.labels_colors[labelKey].color;
-                }
-            }
-        } catch (e) { }
-        return item.groupColor || '#8b5cf6';
-    };
-
-    const getStatusText = (item: any) => {
-        const statusCol = boardData.columns?.find((c: any) => c.title.toLowerCase().includes('status'));
-        if (!statusCol) return 'Active';
-        const val = item.column_values.find((v: any) => v.id === statusCol.id)?.text;
-        return val || 'Active';
-    };
 
     // Navigation handlers for Modal Cycling
     const currentIndex = useMemo(() => {
@@ -529,6 +555,21 @@ export const EditorProjectSelectionView = ({
                         </div>
                     </div>
 
+                    {/* Status Filter */}
+                    <div className="relative w-full md:w-48">
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="w-full bg-[#0e0e1a] border border-white/5 rounded-xl px-4 py-2.5 text-sm text-white appearance-none focus:outline-none focus:border-violet-500/50 transition-all font-medium cursor-pointer"
+                        >
+                            <option value="All">All Statuses</option>
+                            {uniqueStatuses.map(s => (
+                                <option key={s} value={s}>{s}</option>
+                            ))}
+                        </select>
+                        <svg className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+
                     <div className="relative w-full md:w-80">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <input
@@ -557,7 +598,7 @@ export const EditorProjectSelectionView = ({
 
             {/* --- ALL PROJECTS VIEW --- */}
             {viewMode === 'all' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <div className="space-y-2">
                     <AnimatePresence mode='popLayout'>
                         {filteredItems.map((item: any, index: number) => (
                             <ProjectCard
@@ -648,8 +689,7 @@ export const EditorProjectSelectionView = ({
                                                 exit={{ height: 0, opacity: 0 }}
                                                 transition={{ duration: 0.3, ease: 'easeInOut' }}
                                             >
-                                                <div className="p-6 pt-0 border-t border-white/5 mt-0">
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mt-6">
+                                                <div className="space-y-2 mt-4 px-6 pb-6">
                                                         {items.map((item: any, index: number) => (
                                                             <ProjectCard
                                                                 key={item.id}
@@ -662,7 +702,6 @@ export const EditorProjectSelectionView = ({
                                                             />
                                                         ))}
                                                     </div>
-                                                </div>
                                             </motion.div>
                                         )}
                                     </AnimatePresence>

@@ -1,17 +1,15 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    LayoutDashboard,
     Briefcase,
     Loader2,
-    ArrowLeft,
     Sparkles,
     LogOut,
     Menu,
     Calendar
 } from 'lucide-react';
 import { PortalLayout } from '../components/shared/PortalLayout';
-import { PortalWorkspaceCard } from '../components/shared/PortalWorkspaceCard';
+import { SidebarItem } from '../components/shared/SidebarItem';
 import { EditorProjectSelectionView } from '../components/views/EditorProjectSelectionView';
 import { PortalCalendar } from '../components/views/PortalCalendar';
 import { getAllBoards, getBoardItems } from '../services/mondayService';
@@ -42,6 +40,20 @@ function EditorPortalContent() {
 
     // User info
     const currentUserName = localStorage.getItem('portal_user_name') || 'Editor';
+
+    // Format stored name into proper display name
+    // Handles: "juanCruz" → "Juan Cruz", "juan_cruz" → "Juan Cruz", "Joshua Santos" → "Joshua Santos"
+    // Note: all-lowercase merged names like "joshuasantos" can't be auto-split — fix the name in the DB.
+    const formatDisplayName = (name: string) =>
+        name
+            .replace(/([a-z])([A-Z])/g, '$1 $2')   // camelCase → words
+            .split(/[-_. ]+/)                         // split on separators
+            .filter(Boolean)
+            .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+            .join(' ');
+
+    const displayName = formatDisplayName(currentUserName);
+    const greeting = (() => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; })();
 
     // Strict Role Check & Initial Fetch
     useEffect(() => {
@@ -94,6 +106,16 @@ function EditorPortalContent() {
 
             setBoards(workspaceBoards);
 
+            // Auto-enter the first assigned workspace directly
+            if (workspaceBoards.length > 0) {
+                try {
+                    const fullBoardData = await getBoardItems(workspaceBoards[0].id, true);
+                    setSelectedBoard(fullBoardData);
+                } catch {
+                    setSelectedBoard(workspaceBoards[0]);
+                }
+            }
+
         } catch (error) {
             console.error("Failed to load editor boards", error);
         } finally {
@@ -118,51 +140,31 @@ function EditorPortalContent() {
             isMobileSidebarOpen={isMobileSidebarOpen}
             onMobileSidebarClose={() => setIsMobileSidebarOpen(false)}
             sidebarContent={
-                <div className="space-y-1">
-                    <button
-                        onClick={() => {
-                            setSelectedBoard(null);
-                            setInitialItemId(undefined);
-                        }}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${!selectedBoard ? 'bg-white/10 text-white shadow-lg shadow-white/5' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
-                    >
-                        <LayoutDashboard className={`w-5 h-5 transition-transform duration-300 ${!selectedBoard ? 'scale-110' : 'group-hover:scale-110'}`} />
-                        <span className="text-sm font-bold tracking-tight">Main</span>
-                    </button>
-
+                <div className="space-y-0.5">
                     {boards.map((board) => (
-                        <button
+                        <SidebarItem
                             key={board.id}
+                            icon={<Briefcase className="w-4 h-4" />}
+                            label="Main"
+                            active={selectedBoard?.id === board.id}
                             onClick={async () => {
-                                setLoading(true);
                                 setInitialItemId(undefined);
                                 try {
                                     const fullBoardData = await getBoardItems(board.id);
                                     setSelectedBoard(fullBoardData);
                                 } catch (e) {
                                     setSelectedBoard(board);
-                                } finally {
-                                    setLoading(false);
                                 }
                             }}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${selectedBoard?.id === board.id ? 'bg-white/10 text-white shadow-lg shadow-white/5' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
-                        >
-                            <Briefcase className="w-5 h-5 opacity-50 group-hover:opacity-100" />
-                            <span className="text-xs font-medium truncate">{board.name.replace(/- Workspace/i, '').trim()}</span>
-                        </button>
+                        />
                     ))}
-
-                    <div className="pt-2 mt-2 border-t border-white/5">
-                        <button
-                            onClick={() => {
-                                setSelectedBoard('calendar');
-                                setInitialItemId(undefined);
-                            }}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${selectedBoard === 'calendar' ? 'bg-white/10 text-white shadow-lg shadow-white/5' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
-                        >
-                            <Calendar className={`w-5 h-5 transition-transform duration-300 ${selectedBoard === 'calendar' ? 'text-emerald-400' : 'opacity-50 group-hover:opacity-100'}`} />
-                            <span className="text-sm font-bold tracking-tight">My Calendar</span>
-                        </button>
+                    <div className="pt-2 mt-1 border-t border-white/[0.04]">
+                        <SidebarItem
+                            icon={<Calendar className="w-4 h-4" />}
+                            label="My Calendar"
+                            active={selectedBoard === 'calendar'}
+                            onClick={() => { setSelectedBoard('calendar'); setInitialItemId(undefined); }}
+                        />
                     </div>
                 </div>
             }
@@ -170,13 +172,13 @@ function EditorPortalContent() {
                 <div className="space-y-1">
                     <TimeTracker />
                     {currentUserName && (
-                        <div className="flex items-center gap-3 px-3 py-2.5 mb-1">
-                            <div className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold text-xs flex-shrink-0">
+                        <div className="flex items-center gap-2.5 px-3 py-2.5 mb-1">
+                            <div className="w-7 h-7 rounded-lg bg-violet-500/12 border border-violet-500/20 flex items-center justify-center text-violet-300 font-bold text-xs flex-shrink-0">
                                 {currentUserName.charAt(0).toUpperCase()}
                             </div>
                             <div className="overflow-hidden">
-                                <div className="text-white text-xs font-semibold truncate">{currentUserName}</div>
-                                <div className="text-[10px] text-emerald-500/60 uppercase tracking-widest font-medium">Editor</div>
+                                <div className="text-white/80 text-[12px] font-semibold truncate">{currentUserName}</div>
+                                <div className="text-[9px] tracking-widest font-medium" style={{ color: 'rgba(139,92,246,0.5)' }}>EDITOR</div>
                             </div>
                         </div>
                     )}
@@ -195,7 +197,7 @@ function EditorPortalContent() {
                     )}
                     <button
                         onClick={() => setIsLeaveModalOpen(true)}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:text-emerald-400 hover:bg-emerald-500/5 transition-all duration-200"
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:text-violet-400 hover:bg-violet-500/5 transition-all duration-200"
                     >
                         <Calendar className="w-4 h-4 flex-shrink-0" />
                         <span className="text-[13px] font-medium">Request Leave</span>
@@ -210,7 +212,7 @@ function EditorPortalContent() {
                 </div>
             }
             mainContent={
-                <div className="flex-1 flex flex-col h-full bg-[#050511] overflow-hidden relative">
+                <div className="flex-1 flex flex-col h-full bg-[#020204] overflow-hidden relative">
 
                     {/* Navigation Overlay */}
                     <AnimatePresence>
@@ -232,7 +234,7 @@ function EditorPortalContent() {
                     <div className="absolute top-4 left-4 z-50 lg:hidden">
                         <button
                             onClick={() => setIsMobileSidebarOpen(true)}
-                            className="p-2 rounded-lg bg-[#13141f] border border-white/10 text-white hover:bg-white/10 transition-colors"
+                            className="p-2 rounded-lg glass-panel text-white hover:bg-white/10 transition-colors"
                         >
                             <Menu className="w-6 h-6" />
                         </button>
@@ -243,9 +245,10 @@ function EditorPortalContent() {
                         <NotificationBell />
                     </div>
 
-                    {/* Background Texture */}
-                    <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none mix-blend-overlay" />
-                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-[100px] pointer-events-none" />
+                    {/* Ambient orbs inside content area */}
+                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-violet-500/[0.04] rounded-full blur-[120px] pointer-events-none" />
+                    <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-violet-500/[0.03] rounded-full blur-[160px] pointer-events-none" />
+                    <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-indigo-500/[0.03] rounded-full blur-[140px] pointer-events-none" />
 
                     <AnimatePresence mode="wait">
                         {!selectedBoard ? (
@@ -256,65 +259,65 @@ function EditorPortalContent() {
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0, scale: 0.95 }}
                                 transition={{ duration: 0.5 }}
-                                className="flex-1 overflow-y-auto custom-scrollbar p-8 z-10"
+                                className="flex-1 flex flex-col items-center justify-center p-7 md:p-9 z-10"
                             >
-                                <div className="max-w-7xl mx-auto space-y-12 pb-20">
-                                    {/* Header */}
-                                    <div className="text-center space-y-4 pt-12 mb-16">
-                                        <motion.div
-                                            initial={{ y: -20, opacity: 0 }}
-                                            animate={{ y: 0, opacity: 1 }}
-                                            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20"
+                                <div className="w-full max-w-md text-center">
+                                    {/* Greeting */}
+                                    <div className="pt-2 pb-10">
+                                        <motion.p
+                                            initial={{ opacity: 0, y: 8 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ duration: 0.6, ease: 'easeOut' }}
+                                            className="font-display text-2xl md:text-3xl font-light text-white/40 leading-tight mb-1"
                                         >
-                                            <Sparkles className="w-4 h-4 text-emerald-400" />
-                                            <span className="text-xs font-bold text-emerald-200 uppercase tracking-widest">Welcome, editor!</span>
-                                        </motion.div>
+                                            {greeting},
+                                        </motion.p>
                                         <motion.h1
-                                            initial={{ y: 20, opacity: 0 }}
-                                            animate={{ y: 0, opacity: 1 }}
-                                            transition={{ delay: 0.1 }}
-                                            className="text-5xl md:text-6xl font-black text-white tracking-tight uppercase"
+                                            initial={{ opacity: 0, y: 14, filter: 'blur(8px)' }}
+                                            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                                            transition={{ delay: 0.12, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                                            className="font-display text-4xl md:text-5xl font-medium tracking-tight text-white leading-[1.0] mb-5"
                                         >
-                                            Your Portal
+                                            {displayName}<span className="italic text-violet-400">.</span>
                                         </motion.h1>
                                         <motion.p
-                                            initial={{ y: 20, opacity: 0 }}
-                                            animate={{ y: 0, opacity: 1 }}
-                                            transition={{ delay: 0.2 }}
-                                            className="text-gray-500 max-w-lg mx-auto font-medium"
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            transition={{ delay: 0.3, duration: 0.5 }}
+                                            className="text-white/30 font-light text-sm"
                                         >
-                                            Choose your assigned workspace to manage cycles and fulfillment.
+                                            Your workspace is loading…
                                         </motion.p>
                                     </div>
 
                                     {/* Cards Grid */}
                                     {loading ? (
-                                        <div className="flex justify-center py-20">
-                                            <Loader2 className="w-10 h-10 animate-spin text-emerald-500/50" />
+                                        <div className="flex items-center justify-center py-20">
+                                            <Loader2 className="w-5 h-5 text-violet-400/50 animate-spin" />
                                         </div>
                                     ) : boards.length > 0 ? (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                                            {boards.map((board, index) => (
+                                        <div className="space-y-2 max-w-2xl">
+                                            {boards.map((b: any, i: number) => (
                                                 <PortalWorkspaceCard
-                                                    key={board.id}
-                                                    index={index}
-                                                    name={board.name}
-                                                    itemCount={board.items_count || 0}
+                                                    key={b.id}
+                                                    index={i}
+                                                    name={b.name}
+                                                    itemCount={b.items_count || 0}
                                                     color={[
                                                         '#8b5cf6', // Violet
                                                         '#ec4899', // Pink
                                                         '#3b82f6', // Blue
                                                         '#10b981', // Emerald
                                                         '#f59e0b', // Amber
-                                                    ][index % 5]}
+                                                    ][i % 5]}
                                                     onClick={async () => {
                                                         setLoading(true);
                                                         setInitialItemId(undefined);
                                                         try {
-                                                            const fullBoardData = await getBoardItems(board.id, true);
+                                                            const fullBoardData = await getBoardItems(b.id, true);
                                                             setSelectedBoard(fullBoardData);
                                                         } catch (e) {
-                                                            setSelectedBoard(board);
+                                                            setSelectedBoard(b);
                                                         } finally {
                                                             setLoading(false);
                                                         }
@@ -323,18 +326,18 @@ function EditorPortalContent() {
                                             ))}
                                         </div>
                                     ) : (
-                                        <div className="text-center py-32 text-gray-500 border border-white/5 rounded-[2.5rem] bg-white/5 mx-auto max-w-md border-dashed">
-                                            <Briefcase className="w-12 h-12 mx-auto mb-4 opacity-10" />
-                                            <p className="font-medium text-sm">No assigned workspaces found.</p>
+                                        <div className="py-20 text-center text-white/20 border border-white/[0.05] rounded-2xl">
+                                            <Briefcase className="w-8 h-8 mx-auto mb-3 opacity-30" />
+                                            <p className="text-sm font-medium">No assigned workspaces found.</p>
                                         </div>
                                     )}
                                 </div>
                             </motion.div>
                         ) : selectedBoard === 'calendar' ? (
-                            <PortalCalendar 
-                                key="calendar" 
-                                boardIds={boards.map((b: any) => b.id)} 
-                                portalType="editor" 
+                            <PortalCalendar
+                                key="calendar"
+                                boardIds={boards.map((b: any) => b.id)}
+                                portalType="editor"
                                 onBack={() => {
                                     setSelectedBoard(null);
                                     setInitialItemId(undefined);
@@ -363,24 +366,13 @@ function EditorPortalContent() {
                                 className="flex-1 flex flex-col h-full z-10"
                             >
                                 {/* Detail Header */}
-                                <div className="h-24 px-8 flex items-center gap-6 border-b border-white/5 bg-[#0a0a16] flex-shrink-0">
-                                    <button
-                                        onClick={() => {
-                                            setSelectedBoard(null);
-                                            setInitialItemId(undefined);
-                                        }}
-                                        className="p-3 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-all group"
-                                    >
-                                        <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
-                                    </button>
+                                <div className="h-24 px-8 flex items-center gap-6 border-b border-white/5 bg-[#0a0a16] flex-shrink-0 z-20">
                                     <div>
-                                        <h1 className="text-3xl font-black text-white tracking-tight leading-tight uppercase">
-                                            {selectedBoard.name.replace(/- Workspace/i, '').trim()}
-                                        </h1>
-                                        <div className="text-xs text-emerald-400 font-bold flex items-center gap-2 mt-0.5 uppercase tracking-widest">
-                                            <Sparkles className="w-3.5 h-3.5" />
-                                            Active Workspace View
-                                        </div>
+                                        <h2 className="text-3xl font-black text-white tracking-tight uppercase flex items-center gap-3">
+                                            <Briefcase className="w-8 h-8 text-emerald-400" />
+                                            {selectedBoard.name.replace(/- Workspace/i, '').replace(/\(c-w-[\w-]+\)/gi, '').trim()}
+                                        </h2>
+                                        <p className="text-sm text-gray-400 font-medium">Manage your active tasks and workspace deliverables</p>
                                     </div>
                                 </div>
 

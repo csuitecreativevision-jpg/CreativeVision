@@ -665,12 +665,14 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
         >
             {/* Header */}
             <div className="h-24 px-8 flex items-center gap-6 border-b border-white/5 bg-[#0a0a16] flex-shrink-0">
-                <button
-                    onClick={onBack}
-                    className="p-3 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-all group"
-                >
-                    <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 duration-300" />
-                </button>
+                {portalType === 'admin' && (
+                    <button
+                        onClick={onBack}
+                        className="p-3 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-all group"
+                    >
+                        <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 duration-300" />
+                    </button>
+                )}
                 <div>
                     <h2 className="text-3xl font-black text-white tracking-tight uppercase flex items-center gap-3">
                         <CalendarIcon className={`w-8 h-8 text-${accentColor}-400`} />

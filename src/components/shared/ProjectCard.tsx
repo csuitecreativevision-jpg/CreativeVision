@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { ArrowUpRight, Calendar, Clock, Sparkles } from 'lucide-react';
+import { Calendar, ArrowUpRight } from 'lucide-react';
 import { forwardRef } from 'react';
 
 interface ProjectCardProps {
@@ -11,6 +11,27 @@ interface ProjectCardProps {
     onClick?: () => void;
     index?: number;
 }
+
+// Maps a status string → a semantic color if Monday's own color isn't available
+const getStatusMeta = (status: string, brandColor: string) => {
+    const s = status.toLowerCase();
+    if (s.includes('approved') || s.includes('done') || s.includes('complete'))
+        return { bg: '#10b981', text: '#fff' };
+    if (s.includes('revision') || s.includes('change') || s.includes('sent for'))
+        return { bg: '#ef4444', text: '#fff' };
+    if (s.includes('progress') || s.includes('working') || s.includes('assigned'))
+        return { bg: '#3b82f6', text: '#fff' };
+    if (s.includes('review') || s.includes('approval') || s.includes('for approval'))
+        return { bg: '#8b5cf6', text: '#fff' };
+    if (s.includes('waiting') || s.includes('client'))
+        return { bg: '#f59e0b', text: '#fff' };
+    if (s.includes('new') || s.includes('open') || s.includes('unassigned'))
+        return { bg: '#06b6d4', text: '#fff' };
+    if (s.includes('stuck') || s.includes('hold'))
+        return { bg: '#64748b', text: '#fff' };
+    // Fallback to the brand color passed in from Monday
+    return { bg: brandColor, text: '#fff' };
+};
 
 export const ProjectCard = forwardRef<HTMLDivElement, ProjectCardProps>((
     {
@@ -24,70 +45,59 @@ export const ProjectCard = forwardRef<HTMLDivElement, ProjectCardProps>((
     },
     ref
 ) => {
+    const { bg: statusBg } = getStatusMeta(status, color);
+
     return (
         <motion.div
             ref={ref}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: index * 0.05, duration: 0.4 }}
-            whileHover={{ scale: 1.02, y: -5 }}
-            whileTap={{ scale: 0.98 }}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.04, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            whileTap={{ scale: 0.995 }}
             onClick={onClick}
             className="group relative cursor-pointer"
         >
-            {/* Glow Effect */}
-            <div
-                className="absolute -inset-0.5 bg-gradient-to-br from-white/20 to-white/0 rounded-2xl blur opacity-0 group-hover:opacity-100 transition duration-500"
-                style={{ background: `linear-gradient(to bottom right, ${color}40, transparent)` }}
-            />
+            <div className="relative flex items-center gap-4 px-5 py-4 bg-white/[0.02] hover:bg-white/[0.045] border border-white/[0.06] hover:border-white/[0.12] rounded-2xl transition-all duration-200 hover:translate-x-0.5">
 
-            {/* Card Content */}
-            <div className="relative h-full bg-[#0E0E1A]/90 backdrop-blur-xl border border-white/5 rounded-2xl p-5 flex flex-col justify-between overflow-hidden group-hover:border-white/10 transition-all duration-300">
-
-                {/* Background Gradient Mesh */}
+                {/* Left accent bar — uses the Monday brand color */}
                 <div
-                    className="absolute top-0 right-0 w-32 h-32 opacity-10 rounded-full blur-2xl -mr-10 -mt-10 transition-transform duration-700 group-hover:scale-150"
-                    style={{ background: color }}
+                    className="w-1 h-10 rounded-full flex-shrink-0 transition-all duration-300 group-hover:h-12"
+                    style={{ background: `linear-gradient(to bottom, ${color}, ${color}22)` }}
                 />
 
-                {/* Header */}
-                <div className="flex justify-between items-start z-10">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-white/10 to-transparent border border-white/5 flex items-center justify-center text-white shadow-lg group-hover:shadow-[0_0_15px_rgba(255,255,255,0.1)] transition-all">
-                        <Sparkles className="w-5 h-5 opacity-70 group-hover:opacity-100" style={{ color }} />
-                    </div>
-                    {cycle && (
-                        <div className="px-2 py-1 rounded-md bg-white/5 border border-white/5 text-[10px] font-mono text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
-                            <Clock className="w-3 h-3" />
-                            {cycle}
-                        </div>
-                    )}
-                </div>
-
-                {/* Main Content */}
-                <div className="mt-8 z-10">
-                    <h3 className="text-xl font-black text-white leading-tight line-clamp-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-gray-400 transition-all">
+                {/* Main info */}
+                <div className="flex-1 min-w-0">
+                    <div className="text-[14px] font-semibold text-white/80 group-hover:text-white truncate leading-tight transition-colors duration-150">
                         {name}
-                    </h3>
-
-                    <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-4">
-                        <div className="flex items-center gap-2">
-                            <div className={`w-1.5 h-1.5 rounded-full animate-pulse`} style={{ backgroundColor: color }} />
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{status}</span>
-                        </div>
-
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                        {cycle && (
+                            <>
+                                <span className="text-[10px] text-white/25 font-medium">{cycle}</span>
+                                <span className="text-white/10">·</span>
+                            </>
+                        )}
                         {date && (
-                            <div className="text-[10px] text-gray-600 font-mono flex items-center gap-1">
-                                <Calendar className="w-3 h-3" />
+                            <span className="text-[10px] text-white/25 font-medium flex items-center gap-1">
+                                <Calendar className="w-2.5 h-2.5" />
                                 {date}
-                            </div>
+                            </span>
                         )}
                     </div>
                 </div>
 
-                {/* Hover Action */}
-                <div className="absolute top-4 right-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
-                    <ArrowUpRight className="w-5 h-5 text-white" />
-                </div>
+                {/* Status pill — only shown when we have a real status string */}
+                {status && (
+                    <div
+                        className="flex-shrink-0 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide whitespace-nowrap"
+                        style={{ background: `${statusBg}20`, color: statusBg, border: `1px solid ${statusBg}35` }}
+                    >
+                        {status}
+                    </div>
+                )}
+
+                {/* Arrow */}
+                <ArrowUpRight className="w-4 h-4 text-white/10 group-hover:text-white/50 flex-shrink-0 transition-all duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
             </div>
         </motion.div>
     );

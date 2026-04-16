@@ -1,18 +1,16 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    LayoutDashboard,
     Crown,
     Briefcase,
     Loader2,
-    ArrowLeft,
     Sparkles,
     LogOut,
     Menu,
     Calendar
 } from 'lucide-react';
 import { PortalLayout } from '../components/shared/PortalLayout';
-import { PortalBoardCard } from '../components/shared/PortalBoardCard';
+import { SidebarItem } from '../components/shared/SidebarItem';
 import { ProjectSelectionView } from '../components/views/ProjectSelectionView';
 import { PortalOnboarding } from '../components/shared/PortalOnboarding';
 import { getAllBoards, getBoardItems, getAllFolders } from '../services/mondayService';
@@ -38,6 +36,19 @@ function ClientPortalContent() {
     useEffect(() => {
         setCurrentUserName(localStorage.getItem('portal_user_name'));
     }, []);
+
+    // Format stored name into proper display name
+    // e.g. "juancruz" → "Juan Cruz", "juan_cruz" → "Juan Cruz", "juanCruz" → "Juan Cruz"
+    const formatDisplayName = (name: string) =>
+        name
+            .replace(/([a-z])([A-Z])/g, '$1 $2')
+            .split(/[-_. ]+/)
+            .filter(Boolean)
+            .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+            .join(' ');
+
+    const displayName = formatDisplayName(currentUserName || 'Client');
+    const greeting = (() => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; })();
 
     const onboardingSteps = [
         {
@@ -102,6 +113,17 @@ function ClientPortalContent() {
             }));
 
             setBoards(clientBoards);
+
+            // Auto-enter the first assigned project space directly
+            if (clientBoards.length > 0) {
+                try {
+                    const fullBoardData = await getBoardItems(clientBoards[0].id, true);
+                    setSelectedBoard(fullBoardData);
+                } catch {
+                    setSelectedBoard(clientBoards[0]);
+                }
+            }
+
         } catch (error) {
             console.error("Failed to load client data", error);
         } finally {
@@ -129,62 +151,46 @@ function ClientPortalContent() {
             isMobileSidebarOpen={isMobileSidebarOpen}
             onMobileSidebarClose={() => setIsMobileSidebarOpen(false)}
             sidebarContent={
-                <div className="space-y-1">
-                    <button
-                        onClick={() => {
-                            setSelectedBoard(null);
-                            setInitialItemId(undefined);
-                        }}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${!selectedBoard ? 'bg-white/10 text-white shadow-lg shadow-white/5' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
-                    >
-                        <LayoutDashboard className={`w-5 h-5 transition-transform duration-300 ${!selectedBoard ? 'scale-110' : 'group-hover:scale-110'}`} />
-                        <span className="text-sm font-bold tracking-tight">Experience</span>
-                    </button>
-
-                    <button
-                        onClick={() => {
-                            setSelectedBoard('calendar' as any);
-                            setInitialItemId(undefined);
-                        }}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${selectedBoard === 'calendar' ? 'bg-white/10 text-white shadow-lg shadow-white/5' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
-                    >
-                        <Calendar className={`w-5 h-5 transition-transform duration-300 ${selectedBoard === 'calendar' ? 'scale-110' : 'group-hover:scale-110'}`} />
-                        <span className="text-sm font-bold tracking-tight">Calendar</span>
-                    </button>
-
+                <div className="space-y-0.5">
                     {boards.map((board) => (
-                        <button
+                        <SidebarItem
                             key={board.id}
+                            isClientItem
+                            icon={<Briefcase className="w-4 h-4" />}
+                            label="Main"
+                            active={selectedBoard?.id === board.id}
                             onClick={async () => {
-                                setLoading(true);
                                 setInitialItemId(undefined);
                                 try {
                                     const fullBoardData = await getBoardItems(board.id);
                                     setSelectedBoard(fullBoardData);
                                 } catch (e) {
                                     setSelectedBoard(board);
-                                } finally {
-                                    setLoading(false);
                                 }
                             }}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${selectedBoard?.id === board.id ? 'bg-white/10 text-white shadow-lg shadow-white/5' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
-                        >
-                            <Briefcase className="w-5 h-5 opacity-50 group-hover:opacity-100" />
-                            <span className="text-xs font-medium truncate">{board.name.replace(/fulfillment board/i, '').trim()}</span>
-                        </button>
+                        />
                     ))}
+                    <div className="pt-2 mt-1 border-t border-white/[0.04]">
+                        <SidebarItem
+                            isClientItem
+                            icon={<Calendar className="w-4 h-4" />}
+                            label="Calendar"
+                            active={selectedBoard === ('calendar' as any)}
+                            onClick={() => { setSelectedBoard('calendar' as any); setInitialItemId(undefined); }}
+                        />
+                    </div>
                 </div>
             }
             sidebarFooter={
                 <div className="space-y-1">
                     {currentUserName && (
-                        <div className="flex items-center gap-3 px-3 py-2.5 mb-1">
-                            <div className="w-7 h-7 rounded-lg bg-blue-500/15 border border-blue-500/20 flex items-center justify-center text-blue-400 font-bold text-xs flex-shrink-0">
+                        <div className="flex items-center gap-2.5 px-3 py-2.5 mb-1">
+                            <div className="w-7 h-7 rounded-lg bg-violet-500/12 border border-violet-500/20 flex items-center justify-center text-violet-300 font-bold text-xs flex-shrink-0">
                                 {currentUserName.charAt(0).toUpperCase()}
                             </div>
                             <div className="overflow-hidden">
-                                <div className="text-white text-xs font-semibold truncate">{currentUserName}</div>
-                                <div className="text-[10px] text-blue-500/60 uppercase tracking-widest font-medium">Client</div>
+                                <div className="text-white/80 text-[12px] font-semibold truncate">{currentUserName}</div>
+                                <div className="text-[9px] tracking-widest font-medium" style={{ color: 'rgba(139,92,246,0.5)' }}>CLIENT</div>
                             </div>
                         </div>
                     )}
@@ -198,7 +204,7 @@ function ClientPortalContent() {
                 </div>
             }
             mainContent={
-                <div className="flex-1 flex flex-col h-full bg-[#050511] overflow-hidden relative">
+                <div className="flex-1 flex flex-col h-full bg-[#020204] overflow-hidden relative">
 
                     {/* Navigation Overlay */}
                     <AnimatePresence>
@@ -220,7 +226,7 @@ function ClientPortalContent() {
                     <div className="absolute top-4 left-4 z-50 lg:hidden">
                         <button
                             onClick={() => setIsMobileSidebarOpen(true)}
-                            className="p-2 rounded-lg bg-[#13141f] border border-white/10 text-white hover:bg-white/10 transition-colors"
+                            className="p-2 rounded-lg glass-panel text-white hover:bg-white/10 transition-colors"
                         >
                             <Menu className="w-6 h-6" />
                         </button>
@@ -231,9 +237,9 @@ function ClientPortalContent() {
                         <NotificationBell />
                     </div>
 
-                    {/* Background Texture */}
-                    <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none mix-blend-overlay" />
-                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[100px] pointer-events-none" />
+                    {/* Ambient orbs */}
+                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-violet-500/[0.04] rounded-full blur-[120px] pointer-events-none" />
+                    <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-indigo-500/[0.03] rounded-full blur-[140px] pointer-events-none" />
 
                     <PortalOnboarding
                         isOpen={false}
@@ -251,34 +257,34 @@ function ClientPortalContent() {
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0, scale: 0.95 }}
                                 transition={{ duration: 0.5 }}
-                                className="flex-1 overflow-y-auto custom-scrollbar p-8 z-10"
+                                className="flex-1 flex flex-col items-center justify-center p-7 md:p-9 z-10"
                             >
-                                <div className="max-w-7xl mx-auto space-y-12 pb-20">
-                                    {/* Header */}
-                                    <div className="text-center space-y-4 pt-12 mb-16">
-                                        <motion.div
-                                            initial={{ y: -20, opacity: 0 }}
-                                            animate={{ y: 0, opacity: 1 }}
-                                            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20"
+                                <div className="w-full max-w-md text-center">
+                                    {/* Greeting */}
+                                    <div className="pt-2 pb-10">
+                                        <motion.p
+                                            initial={{ opacity: 0, y: 8 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ duration: 0.6, ease: 'easeOut' }}
+                                            className="font-display text-2xl md:text-3xl font-light text-white/40 leading-tight mb-1"
                                         >
-                                            <Crown className="w-4 h-4 text-blue-400" />
-                                            <span className="text-xs font-bold text-blue-200 uppercase tracking-widest">Elite Clients</span>
-                                        </motion.div>
+                                            {greeting},
+                                        </motion.p>
                                         <motion.h1
-                                            initial={{ y: 20, opacity: 0 }}
-                                            animate={{ y: 0, opacity: 1 }}
-                                            transition={{ delay: 0.1 }}
-                                            className="text-5xl md:text-6xl font-black text-white tracking-tight uppercase"
+                                            initial={{ opacity: 0, y: 14, filter: 'blur(8px)' }}
+                                            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                                            transition={{ delay: 0.12, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                                            className="font-display text-4xl md:text-5xl font-medium tracking-tight text-white leading-[1.0] mb-5"
                                         >
-                                            Client Experience
+                                            {displayName}<span className="italic text-violet-400">.</span>
                                         </motion.h1>
                                         <motion.p
-                                            initial={{ y: 20, opacity: 0 }}
-                                            animate={{ y: 0, opacity: 1 }}
-                                            transition={{ delay: 0.2 }}
-                                            className="text-gray-500 max-w-lg mx-auto font-medium"
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            transition={{ delay: 0.3, duration: 0.5 }}
+                                            className="text-white/30 font-light text-sm"
                                         >
-                                            Select a project to enter your exclusive workspace.
+                                            Your workspace is loading…
                                         </motion.p>
                                     </div>
 
@@ -288,28 +294,22 @@ function ClientPortalContent() {
                                             <Loader2 className="w-10 h-10 animate-spin text-blue-500/50" />
                                         </div>
                                     ) : boards.length > 0 ? (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                                            {boards.map((board, index) => (
+                                        <div className="space-y-2 max-w-2xl">
+                                            {boards.map((b: any, i: number) => (
                                                 <PortalBoardCard
-                                                    key={board.id}
-                                                    index={index}
-                                                    name={board.name}
-                                                    itemCount={board.items_count || 0}
-                                                    color={[
-                                                        '#3b82f6', // Blue
-                                                        '#06b6d4', // Cyan
-                                                        '#6366f1', // Indigo
-                                                        '#8b5cf6', // Violet
-                                                        '#14b8a6', // Teal
-                                                    ][index % 5]}
+                                                    key={b.id}
+                                                    name={b.name}
+                                                    itemCount={b.items_count || 0}
+                                                    index={i}
+                                                    color={['#8b5cf6','#ec4899','#06b6d4','#10b981','#f59e0b'][i % 5]}
                                                     onClick={async () => {
                                                         setLoading(true);
                                                         setInitialItemId(undefined);
                                                         try {
-                                                            const fullBoardData = await getBoardItems(board.id, true);
+                                                            const fullBoardData = await getBoardItems(b.id, true);
                                                             setSelectedBoard(fullBoardData);
                                                         } catch (e) {
-                                                            setSelectedBoard(board);
+                                                            setSelectedBoard(b);
                                                         } finally {
                                                             setLoading(false);
                                                         }
@@ -318,22 +318,22 @@ function ClientPortalContent() {
                                             ))}
                                         </div>
                                     ) : (
-                                        <div className="text-center py-32 text-gray-500 border border-white/5 rounded-[2.5rem] bg-white/5 mx-auto max-w-md border-dashed">
-                                            <Briefcase className="w-12 h-12 mx-auto mb-4 opacity-10" />
-                                            <p className="font-medium text-sm">No active project workspaces found.</p>
+                                        <div className="py-20 text-center text-white/20 border border-white/[0.05] rounded-2xl">
+                                            <Briefcase className="w-8 h-8 mx-auto mb-3 opacity-30" />
+                                            <p className="text-sm font-medium">No active project workspaces found.</p>
                                         </div>
                                     )}
                                 </div>
                             </motion.div>
                         ) : selectedBoard === 'calendar' ? (
-                            <PortalCalendar 
-                                key="calendar" 
-                                boardIds={boards.map((b: any) => b.id)} 
-                                portalType="client" 
+                            <PortalCalendar
+                                key="calendar"
+                                boardIds={boards.map((b: any) => b.id)}
+                                portalType="client"
                                 onBack={() => {
                                     setSelectedBoard(null);
                                     setInitialItemId(undefined);
-                                }} 
+                                }}
                                 onGoToItem={async (boardId, itemId) => {
                                     setIsProcessingNavigation(true);
                                     try {
@@ -357,24 +357,13 @@ function ClientPortalContent() {
                                 className="flex-1 flex flex-col h-full z-10"
                             >
                                 {/* Detail Header */}
-                                <div className="h-24 px-8 flex items-center gap-6 border-b border-white/5 bg-[#0a0a16] flex-shrink-0">
-                                    <button
-                                        onClick={() => {
-                                            setSelectedBoard(null);
-                                            setInitialItemId(undefined);
-                                        }}
-                                        className="p-3 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-all group"
-                                    >
-                                        <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
-                                    </button>
+                                <div className="h-24 px-8 flex items-center gap-6 border-b border-white/5 bg-[#0a0a16] flex-shrink-0 z-20">
                                     <div>
-                                        <h1 className="text-3xl font-black text-white tracking-tight leading-tight uppercase">
-                                            {selectedBoard.name.replace(/fulfillment board/i, '').trim()}
-                                        </h1>
-                                        <div className="text-xs text-blue-400 font-bold flex items-center gap-2 mt-0.5 uppercase tracking-widest">
-                                            <Crown className="w-3.5 h-3.5" />
-                                            Exclusive Project Space
-                                        </div>
+                                        <h2 className="text-3xl font-black text-white tracking-tight uppercase flex items-center gap-3">
+                                            <Crown className="w-8 h-8 text-blue-400" />
+                                            {selectedBoard.name.replace(/fulfillment board/i, '').replace(/fullfilment board/i, '').replace(/\(inactive\)/i, '').replace(/\(CF.*?\)/i, '').replace(/\(C-F.*?\)/i, '').replace(/\(c-w-[\w-]+\)/gi, '').replace(/-/g, ' ').trim()}
+                                        </h2>
+                                        <p className="text-sm text-gray-400 font-medium">Track your project's progress and deliverables</p>
                                     </div>
                                 </div>
 

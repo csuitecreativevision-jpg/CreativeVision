@@ -6,6 +6,50 @@
 
 /* ===== Concept Design System ===== */
 
+/* ===== Portal Design Tokens (mirrors HomePage aesthetic) ===== */
+
+/* Ambient orb backgrounds used in portal pages */
+.portal-orb-violet {
+  position: fixed;
+  pointer-events: none;
+  border-radius: 50%;
+  filter: blur(120px);
+  background: rgba(139, 92, 246, 0.08);
+}
+
+.portal-orb-fuchsia {
+  position: fixed;
+  pointer-events: none;
+  border-radius: 50%;
+  filter: blur(150px);
+  background: rgba(217, 70, 239, 0.06);
+}
+
+.portal-orb-indigo {
+  position: fixed;
+  pointer-events: none;
+  border-radius: 50%;
+  filter: blur(100px);
+  background: rgba(99, 102, 241, 0.07);
+}
+
+/* Sidebar brand pill */
+.sidebar-brand-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+}
+
+/* font-display = Playfair Display italic editorial style */
+.font-display {
+  font-family: 'Playfair Display', Georgia, serif;
+}
+
 /* Soft noise texture for depth */
 .bg-noise {
   position: fixed;

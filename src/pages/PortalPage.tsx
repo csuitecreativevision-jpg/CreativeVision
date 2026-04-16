@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { BackgroundLayout } from '../components/layout/BackgroundLayout';
-import { CinematicOverlay } from '../components/ui/CinematicOverlay';
-import { MagneticButton } from '../components/ui/MagneticButton';
-import { SpotlightCard } from '../components/ui/SpotlightCard';
-import { ArrowLeft, Lock, Mail } from 'lucide-react';
-import { FishTank } from '../components/ui/FishTank';
+import { ArrowLeft, Lock, Mail, ArrowRight, Layers } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { loginUser } from '../services/boardsService';
+
+const fadeUp = (delay = 0) => ({
+    initial: { opacity: 0, y: 16 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.7, delay, ease: [0.22, 1, 0.36, 1] },
+});
 
 export default function PortalPage() {
     const navigate = useNavigate();
@@ -29,7 +30,6 @@ export default function PortalPage() {
             return;
         }
 
-        // Store user info
         localStorage.setItem('portal_user_email', result.user.email);
         localStorage.setItem('portal_user_role', result.user.role);
         localStorage.setItem('portal_user_name', result.user.name);
@@ -39,147 +39,165 @@ export default function PortalPage() {
             localStorage.removeItem('portal_user_workspace');
         }
 
-        // Redirect based on role
         setTimeout(() => {
-            if (result.user!.role === 'admin') {
-                navigate('/admin-portal');
-            } else if (result.user!.role === 'editor') {
-                navigate('/editor-portal');
-            } else {
-                navigate('/client-portal');
-            }
-        }, 500);
+            if (result.user!.role === 'admin') navigate('/admin-portal');
+            else if (result.user!.role === 'editor') navigate('/editor-portal');
+            else navigate('/client-portal');
+        }, 400);
     };
 
     return (
-        <BackgroundLayout>
-            <CinematicOverlay />
+        <div className="relative min-h-screen w-full flex overflow-hidden bg-[#020204]">
+            <div className="bg-noise" />
 
-            <div className="relative min-h-screen w-full flex items-center justify-center p-4 md:p-8 overflow-hidden bg-[#050511]">
+            {/* ─── LEFT PANEL : Auth ──────────────────────────────── */}
+            <div className="flex-1 lg:flex-none lg:w-[460px] xl:w-[500px] flex flex-col relative bg-[#020204]">
 
-                {/* Back Link */}
+                {/* Back link */}
                 <button
                     onClick={() => navigate('/')}
-                    className="absolute top-8 left-8 z-50 flex items-center gap-3 text-white/40 hover:text-white transition-all duration-300 group"
+                    className="absolute top-8 left-8 z-50 flex items-center gap-2 text-white/25 hover:text-white/70 transition-colors duration-200 group"
                 >
-                    <div className="p-2.5 rounded-full bg-white/5 border border-white/10 group-hover:bg-white/10 group-hover:border-white/20 transition-all">
-                        <ArrowLeft className="w-4 h-4" />
-                    </div>
-                    <span className="text-xs font-bold tracking-[0.25em] uppercase hidden md:inline-block">Return</span>
+                    <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform duration-200" />
+                    <span className="text-[11px] font-semibold tracking-[0.2em] uppercase">Return</span>
                 </button>
 
-                {/* Main Card */}
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.98 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-                    className="w-full max-w-[1100px] h-[650px] md:h-[750px] relative z-20"
-                >
-                    <SpotlightCard className="w-full h-full rounded-[2.5rem] bg-[#0A0A16]/90 border border-white/10 backdrop-blur-3xl flex flex-col md:flex-row shadow-2xl p-2 md:p-3 overflow-hidden">
+                {/* Form area — vertically centered */}
+                <div className="flex-1 flex flex-col items-center justify-center px-10 xl:px-14">
+                    <div className="w-full max-w-[340px]">
 
-                        {/* LEFT SIDE: Login Form */}
-                        <div className="w-full md:w-[45%] lg:w-[40%] h-full flex flex-col justify-between p-8 md:p-12 relative overflow-hidden">
+                        {/* Heading */}
+                        <motion.div {...fadeUp(0.05)} className="mb-10">
+                            <p className="text-[10px] font-bold tracking-[0.25em] uppercase text-white/25 mb-4">Portal Access</p>
+                            <h1 className="font-display text-4xl xl:text-5xl font-medium tracking-tight leading-[1.0] text-glow-premium">
+                                Sign <span className="italic text-violet-400 text-glow-violet">in.</span>
+                            </h1>
+                        </motion.div>
 
-                            {/* Ambient Glow */}
-                            <div className="absolute top-0 left-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-[100px]" />
+                        {/* Error */}
+                        {error && (
+                            <motion.div
+                                initial={{ opacity: 0, y: -6 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="mb-6 flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/8 border border-red-500/15"
+                            >
+                                <div className="w-1 h-1 rounded-full bg-red-400 flex-shrink-0" />
+                                <span className="text-xs text-red-400/90 font-medium">{error}</span>
+                            </motion.div>
+                        )}
 
-                            {/* Brand Pill */}
-                            <div className="self-start relative z-10 text-white/90">
-                                <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.5)] animate-pulse" />
-                                    <span className="text-[10px] font-bold tracking-[0.2em] uppercase">CreativeVision Portal</span>
-                                </div>
+                        {/* Form */}
+                        <motion.form {...fadeUp(0.15)} onSubmit={handleLogin} className="space-y-3">
+
+                            {/* Email */}
+                            <div className="group relative">
+                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/20 group-focus-within:text-violet-400/80 transition-colors duration-200 z-10" />
+                                <input
+                                    type="email"
+                                    value={email}
+                                    onChange={e => setEmail(e.target.value)}
+                                    placeholder="Email address"
+                                    disabled={isLoading}
+                                    className="w-full bg-white/[0.03] border border-white/[0.07] hover:border-white/[0.11] rounded-2xl pl-11 pr-5 py-3.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-violet-500/35 focus:bg-white/[0.05] focus:ring-1 focus:ring-violet-500/20 transition-all duration-200 font-medium"
+                                />
                             </div>
 
-                            {/* Form Content */}
-                            <div className="max-w-xs w-full mx-auto relative z-10">
-                                <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">Welcome Back</h1>
-                                <p className="text-gray-400 text-sm mb-8 font-medium">Please enter your credentials.</p>
-
-                                {error && (
-                                    <motion.div
-                                        initial={{ opacity: 0, y: -10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center justify-center"
-                                    >
-                                        <span className="text-xs text-red-400 font-medium">{error}</span>
-                                    </motion.div>
-                                )}
-
-                                <form onSubmit={handleLogin} className="space-y-4">
-                                    {/* Email */}
-                                    <div className="group relative">
-                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-white transition-colors duration-300 z-10">
-                                            <Mail className="w-4 h-4" />
-                                        </div>
-                                        <input
-                                            type="email"
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                            placeholder="Identity"
-                                            className="w-full bg-black/40 border border-white/10 rounded-xl pl-12 pr-6 py-4 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500/50 focus:bg-white/5 focus:ring-1 focus:ring-indigo-500/50 transition-all duration-300 text-sm font-medium"
-                                            disabled={isLoading}
-                                        />
-                                    </div>
-
-                                    {/* Password */}
-                                    <div className="group relative">
-                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-white transition-colors duration-300 z-10">
-                                            <Lock className="w-4 h-4" />
-                                        </div>
-                                        <input
-                                            type="password"
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            placeholder="Passkey"
-                                            className="w-full bg-black/40 border border-white/10 rounded-xl pl-12 pr-6 py-4 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500/50 focus:bg-white/5 focus:ring-1 focus:ring-indigo-500/50 transition-all duration-300 text-sm font-medium"
-                                            disabled={isLoading}
-                                        />
-                                    </div>
-
-                                    <div className="pt-6">
-                                        <MagneticButton className="w-full">
-                                            <button
-                                                type="submit"
-                                                disabled={isLoading}
-                                                className="w-full py-4 bg-white text-black text-xs font-bold tracking-[0.2em] uppercase rounded-xl hover:bg-indigo-50 transition-all duration-300 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.25)] disabled:opacity-50 disabled:cursor-not-allowed"
-                                            >
-                                                {isLoading ? 'Verifying...' : 'Authenticate'}
-                                            </button>
-                                        </MagneticButton>
-                                    </div>
-
-                                    <div className="flex justify-center gap-6 mt-8 text-[10px] text-gray-600 font-bold tracking-widest uppercase">
-                                        <button type="button" className="hover:text-white transition-colors duration-200">Help</button>
-                                        <button type="button" className="hover:text-white transition-colors duration-200">Privacy</button>
-                                    </div>
-                                </form>
+                            {/* Password */}
+                            <div className="group relative">
+                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/20 group-focus-within:text-violet-400/80 transition-colors duration-200 z-10" />
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={e => setPassword(e.target.value)}
+                                    placeholder="Passkey"
+                                    disabled={isLoading}
+                                    className="w-full bg-white/[0.03] border border-white/[0.07] hover:border-white/[0.11] rounded-2xl pl-11 pr-5 py-3.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-violet-500/35 focus:bg-white/[0.05] focus:ring-1 focus:ring-violet-500/20 transition-all duration-200 font-medium"
+                                />
                             </div>
 
-
-                            {/* Footer */}
-                            <div className="text-[10px] text-gray-600 font-medium tracking-wider">
-                                © 2024 CreativeVision Inc. • Secured Connection
+                            {/* CTA */}
+                            <div className="pt-2">
+                                <button
+                                    type="submit"
+                                    disabled={isLoading}
+                                    className="w-full bg-white text-black rounded-full py-3.5 font-semibold text-sm tracking-wide flex items-center justify-center gap-2.5 hover:bg-violet-50 hover:scale-[1.015] active:scale-[0.99] transition-all duration-200 shadow-[0_0_40px_rgba(255,255,255,0.15)] hover:shadow-[0_0_60px_rgba(255,255,255,0.25)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+                                >
+                                    {isLoading ? (
+                                        <>
+                                            <span className="w-3.5 h-3.5 border-2 border-black/20 border-t-black/70 rounded-full animate-spin" />
+                                            Verifying
+                                        </>
+                                    ) : (
+                                        <>
+                                            Authenticate
+                                            <ArrowRight className="w-3.5 h-3.5" />
+                                        </>
+                                    )}
+                                </button>
                             </div>
-                        </div>
+                        </motion.form>
 
-                        {/* RIGHT SIDE: Visual Card via FishTank */}
-                        <div className="hidden md:block flex-1 h-full rounded-[2.5rem] relative overflow-hidden bg-gray-900 group">
+                        {/* Utility links */}
+                        <motion.div {...fadeUp(0.25)} className="mt-8 flex items-center justify-center gap-5 text-[10px] text-white/20 font-bold tracking-widest uppercase">
+                            <button type="button" className="hover:text-white/50 transition-colors duration-150">Help</button>
+                            <span className="w-px h-3 bg-white/10" />
+                            <button type="button" className="hover:text-white/50 transition-colors duration-150">Privacy</button>
+                        </motion.div>
+                    </div>
+                </div>
 
-                            {/* Interactive Fish Tank */}
-                            <FishTank />
-
-                            {/* Overlay Gradient for Text Readability */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none z-20" />
-                        </div>
-
-                    </SpotlightCard>
-                </motion.div>
-
-                {/* Background Grid - Darker */}
-                <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:100px_100px] [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_80%)] pointer-events-none z-0" />
-
+                {/* Footer */}
+                <div className="pb-8 text-center">
+                    <p className="text-[10px] text-white/15 font-medium tracking-wider">© 2024 CreativeVision Inc.</p>
+                </div>
             </div>
-        </BackgroundLayout>
+
+            {/* Hairline divider */}
+            <div className="hidden lg:block w-px self-stretch bg-gradient-to-b from-transparent via-white/[0.07] to-transparent flex-shrink-0" />
+
+            {/* ─── RIGHT PANEL : Brand ──────────────────────────────── */}
+            <div className="hidden lg:flex flex-1 relative flex-col overflow-hidden">
+
+                {/* Ambient art */}
+                <div className="absolute inset-0">
+                    <div className="portal-orb-violet w-[80%] h-[80%] top-[-30%] right-[-30%]" />
+                    <div className="portal-orb-fuchsia w-[70%] h-[70%] bottom-[-30%] left-[-20%]" />
+                    <div className="portal-orb-indigo w-[50%] h-[50%] top-[30%] left-[10%]" />
+                    {/* Fine grid */}
+                    <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:60px_60px]" />
+                    {/* Fade edges — left side fades toward divider */}
+                    <div className="absolute inset-0 bg-gradient-to-l from-transparent to-[#020204]/60" />
+                    <div className="absolute inset-0 bg-gradient-to-b from-[#020204]/30 via-transparent to-[#020204]/40" />
+                </div>
+
+                {/* Content */}
+                <div className="relative z-10 flex flex-col h-full p-14 xl:p-16">
+                    {/* Logomark */}
+                    <motion.div {...fadeUp(0)} className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600/40 to-violet-900/30 border border-violet-500/30 flex items-center justify-center">
+                            <Layers className="w-4 h-4 text-violet-300" />
+                        </div>
+                        <span className="text-white/80 font-semibold text-sm tracking-wide">CreativeVision</span>
+                    </motion.div>
+
+                    {/* Main wordmark — bottom anchored */}
+                    <div className="mt-auto">
+                        <motion.div {...fadeUp(0.1)} className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white/[0.05] border border-white/[0.08] mb-10">
+                            <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
+                            <span className="text-[10px] font-semibold tracking-[0.22em] uppercase text-white/50">Accepting New Clients</span>
+                        </motion.div>
+
+                        <motion.h1 {...fadeUp(0.2)} className="font-display text-[4.5rem] xl:text-[5.5rem] font-medium leading-[0.88] tracking-tight text-glow-premium mb-8">
+                            Creative<br />
+                            <span className="italic text-violet-400 text-glow-violet">Vision.</span>
+                        </motion.h1>
+
+                        <motion.p {...fadeUp(0.3)} className="text-white/35 font-light text-lg max-w-xs leading-relaxed">
+                            Cinematic content engineered to hook audiences and drive real conversions.
+                        </motion.p>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 }

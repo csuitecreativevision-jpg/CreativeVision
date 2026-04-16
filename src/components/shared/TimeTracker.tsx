@@ -203,39 +203,43 @@ export const TimeTracker = () => {
     }
 
     return (
-        <div className="w-full bg-[#13141f] rounded-xl border border-white/5 mb-4 overflow-hidden relative">
-            <div className={`absolute top-0 left-0 w-1 h-full ${activeLogId ? 'bg-emerald-500' : 'bg-gray-600'}`} />
+        <div className="w-full bg-white/[0.02] rounded-xl border border-white/[0.05] mb-2 overflow-hidden relative group transition-all duration-300 hover:bg-white/[0.03]">
+            <div className={`absolute left-0 top-0 w-1 h-full transition-colors duration-300 ${activeLogId ? (status === 'paused' ? 'bg-amber-500' : 'bg-emerald-500') : 'bg-white/10'}`} />
             
-            <div className="p-3 pl-4 flex flex-col gap-2">
+            <div className="p-3.5 pl-5 flex flex-col gap-2.5">
+                {/* Header Section */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <Clock className={`w-4 h-4 ${activeLogId ? 'text-emerald-400' : 'text-gray-400'}`} />
-                        <span className="text-xs font-bold text-gray-300">Time Tracking</span>
+                        <Clock className={`w-3.5 h-3.5 transition-colors duration-300 ${activeLogId ? (status === 'paused' ? 'text-amber-400' : 'text-emerald-400') : 'text-white/30'}`} />
+                        <span className="text-[10px] font-bold tracking-widest uppercase text-white/50">
+                            Time Tracker
+                        </span>
                     </div>
                     {activeLogId && (
-                        <div className={`px-2 py-0.5 rounded-full border text-[10px] font-mono font-bold animate-pulse ${
+                        <div className={`px-2 py-0.5 rounded-md border text-[9px] font-black tracking-widest uppercase transition-all duration-300 ${
                             status === 'paused' 
                                 ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' 
-                                : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                                : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 animate-pulse'
                         }`}>
                             {status === 'paused' ? 'PAUSED' : 'ACTIVE'}
                         </div>
                     )}
                 </div>
 
-                <div className="flex items-center justify-between mt-1">
-                    <div className={`font-mono text-lg font-bold ${activeLogId ? 'text-white tracking-wider' : 'text-gray-600'} ${status === 'paused' && 'opacity-50'}`}>
+                {/* Timer and Action Buttons */}
+                <div className="flex flex-col mt-2">
+                    <div className={`font-mono text-xl font-bold text-center tabular-nums transition-all duration-300 ${activeLogId ? (status === 'paused' ? 'text-white/50' : 'text-white') : 'text-white/20'}`}>
                         {elapsedTime}
                     </div>
 
-                    <div className="flex gap-1.5">
+                    <div className="flex items-center gap-2 mt-3 w-full">
                         {!activeLogId ? (
                             <button
                                 onClick={handleTimeIn}
                                 disabled={actionLoading}
-                                className="bg-emerald-500 hover:bg-emerald-400 text-black px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 disabled:opacity-50"
+                                className="w-full bg-emerald-500 hover:bg-emerald-400 text-black px-3.5 py-2.5 h-10 rounded-xl text-[11px] uppercase tracking-widest font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                             >
-                                {actionLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3 fill-current" />}
+                                {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
                                 TIME IN
                             </button>
                         ) : (
@@ -244,25 +248,29 @@ export const TimeTracker = () => {
                                     <button
                                         onClick={handlePause}
                                         disabled={actionLoading}
-                                        className="bg-amber-500/20 border border-amber-500/30 hover:bg-amber-500 hover:text-white text-amber-500 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 disabled:opacity-50"
+                                        className="flex-1 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500 hover:text-white text-[11px] font-bold tracking-widest uppercase transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                        title="Pause"
                                     >
-                                        {actionLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Pause className="w-3 h-3 fill-current" />}
+                                        {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pause className="w-4 h-4 fill-current" />}
+                                        PAUSE
                                     </button>
                                 ) : (
                                     <button
                                         onClick={handleResume}
                                         disabled={actionLoading}
-                                        className="bg-emerald-500/20 border border-emerald-500/30 hover:bg-emerald-500 hover:text-white text-emerald-400 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 disabled:opacity-50"
+                                        className="flex-1 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white text-[11px] font-bold tracking-widest uppercase transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                        title="Resume"
                                     >
-                                        {actionLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                                        {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
+                                        RESUME
                                     </button>
                                 )}
                                 <button
                                     onClick={handleTimeOut}
                                     disabled={actionLoading}
-                                    className="bg-red-500/20 border border-red-500/30 hover:bg-red-500 hover:text-white text-red-400 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 disabled:opacity-50"
+                                    className="flex-1 bg-red-500/10 border border-red-500/20 hover:bg-red-500 hover:text-white text-red-500 px-3 py-2.5 h-10 rounded-xl text-[11px] font-bold tracking-widest transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                                 >
-                                    {actionLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Square className="w-3 h-3 fill-current" />}
+                                    {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Square className="w-4 h-4 fill-current" />}
                                     OUT
                                 </button>
                             </>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { StatCard } from '../../components/shared/StatCard';
 import { AdminPageLayout } from '../../components/layout/AdminPageLayout';
+import { motion } from 'framer-motion';
 import {
     Activity,
     TrendingUp,
@@ -8,7 +8,11 @@ import {
     Users,
     ChevronDown,
     Check,
-    Calendar
+    Calendar,
+    Loader2,
+    Crown,
+    Sparkles,
+    ArrowUpRight,
 } from 'lucide-react';
 import {
     getAllBoards, getMultipleBoardItems, getWorkspaceAnalytics, getAllFolders
@@ -18,22 +22,123 @@ import { getCache, setCache } from '../../services/cacheService';
 
 const OVERVIEW_CACHE_KEY = 'admin_overview_stats';
 
-// --- Admin Overview Component ---
+const ACCENT_COLORS = ['#8b5cf6', '#ec4899', '#3b82f6', '#10b981', '#f59e0b'];
+const EDITOR_COLORS = ['#8b5cf6', '#ec4899', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4'];
+
+// ── Stat card ───────────────────────────────────────────────────────────────
+function StatCard({
+    title,
+    value,
+    sub,
+    icon,
+    color,
+    delay = 0,
+    loading = false,
+}: {
+    title: string;
+    value: string;
+    sub: string;
+    icon: React.ReactNode;
+    color: string;
+    delay?: number;
+    loading?: boolean;
+}) {
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="relative flex flex-col justify-between p-6 bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden"
+        >
+            {/* Top accent line */}
+            <div className="absolute top-0 left-6 right-6 h-[1px]" style={{ background: `linear-gradient(to right, transparent, ${color}66, transparent)` }} />
+
+            {/* Icon */}
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-5" style={{ background: `${color}14`, border: `1px solid ${color}25` }}>
+                <span style={{ color }}>{icon}</span>
+            </div>
+
+            {/* Value */}
+            <div>
+                {loading ? (
+                    <div className="h-9 w-16 bg-white/5 rounded-lg animate-pulse mb-2" />
+                ) : (
+                    <div className="text-[32px] font-black text-white leading-none tracking-tight mb-1.5">{value}</div>
+                )}
+                <div className="text-[11px] font-bold uppercase tracking-widest" style={{ color: `${color}80` }}>{title}</div>
+                <div className="text-[11px] text-white/25 mt-0.5 font-medium">{sub}</div>
+            </div>
+        </motion.div>
+    );
+}
+
+// ── Bar row ─────────────────────────────────────────────────────────────────
+function BarRow({
+    rank,
+    name,
+    count,
+    max,
+    color,
+    label,
+    isTop,
+}: {
+    rank: number;
+    name: string;
+    count: number;
+    max: number;
+    color: string;
+    label: string;
+    isTop?: boolean;
+}) {
+    const pct = max > 0 ? (count / max) * 100 : 0;
+    const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
+    return (
+        <div className="flex items-center gap-3 group py-2">
+            {/* Avatar / rank */}
+            <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black flex-shrink-0 relative"
+                style={{ background: `${color}18`, border: `1px solid ${color}30`, color }}
+            >
+                {initials || rank}
+                {isTop && (
+                    <Crown className="w-2.5 h-2.5 absolute -top-1 -right-1" style={{ color: '#f59e0b' }} />
+                )}
+            </div>
+
+            {/* Name + bar */}
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[12px] font-semibold text-white/65 group-hover:text-white/90 truncate transition-colors leading-none">{name}</span>
+                    <span className="text-[10px] font-bold ml-2 flex-shrink-0 px-2 py-0.5 rounded-md" style={{ color, background: `${color}14`, border: `1px solid ${color}22` }}>
+                        {count} {label}
+                    </span>
+                </div>
+                <div className="h-[3px] w-full rounded-full overflow-hidden" style={{ background: `${color}12` }}>
+                    <motion.div
+                        className="h-full rounded-full"
+                        style={{ background: `linear-gradient(to right, ${color}, ${color}99)` }}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${pct}%` }}
+                        transition={{ delay: 0.2, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                    />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ── Main component ───────────────────────────────────────────────────────────
 export default function AdminOverview() {
-    // Raw data state (fetched once)
     const [rawData, setRawData] = useState<any>(() => {
         const cached = getCache<any>(OVERVIEW_CACHE_KEY);
         return cached?.data || null;
     });
     const [overviewLoading, setOverviewLoading] = useState(() => !getCache(OVERVIEW_CACHE_KEY));
-
-    // Cycle selection state
     const [selectedCycles, setSelectedCycles] = useState<Set<string>>(new Set());
     const [isCycleDropdownOpen, setIsCycleDropdownOpen] = useState(false);
 
-    useEffect(() => {
-        fetchOverviewData();
-    }, []);
+    useEffect(() => { fetchOverviewData(); }, []);
 
     const fetchOverviewData = async () => {
         const hasCachedData = !!getCache(OVERVIEW_CACHE_KEY);
@@ -48,7 +153,6 @@ export default function AdminOverview() {
             const allFetchedBoards = boardsData || [];
             const { cycles, data: cycleData } = analyticsData;
 
-            // Find Active Clients folder
             const activeClientsFolder = allFolders.find((f: any) => f.name.toLowerCase() === 'active clients');
             let clientBoardItems: any[] = [];
 
@@ -56,11 +160,8 @@ export default function AdminOverview() {
                 const clientBoardIds = activeClientsFolder.children.map((c: any) => String(c.id));
                 const clientBoards = allFetchedBoards.filter((b: any) => clientBoardIds.includes(String(b.id)));
                 const clientBoardMap = new Map(clientBoards.map((b: any) => [String(b.id), b.name]));
-
                 if (clientBoardIds.length > 0) {
-                    const [clientItemsData] = await Promise.all([
-                        getMultipleBoardItems(clientBoardIds)
-                    ]);
+                    const [clientItemsData] = await Promise.all([getMultipleBoardItems(clientBoardIds)]);
                     clientBoardItems = clientItemsData.map((board: any) => ({
                         ...board,
                         boardName: clientBoardMap.get(String(board.id)) || board.name
@@ -68,44 +169,34 @@ export default function AdminOverview() {
                 }
             }
 
-            const newData = {
-                cycles,
-                cycleData,
-                clientBoardItems
-            };
-
+            const newData = { cycles, cycleData, clientBoardItems };
             setRawData(newData);
             setCache(OVERVIEW_CACHE_KEY, newData);
 
-            // Default to latest cycle selected
             if (cycles.length > 0 && selectedCycles.size === 0) {
                 setSelectedCycles(new Set([cycles[0]]));
             }
-
         } catch (error) {
-            console.error("Failed to load overview data", error);
+            console.error('Failed to load overview data', error);
         } finally {
             setOverviewLoading(false);
         }
     };
 
-    // --- Derived stats based on selected cycles ---
     const overviewStats = useMemo(() => {
-        if (!rawData || !rawData.cycles) return {
-            activeClientsCount: 0,
-            activeProjectsCount: 0,
-            activeEditorsCount: 0,
+        const empty = {
+            activeClientsCount: 0, activeProjectsCount: 0, activeEditorsCount: 0,
             topEditor: { name: 'N/A', count: 0 },
-            clientProjectDistribution: [] as { name: string, count: number }[],
-            editorPerformance: [] as { name: string, count: number }[],
+            clientProjectDistribution: [] as { name: string; count: number }[],
+            editorPerformance: [] as { name: string; count: number }[],
         };
+        if (!rawData?.cycles) return empty;
 
         const { cycles, cycleData, clientBoardItems } = rawData;
         const cyclesToUse = selectedCycles.size > 0 ? Array.from(selectedCycles) : (cycles.length > 0 ? [cycles[0]] : []);
 
-        // --- Editor Stats (aggregated across selected cycles) ---
+        // Editor stats
         const editorTotals: Record<string, number> = {};
-
         cyclesToUse.forEach((cycleKey: string) => {
             if (cycleData[cycleKey]) {
                 Object.entries(cycleData[cycleKey]).forEach(([name, count]) => {
@@ -113,41 +204,27 @@ export default function AdminOverview() {
                 });
             }
         });
-
         const editorPerformance = Object.entries(editorTotals)
             .map(([name, count]) => ({ name, count }))
             .sort((a, b) => b.count - a.count);
 
-        const activeEditorsCount = editorPerformance.length;
-        const topEditor = editorPerformance.length > 0
-            ? { name: editorPerformance[0].name, count: editorPerformance[0].count }
-            : { name: 'None', count: 0 };
-
-        // --- Client/Project Stats (aggregated across selected cycles) ---
+        // Client stats
         const clientCounts: Record<string, number> = {};
-        let totalActiveProjects = 0;
-
         cyclesToUse.forEach((cycleKey: string) => {
-            // Parse cycle key to get date range
             const match = cycleKey.match(/(\w+) (\d+) - Cycle (\d)/);
             if (!match) return;
-
             const [, monthStr, yearStr, cycleNumStr] = match;
             const year = parseInt(yearStr);
             const cycle = parseInt(cycleNumStr) as 1 | 2;
             const month = new Date(`${monthStr} 1, ${year}`).getMonth() + 1;
             const cycleInfo = getCycleDates(cycle, month, year);
-
             (clientBoardItems || []).forEach((board: any) => {
                 const validItems = (board.items || []).filter((i: any) => {
                     if (!i.created_at) return false;
-                    const createdDate = new Date(i.created_at);
-                    return isDateInCycle(createdDate, cycleInfo);
+                    return isDateInCycle(new Date(i.created_at), cycleInfo);
                 });
-
-                const count = validItems.length;
-                if (count > 0) {
-                    clientCounts[board.boardName] = (clientCounts[board.boardName] || 0) + count;
+                if (validItems.length > 0) {
+                    clientCounts[board.boardName] = (clientCounts[board.boardName] || 0) + validItems.length;
                 }
             });
         });
@@ -155,114 +232,72 @@ export default function AdminOverview() {
         const clientProjectDistribution = Object.entries(clientCounts)
             .map(([name, count]) => ({ name, count }))
             .sort((a, b) => b.count - a.count);
-
-        totalActiveProjects = clientProjectDistribution.reduce((sum, c) => sum + c.count, 0);
-        const activeClientsCount = clientProjectDistribution.length;
+        const totalActiveProjects = clientProjectDistribution.reduce((s, c) => s + c.count, 0);
 
         return {
-            activeClientsCount,
+            activeClientsCount: clientProjectDistribution.length,
             activeProjectsCount: totalActiveProjects,
-            activeEditorsCount,
-            topEditor,
+            activeEditorsCount: editorPerformance.length,
+            topEditor: editorPerformance[0] ?? { name: 'None', count: 0 },
             clientProjectDistribution,
             editorPerformance,
         };
     }, [rawData, selectedCycles]);
 
-    // --- Cycle selector helpers ---
     const availableCycles: string[] = rawData?.cycles || [];
-
-    const toggleCycle = (cycle: string) => {
-        setSelectedCycles(prev => {
-            const next = new Set(prev);
-            if (next.has(cycle)) {
-                next.delete(cycle);
-            } else {
-                next.add(cycle);
-            }
-            return next;
-        });
-    };
-
-    const selectAll = () => {
-        setSelectedCycles(new Set(availableCycles));
-    };
-
-    const clearAll = () => {
-        setSelectedCycles(new Set());
-    };
-
-    const cycleLabel = selectedCycles.size === 0
-        ? 'Select Cycles'
-        : selectedCycles.size === 1
-            ? Array.from(selectedCycles)[0]
-            : `${selectedCycles.size} Cycles Selected`;
+    const toggleCycle = (cycle: string) => setSelectedCycles(prev => {
+        const next = new Set(prev);
+        next.has(cycle) ? next.delete(cycle) : next.add(cycle);
+        return next;
+    });
+    const cycleLabel = selectedCycles.size === 0 ? 'All Cycles'
+        : selectedCycles.size === 1 ? Array.from(selectedCycles)[0]
+        : `${selectedCycles.size} Cycles`;
 
     return (
         <AdminPageLayout
+            label="Admin"
             title="Overview"
-            subtitle="Platform activity at a glance. Real-time metrics and performance tracking."
+            subtitle="Platform activity at a glance"
             action={
                 <div className="relative">
                     <button
                         onClick={() => setIsCycleDropdownOpen(!isCycleDropdownOpen)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-[#0e0e1a] border border-white/10 rounded-xl text-sm font-bold text-white hover:bg-white/5 transition-all"
+                        className="flex items-center gap-2 px-3.5 py-2 bg-white/[0.04] border border-white/[0.07] rounded-xl text-xs font-semibold text-white/70 hover:text-white transition-all duration-150"
                     >
-                        <Calendar className="w-4 h-4 text-violet-400" />
-                        <span className="truncate max-w-[200px]">{cycleLabel}</span>
-                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isCycleDropdownOpen ? 'rotate-180' : ''}`} />
+                        <Calendar className="w-3.5 h-3.5 text-violet-400" />
+                        <span className="truncate max-w-[180px]">{cycleLabel}</span>
+                        <ChevronDown className={`w-3.5 h-3.5 text-white/30 transition-transform duration-200 ${isCycleDropdownOpen ? 'rotate-180' : ''}`} />
                     </button>
 
-                    {/* Backdrop */}
-                    {isCycleDropdownOpen && (
-                        <div className="fixed inset-0 z-40" onClick={() => setIsCycleDropdownOpen(false)} />
-                    )}
+                    {isCycleDropdownOpen && <div className="fixed inset-0 z-40" onClick={() => setIsCycleDropdownOpen(false)} />}
 
-                    {/* Dropdown */}
                     {isCycleDropdownOpen && (
-                        <div className="absolute top-full right-0 mt-2 w-80 bg-[#0A0A16] border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 z-50">
-                            {/* Header with Select All / Clear */}
-                            <div className="p-3 border-b border-white/5 flex items-center justify-between">
-                                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Filter by Cycle</span>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={selectAll}
-                                        className="text-[10px] font-bold text-violet-400 hover:text-violet-300 transition-colors"
-                                    >
-                                        All
-                                    </button>
-                                    <span className="text-gray-600">|</span>
-                                    <button
-                                        onClick={clearAll}
-                                        className="text-[10px] font-bold text-gray-500 hover:text-gray-300 transition-colors"
-                                    >
-                                        Clear
-                                    </button>
+                        <div className="absolute top-full right-0 mt-2 w-72 bg-[#06060a]/95 backdrop-blur-xl border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden z-50">
+                            <div className="px-4 py-3 border-b border-white/[0.05] flex items-center justify-between">
+                                <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Filter by Cycle</span>
+                                <div className="flex gap-3">
+                                    <button onClick={() => setSelectedCycles(new Set(availableCycles))} className="text-[10px] font-bold text-violet-400 hover:text-violet-300 transition-colors">All</button>
+                                    <span className="text-white/10">·</span>
+                                    <button onClick={() => setSelectedCycles(new Set())} className="text-[10px] font-bold text-white/30 hover:text-white/60 transition-colors">Clear</button>
                                 </div>
                             </div>
-
-                            {/* Cycle List */}
-                            <div className="max-h-[300px] overflow-y-auto custom-scrollbar p-2">
+                            <div className="max-h-64 overflow-y-auto custom-scrollbar p-2">
                                 {availableCycles.map(cycle => {
-                                    const isSelected = selectedCycles.has(cycle);
+                                    const sel = selectedCycles.has(cycle);
                                     return (
                                         <button
                                             key={cycle}
                                             onClick={() => toggleCycle(cycle)}
-                                            className={`w-full text-left px-4 py-3 rounded-xl transition-all mb-1 flex items-center justify-between group ${isSelected
-                                                ? 'bg-violet-500/10 text-violet-400 font-bold'
-                                                : 'text-gray-400 hover:bg-white/5 hover:text-white'
-                                                }`}
+                                            className={`w-full text-left px-3 py-2.5 rounded-xl transition-all mb-0.5 flex items-center justify-between ${sel ? 'bg-violet-500/10 text-violet-300' : 'text-white/40 hover:bg-white/[0.04] hover:text-white/80'}`}
                                         >
-                                            <span className="text-xs">{cycle}</span>
-                                            {isSelected && <Check className="w-3.5 h-3.5 flex-shrink-0" />}
+                                            <span className="text-xs font-medium">{cycle}</span>
+                                            {sel && <Check className="w-3 h-3 flex-shrink-0" />}
                                         </button>
                                     );
                                 })}
                                 {availableCycles.length === 0 && (
-                                    <div className="p-4 text-center text-gray-500 text-xs italic">
-                                        No cycles available.
-                                    </div>
+                                    <div className="p-4 text-center text-white/20 text-xs">No cycles available.</div>
                                 )}
                             </div>
                         </div>
@@ -270,120 +305,149 @@ export default function AdminOverview() {
                 </div>
             }
         >
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* ── Stat cards ── */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard
                     title="Active Clients"
-                    value={overviewLoading ? "..." : String(overviewStats.activeClientsCount)}
-                    change="Boards"
-                    icon={<Briefcase className="w-5 h-5 text-blue-400" />}
-                    delay={0.1}
+                    value={overviewLoading ? '—' : String(overviewStats.activeClientsCount)}
+                    sub="With active projects"
+                    icon={<Briefcase className="w-4 h-4" />}
+                    color="#3b82f6"
+                    delay={0.05}
+                    loading={overviewLoading}
                 />
                 <StatCard
                     title="Active Projects"
-                    value={overviewLoading ? "..." : String(overviewStats.activeProjectsCount)}
-                    change="In Progress"
-                    icon={<Activity className="w-5 h-5 text-purple-400" />}
-                    delay={0.2}
-                />
-                <StatCard
-                    title="Top Editor"
-                    value={overviewLoading ? "..." : overviewStats.topEditor.name}
-                    change={`${overviewStats.topEditor.count} Videos`}
-                    icon={<TrendingUp className="w-5 h-5 text-green-400" />}
-                    delay={0.3}
+                    value={overviewLoading ? '—' : String(overviewStats.activeProjectsCount)}
+                    sub="In selected cycle(s)"
+                    icon={<Activity className="w-4 h-4" />}
+                    color="#8b5cf6"
+                    delay={0.1}
+                    loading={overviewLoading}
                 />
                 <StatCard
                     title="Active Editors"
-                    value={overviewLoading ? "..." : String(overviewStats.activeEditorsCount)}
-                    change="In Workspace"
-                    icon={<Users className="w-5 h-5 text-emerald-400" />}
-                    delay={0.4}
+                    value={overviewLoading ? '—' : String(overviewStats.activeEditorsCount)}
+                    sub="With submitted work"
+                    icon={<Users className="w-4 h-4" />}
+                    color="#10b981"
+                    delay={0.15}
+                    loading={overviewLoading}
+                />
+                <StatCard
+                    title="Top Editor"
+                    value={overviewLoading ? '—' : overviewStats.topEditor.name.split(' ')[0]}
+                    sub={`${overviewStats.topEditor.count} projects`}
+                    icon={<Crown className="w-4 h-4" />}
+                    color="#f59e0b"
+                    delay={0.2}
+                    loading={overviewLoading}
                 />
             </div>
 
-            {/* Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* ── Charts ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+
                 {/* Client Distribution */}
-                <div className="bg-[#13141f] border border-white/5 rounded-2xl p-8 relative overflow-hidden">
-                    <h3 className="text-white font-bold mb-6 flex items-center gap-2 relative z-10">
-                        <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400">
-                            <Activity className="w-4 h-4" />
+                <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.25, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                    className="bg-white/[0.018] border border-white/[0.06] rounded-2xl overflow-hidden"
+                >
+                    {/* Panel header */}
+                    <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.05]">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: '#8b5cf614', border: '1px solid #8b5cf622' }}>
+                                <Activity className="w-3.5 h-3.5" style={{ color: '#8b5cf6' }} />
+                            </div>
+                            <div>
+                                <h3 className="text-[13px] font-bold text-white/80">Active Projects</h3>
+                                <p className="text-[10px] text-white/25 font-medium mt-0.5">By client</p>
+                            </div>
                         </div>
-                        Active Projects
-                    </h3>
-                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar relative z-10">
-                        {overviewStats.clientProjectDistribution.length > 0 ? (
-                            overviewStats.clientProjectDistribution.map((client: { name: string, count: number }, i: number) => (
-                                <div key={i} className="flex items-center gap-4 group/item">
-                                    <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/5 flex items-center justify-center text-xs font-bold text-gray-400 group-hover/item:border-purple-500/30 group-hover/item:text-purple-400 transition-colors">
-                                        {i + 1}
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-sm text-gray-300 font-medium group-hover/item:text-white transition-colors">{client.name}</span>
-                                            <span className="text-[10px] font-bold text-purple-300 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-full">{client.count} Active</span>
-                                        </div>
-                                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-purple-600 rounded-full"
-                                                style={{ width: `${(client.count / Math.max(1, overviewStats.activeProjectsCount)) * 100}%` }}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
+                        <span className="text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded-lg" style={{ color: '#8b5cf6', background: '#8b5cf610', border: '1px solid #8b5cf620' }}>
+                            {overviewStats.activeClientsCount} clients
+                        </span>
+                    </div>
+
+                    <div className="px-6 py-5 space-y-1 max-h-[320px] overflow-y-auto custom-scrollbar">
+                        {overviewLoading ? (
+                            <div className="flex items-center justify-center py-16">
+                                <Loader2 className="w-4 h-4 animate-spin text-violet-400/40" />
+                            </div>
+                        ) : overviewStats.clientProjectDistribution.length > 0 ? (
+                            overviewStats.clientProjectDistribution.map((client, i) => (
+                                <BarRow
+                                    key={i}
+                                    rank={i + 1}
+                                    name={client.name.replace(/- Fulfillment Board.*|Board.*/i, '').trim()}
+                                    count={client.count}
+                                    max={overviewStats.activeProjectsCount}
+                                    color={ACCENT_COLORS[i % ACCENT_COLORS.length]}
+                                    label="projects"
+                                />
                             ))
                         ) : (
-                            <div className="text-center text-gray-500 py-10 border border-dashed border-white/5 rounded-2xl">
-                                No active projects found
+                            <div className="flex flex-col items-center justify-center py-16 text-white/15">
+                                <Sparkles className="w-6 h-6 mb-2" />
+                                <p className="text-xs font-medium">No active projects found</p>
                             </div>
                         )}
                     </div>
-                </div>
+                </motion.div>
 
                 {/* Editor Performance */}
-                <div className="bg-[#13141f] border border-white/5 rounded-2xl p-8 relative overflow-hidden">
-                    <h3 className="text-white font-bold mb-6 flex items-center gap-2 relative z-10 w-full justify-between">
-                        <div className="flex items-center gap-2">
-                            <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                                <TrendingUp className="w-4 h-4" />
+                <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                    className="bg-white/[0.018] border border-white/[0.06] rounded-2xl overflow-hidden"
+                >
+                    {/* Panel header */}
+                    <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.05]">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: '#10b98114', border: '1px solid #10b98122' }}>
+                                <TrendingUp className="w-3.5 h-3.5" style={{ color: '#10b981' }} />
                             </div>
-                            Editor Workload
+                            <div>
+                                <h3 className="text-[13px] font-bold text-white/80">Editor Workload</h3>
+                                <p className="text-[10px] text-white/25 font-medium mt-0.5">By project count</p>
+                            </div>
                         </div>
                         {selectedCycles.size > 0 && (
-                            <span className="text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-full truncate max-w-[200px]">
-                                {selectedCycles.size === 1 ? Array.from(selectedCycles)[0] : `${selectedCycles.size} Cycles`}
+                            <span className="text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded-lg" style={{ color: '#10b981', background: '#10b98110', border: '1px solid #10b98120' }}>
+                                {cycleLabel}
                             </span>
                         )}
-                    </h3>
-                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar relative z-10">
-                        {overviewStats.editorPerformance.length > 0 ? (
-                            overviewStats.editorPerformance.map((editor: { name: string, count: number }, i: number) => (
-                                <div key={i} className="flex items-center gap-4 group/item">
-                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-800 to-black border border-white/10 flex items-center justify-center text-xs font-bold text-gray-400 group-hover/item:border-emerald-500/30 group-hover/item:text-emerald-400 transition-colors shadow-lg">
-                                        {editor.name.charAt(0)}
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-sm text-gray-300 font-medium group-hover/item:text-white transition-colors">{editor.name}</span>
-                                            <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">{editor.count} Projects</span>
-                                        </div>
-                                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-emerald-500 rounded-full"
-                                                style={{ width: `${(editor.count / Math.max(1, overviewStats.topEditor.count || 10)) * 100}%` }}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
+                    </div>
+
+                    <div className="px-6 py-5 space-y-1 max-h-[320px] overflow-y-auto custom-scrollbar">
+                        {overviewLoading ? (
+                            <div className="flex items-center justify-center py-16">
+                                <Loader2 className="w-4 h-4 animate-spin text-emerald-400/40" />
+                            </div>
+                        ) : overviewStats.editorPerformance.length > 0 ? (
+                            overviewStats.editorPerformance.map((editor, i) => (
+                                <BarRow
+                                    key={i}
+                                    rank={i + 1}
+                                    name={editor.name}
+                                    count={editor.count}
+                                    max={overviewStats.topEditor.count || 1}
+                                    color={EDITOR_COLORS[i % EDITOR_COLORS.length]}
+                                    label="projects"
+                                    isTop={i === 0}
+                                />
                             ))
                         ) : (
-                            <div className="text-center text-gray-500 py-10 border border-dashed border-white/5 rounded-2xl">
-                                No active editors found
+                            <div className="flex flex-col items-center justify-center py-16 text-white/15">
+                                <ArrowUpRight className="w-6 h-6 mb-2" />
+                                <p className="text-xs font-medium">No editor data found</p>
                             </div>
                         )}
                     </div>
-                </div>
+                </motion.div>
             </div>
         </AdminPageLayout>
     );

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getApprovalItems, getBoardItems } from '../../services/mondayService';
-import { GlassCard } from '../../components/ui/GlassCard';
-import { Video, RefreshCw, Layers } from 'lucide-react';
+import { Video, RefreshCw, CheckCircle2, Layers, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AdminApprovalModal } from '../../components/views/AdminApprovalModal';
 import { FilePreviewModal } from '../../components/ui/FilePreviewModal';
@@ -11,15 +10,13 @@ export default function AdminApprovalCenter() {
     const [items, setItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Modal State
     const [selectedApprovalItem, setSelectedApprovalItem] = useState<any | null>(null);
     const [approvalBoardData, setApprovalBoardData] = useState<any | null>(null);
     const [loadingBoard, setLoadingBoard] = useState(false);
+    const [loadingItemId, setLoadingItemId] = useState<string | null>(null);
     const [previewFile, setPreviewFile] = useState<{ url: string, name: string, assetId?: string } | null>(null);
 
-    useEffect(() => {
-        loadData();
-    }, []);
+    useEffect(() => { loadData(); }, []);
 
     const loadData = async () => {
         setLoading(true);
@@ -27,7 +24,7 @@ export default function AdminApprovalCenter() {
             const data = await getApprovalItems();
             setItems(data);
         } catch (error) {
-            console.error("Failed to load approvals", error);
+            console.error('Failed to load approvals', error);
         } finally {
             setLoading(false);
         }
@@ -35,17 +32,16 @@ export default function AdminApprovalCenter() {
 
     const handleReviewProject = async (item: any) => {
         setLoadingBoard(true);
+        setLoadingItemId(item.id);
         try {
-            // Fetch full board data for the selected item's board
-            // We need this because ProjectSelectionView expects the full board context
             const boardData = await getBoardItems(item.boardId);
             setApprovalBoardData(boardData);
             setSelectedApprovalItem(item);
         } catch (error) {
-            console.error("Failed to load project details", error);
-            alert("Failed to load project details. Please try again.");
+            console.error('Failed to load project details', error);
         } finally {
             setLoadingBoard(false);
+            setLoadingItemId(null);
         }
     };
 
@@ -57,120 +53,117 @@ export default function AdminApprovalCenter() {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
+                <Loader2 className="w-5 h-5 text-violet-400/50 animate-spin" />
             </div>
         );
     }
 
     return (
         <AdminPageLayout
+            label="Admin"
             title="Pending Approvals"
-            subtitle={`Projects waiting for review (${items.length})`}
+            subtitle={`${items.length} project${items.length !== 1 ? 's' : ''} awaiting review`}
             action={
                 <button
                     onClick={loadData}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white text-sm font-bold transition-all"
+                    className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.04] border border-white/[0.07] hover:bg-white/[0.07] text-white/60 hover:text-white text-xs font-semibold transition-all duration-150"
                 >
-                    <RefreshCw className="w-4 h-4" /> Refresh
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Refresh
                 </button>
             }
         >
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="space-y-2">
                 {items.length === 0 ? (
-                    <div className="text-center py-20 bg-white/5 rounded-2xl border border-white/10">
-                        <div className="bg-white/5 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Video className="w-8 h-8 text-gray-500" />
-                        </div>
-                        <h3 className="text-lg font-bold text-white">No Pending Approvals</h3>
-                        <p className="text-gray-400 mt-2">All caught up! Great work.</p>
+                    <div className="flex flex-col items-center justify-center py-24 border border-white/[0.05] rounded-2xl text-white/20">
+                        <CheckCircle2 className="w-8 h-8 mb-3 opacity-40" />
+                        <p className="text-sm font-medium text-white/30">All caught up — no pending approvals</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {items.map((item, index) => (
-                            <motion.div
-                                key={item.id}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: index * 0.05 }}
-                            >
-                                <GlassCard className="p-0 h-full overflow-hidden flex flex-col border border-white/10 group hover:border-violet-500/50 transition-colors">
-                                    {/* Header / Board Badge */}
-                                    <div className="p-4 border-b border-white/5 bg-white/5 flex justify-between items-start">
-                                        <div className="flex items-center gap-2 text-violet-300 text-xs font-bold uppercase tracking-wider">
-                                            <Layers className="w-3 h-3" />
-                                            {item.boardName.replace(/- Workspace|\(c-w-[\w-]+\)/gi, '').trim()}
-                                        </div>
-                                        <div className="px-2 py-1 rounded bg-violet-500/20 text-violet-300 text-[10px] font-bold border border-violet-500/20">
-                                            Active
-                                        </div>
+                    items.map((item, index) => (
+                        <motion.div
+                            key={item.id}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.04, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                        >
+                            <div className="group flex items-center gap-5 px-6 py-5 bg-white/[0.02] hover:bg-white/[0.045] border border-white/[0.06] hover:border-violet-500/20 rounded-2xl transition-all duration-200">
+
+                                {/* Left accent bar */}
+                                <div className="w-1 h-11 rounded-full flex-shrink-0 bg-gradient-to-b from-violet-500/60 to-violet-500/10" />
+
+                                {/* Editor avatar */}
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600/25 to-fuchsia-600/15 border border-violet-500/20 flex items-center justify-center text-violet-300 font-bold text-sm flex-shrink-0">
+                                    {item.editor?.charAt(0)?.toUpperCase() || '?'}
+                                </div>
+
+                                {/* Main info */}
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-[15px] font-semibold text-white/85 group-hover:text-white truncate leading-tight transition-colors duration-150">
+                                        {item.name}
                                     </div>
-
-                                    {/* Content */}
-                                    <div className="p-6 flex-1 flex flex-col">
-                                        <h3 className="text-lg font-bold text-white mb-3 line-clamp-2 leading-tight group-hover:text-violet-200 transition-colors">
-                                            {item.name}
-                                        </h3>
-
-                                        <div className="mt-auto space-y-4">
-                                            <div className="flex items-center gap-2 text-gray-400 text-sm">
-                                                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-[10px] font-bold text-white">
-                                                    {item.editor.charAt(0)}
-                                                </div>
-                                                {item.editor}
-                                            </div>
-
-                                            {/* Action Button */}
-                                            <button
-                                                onClick={() => handleReviewProject(item)}
-                                                disabled={loadingBoard}
-                                                className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-bold transition-all shadow-[0_0_15px_rgba(124,58,237,0.3)] hover:shadow-[0_0_25px_rgba(124,58,237,0.5)]
-                                                ${item.videoLink ? 'bg-violet-600 hover:bg-violet-500 text-white' : 'bg-white/10 hover:bg-white/20 text-gray-300'}
-                                            `}
-                                            >
-                                                {loadingBoard && selectedApprovalItem?.id === item.id ? (
-                                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                                ) : (
-                                                    <Video className="w-4 h-4" />
-                                                )}
-                                                Review Project
-                                            </button>
-                                        </div>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <Layers className="w-3 h-3 text-violet-400/50 flex-shrink-0" />
+                                        <span className="text-[11px] text-white/30 font-medium truncate">
+                                            {item.boardName?.replace(/- Workspace|\(c-w-[\w-]+\)/gi, '').trim()}
+                                        </span>
+                                        <span className="text-white/10">·</span>
+                                        <span className="text-[11px] text-white/30 font-medium">{item.editor}</span>
                                     </div>
-                                </GlassCard>
-                            </motion.div>
-                        ))}
-                    </div>
+                                </div>
+
+                                {/* Status badge */}
+                                <div className="flex-shrink-0">
+                                    <div className="px-3 py-1.5 rounded-lg bg-amber-500/8 border border-amber-500/15 text-[11px] font-bold tracking-widest uppercase text-amber-400/70">
+                                        Pending
+                                    </div>
+                                </div>
+
+                                {/* Review button */}
+                                <button
+                                    onClick={() => handleReviewProject(item)}
+                                    disabled={loadingBoard}
+                                    className="flex-shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl bg-violet-600/80 hover:bg-violet-500 text-white text-sm font-semibold transition-all duration-150 hover:shadow-[0_0_20px_rgba(139,92,246,0.35)] disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    {loadingItemId === item.id ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                        <Video className="w-4 h-4" />
+                                    )}
+                                    Review
+                                </button>
+                            </div>
+                        </motion.div>
+                    ))
                 )}
-
-                {/* Project Selection / Review Modal */}
-                <AnimatePresence>
-                    {selectedApprovalItem && approvalBoardData && (
-                        <AdminApprovalModal
-                            approvalItems={items}
-                            currentApprovalItem={selectedApprovalItem}
-                            boardData={approvalBoardData}
-                            onClose={closeReview}
-                            onNext={() => {
-                                const idx = items.findIndex(i => i.id === selectedApprovalItem.id);
-                                if (idx < items.length - 1) handleReviewProject(items[idx + 1]);
-                            }}
-                            onPrev={() => {
-                                const idx = items.findIndex(i => i.id === selectedApprovalItem.id);
-                                if (idx > 0) handleReviewProject(items[idx - 1]);
-                            }}
-                            refreshBoardDetails={async () => { await loadData(); }}
-                            setPreviewFile={setPreviewFile}
-                        />
-                    )}
-                </AnimatePresence>
-
-                {/* Independent File Preview Modal for sidebar files */}
-                <FilePreviewModal
-                    previewFile={previewFile}
-                    isLoading={!!previewFile?.assetId}
-                    onClose={() => setPreviewFile(null)}
-                />
             </div>
+
+            <AnimatePresence>
+                {selectedApprovalItem && approvalBoardData && (
+                    <AdminApprovalModal
+                        approvalItems={items}
+                        currentApprovalItem={selectedApprovalItem}
+                        boardData={approvalBoardData}
+                        onClose={closeReview}
+                        onNext={() => {
+                            const idx = items.findIndex(i => i.id === selectedApprovalItem.id);
+                            if (idx < items.length - 1) handleReviewProject(items[idx + 1]);
+                        }}
+                        onPrev={() => {
+                            const idx = items.findIndex(i => i.id === selectedApprovalItem.id);
+                            if (idx > 0) handleReviewProject(items[idx - 1]);
+                        }}
+                        refreshBoardDetails={async () => { await loadData(); }}
+                        setPreviewFile={setPreviewFile}
+                    />
+                )}
+            </AnimatePresence>
+
+            <FilePreviewModal
+                previewFile={previewFile}
+                isLoading={!!previewFile?.assetId}
+                onClose={() => setPreviewFile(null)}
+            />
         </AdminPageLayout>
     );
 }
