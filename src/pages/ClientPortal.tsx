@@ -52,13 +52,13 @@ function ClientPortalContent() {
 
     const onboardingSteps = [
         {
-            title: "Welcome to CreativeVision",
+            title: "Welcome to CreativeVision!",
             description: "Your premium hub for cinematic content. Track milestones, review high-fidelity deliverables, and manage your assets asynchronously.",
             icon: <Crown className="w-10 h-10 text-emerald-400" />
         },
         {
             title: "Total Transparency",
-            description: "Switch between your assigned project workspaces from the sidebar to view real-time status updates, active drafts, and final renders.",
+            description: "View real-time status updates, active drafts, and final renders.",
             icon: <Sparkles className="w-10 h-10 text-blue-400" />
         }
     ];
@@ -299,7 +299,7 @@ function ClientPortalContent() {
                                                     name={b.name}
                                                     itemCount={b.items_count || 0}
                                                     index={i}
-                                                    color={['#8b5cf6','#ec4899','#06b6d4','#10b981','#f59e0b'][i % 5]}
+                                                    color={['#8b5cf6', '#ec4899', '#06b6d4', '#10b981', '#f59e0b'][i % 5]}
                                                     onClick={async () => {
                                                         setLoading(true);
                                                         setInitialItemId(undefined);

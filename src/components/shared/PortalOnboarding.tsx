@@ -83,7 +83,7 @@ export function PortalOnboarding({ isOpen: controlledIsOpen = false, onClose, st
                             <motion.div
                                 initial={{ width: 0 }}
                                 animate={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
-                                className="h-full bg-gradient-to-r from-emerald-500 to-blue-500"
+                                className="h-full bg-violet-500 shadow-[0_0_10px_rgba(139,92,246,0.5)]"
                             />
                         </div>
 
@@ -108,7 +108,7 @@ export function PortalOnboarding({ isOpen: controlledIsOpen = false, onClose, st
                                 >
                                     {/* Icon/Image Area */}
                                     <div className="w-24 h-24 rounded-full bg-gradient-to-br from-white/5 to-transparent border border-white/10 flex items-center justify-center shadow-lg relative group">
-                                        <div className="absolute inset-0 bg-emerald-500/20 rounded-full opacity-0 blur-xl group-hover:opacity-100 transition-opacity duration-500" />
+                                        <div className="absolute inset-0 bg-violet-500/20 rounded-full opacity-0 blur-xl group-hover:opacity-100 transition-opacity duration-500" />
                                         {steps[currentStep].icon ? (
                                             <div className="text-white transform scale-150">
                                                 {steps[currentStep].icon}

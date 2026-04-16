@@ -379,7 +379,7 @@ export function LeaveRequestModal({ isOpen, onClose, userEmail, userName }: Leav
                                             onChange={(e) => setLeaveType(e.target.value)}
                                             className="w-full bg-[#131322] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-violet-500/50 appearance-none transition-colors"
                                         >
-                                            <option value="vacation">Vacation / Paid Time Off</option>
+                                            <option value="vacation">Vacation</option>
                                             <option value="sick">Sick Leave</option>
                                             <option value="personal">Personal Leave</option>
                                             <option value="bereavement">Bereavement</option>
