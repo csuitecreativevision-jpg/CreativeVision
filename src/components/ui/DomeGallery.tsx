@@ -118,7 +118,8 @@ export default function DomeGallery({
   openedImageHeight = '350px',
   imageBorderRadius = '30px',
   openedImageBorderRadius = '30px',
-  grayscale = true
+  grayscale = true,
+  autoRotationSpeed = 0.05
 }: any) {
   const rootRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
@@ -250,6 +251,24 @@ export default function DomeGallery({
   useEffect(() => {
     applyTransform(rotationRef.current.x, rotationRef.current.y);
   }, []);
+
+  useEffect(() => {
+    if (autoRotationSpeed === 0) return;
+
+    let rafId: number;
+    const rotate = () => {
+      // Rotate only if not dragging, not opening a modal, no active inertia, and modal not fully open
+      if (!draggingRef.current && !openingRef.current && !inertiaRAF.current && rootRef.current?.getAttribute('data-enlarging') !== 'true') {
+        const nextY = wrapAngleSigned(rotationRef.current.y + autoRotationSpeed);
+        rotationRef.current = { ...rotationRef.current, y: nextY };
+        applyTransform(rotationRef.current.x, nextY);
+      }
+      rafId = requestAnimationFrame(rotate);
+    };
+
+    rafId = requestAnimationFrame(rotate);
+    return () => cancelAnimationFrame(rafId);
+  }, [autoRotationSpeed]);
 
   const stopInertia = useCallback(() => {
     if (inertiaRAF.current) {
