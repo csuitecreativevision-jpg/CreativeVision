@@ -28,3 +28,5 @@ dist-ssr
 .cv-concept
 
 test_discord.js
+test_edge.js
+supabase/.temp/linked-project.json

@@ -26,10 +26,17 @@ export async function createDiscordThread(editorName: string) {
         });
 
         if (error) {
-            // THIS will show the real error
-            const realError = await error.context.json();
-            console.error("REAL ERROR FROM EDGE FUNCTION:", realError);
-            throw new Error(realError.error);
+            console.error("Error from Edge Function:", error);
+            let errorMessage = error.message || 'Unknown edge function error';
+            try {
+                if (error && typeof error.context?.json === 'function') {
+                    const realError = await error.context.json();
+                    errorMessage = realError?.error || errorMessage;
+                }
+            } catch (jsonError) {
+                // Ignore if it's not valid JSON
+            }
+            throw new Error(errorMessage);
         }
 
         return { success: true };

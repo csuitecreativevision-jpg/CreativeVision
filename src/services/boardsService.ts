@@ -111,6 +111,7 @@ export interface User {
     role: 'admin' | 'editor' | 'client';
     workspace_id?: string;
     allowed_board_ids?: string[];
+    discord_thread_id?: string;
     created_at: string;
     updated_at: string;
 }

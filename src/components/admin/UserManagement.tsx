@@ -636,7 +636,7 @@ export function UserManagement() {
                         <table className="w-full text-left border-collapse">
                             <thead className="bg-[#131322] sticky top-0 z-10">
                                 <tr>
-                                    {['Name', 'Role', 'Workspace', 'Actions'].map(h => (
+                                    {['Name', 'Role', 'Workspace', 'Discord', 'Actions'].map(h => (
                                         <th key={h} className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-white/5">{h}</th>
                                     ))}
                                 </tr>
@@ -662,6 +662,19 @@ export function UserManagement() {
                                                     {workspaces.find(w => w.id.toString() === user.workspace_id)?.name || 'Unknown'}
                                                 </span>
                                             ) : <span className="text-gray-600">-</span>}
+                                        </td>
+                                        <td className="p-4">
+                                            {user.discord_thread_id ? (
+                                                <span className="flex items-center gap-1.5 text-xs font-semibold text-indigo-400 bg-indigo-500/10 px-2 py-1 rounded border border-indigo-500/20 w-fit">
+                                                    Linked
+                                                </span>
+                                            ) : user.role === 'editor' ? (
+                                                <span className="flex items-center gap-1.5 text-xs font-medium text-gray-500 bg-black/20 px-2 py-1 rounded border border-white/5 w-fit">
+                                                    Pending
+                                                </span>
+                                            ) : (
+                                                <span className="text-gray-600">-</span>
+                                            )}
                                         </td>
                                         <td className="p-4">
                                             <div className="flex gap-2">

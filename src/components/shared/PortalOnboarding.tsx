@@ -10,14 +10,14 @@ interface OnboardingStep {
 }
 
 interface PortalOnboardingProps {
-    isOpen: boolean;
-    onClose: () => void;
+    isOpen?: boolean;
+    onClose?: () => void;
     steps: OnboardingStep[];
     storageKey: string;
     autoShow?: boolean; // If true, checks storage on mount and shows if not seen
 }
 
-export function PortalOnboarding({ isOpen: controlledIsOpen, onClose, steps, storageKey, autoShow = true }: PortalOnboardingProps) {
+export function PortalOnboarding({ isOpen: controlledIsOpen = false, onClose, steps, storageKey, autoShow = true }: PortalOnboardingProps) {
     const [isOpen, setIsOpen] = useState(controlledIsOpen);
     const [currentStep, setCurrentStep] = useState(0);
 
@@ -31,13 +31,15 @@ export function PortalOnboarding({ isOpen: controlledIsOpen, onClose, steps, sto
     }, [autoShow, storageKey]);
 
     useEffect(() => {
-        setIsOpen(controlledIsOpen);
+        if (controlledIsOpen !== undefined && controlledIsOpen !== false) {
+            setIsOpen(controlledIsOpen);
+        }
     }, [controlledIsOpen]);
 
     const handleClose = () => {
         setIsOpen(false);
         localStorage.setItem(storageKey, 'true');
-        onClose();
+        if (onClose) onClose();
         setTimeout(() => setCurrentStep(0), 300); // Reset step after closing animation
     };
 

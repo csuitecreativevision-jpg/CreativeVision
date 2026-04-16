@@ -1,0 +1,4 @@
+project_id = "murdekixacjoescjsmmk"
+
+[functions.discord-bot]
+verify_jwt = false

@@ -52,14 +52,14 @@ function ClientPortalContent() {
 
     const onboardingSteps = [
         {
-            title: "Welcome to Your Portal",
-            description: "Manage your projects, track progress, and view submissions all in one place.",
-            icon: <Sparkles className="w-10 h-10 text-emerald-400" />
+            title: "Welcome to CreativeVision",
+            description: "Your premium hub for cinematic content. Track milestones, review high-fidelity deliverables, and manage your assets asynchronously.",
+            icon: <Crown className="w-10 h-10 text-emerald-400" />
         },
         {
-            title: "Project Experience",
-            description: "Select a project workspace to enter your exclusive project space and track deliverables.",
-            icon: <Crown className="w-10 h-10 text-blue-400" />
+            title: "Total Transparency",
+            description: "Switch between your assigned project workspaces from the sidebar to view real-time status updates, active drafts, and final renders.",
+            icon: <Sparkles className="w-10 h-10 text-blue-400" />
         }
     ];
 
@@ -242,8 +242,6 @@ function ClientPortalContent() {
                     <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-indigo-500/[0.03] rounded-full blur-[140px] pointer-events-none" />
 
                     <PortalOnboarding
-                        isOpen={false}
-                        onClose={() => { }}
                         steps={onboardingSteps}
                         storageKey="client_portal_onboarding_seen"
                         autoShow={true}

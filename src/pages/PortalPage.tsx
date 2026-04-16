@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Lock, Mail, ArrowRight, Layers } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { loginUser } from '../services/boardsService';
-
+import DomeGallery from '../components/ui/DomeGallery';
 const fadeUp = (delay = 0) => ({
     initial: { opacity: 0, y: 16 },
     animate: { opacity: 1, y: 0 },
@@ -137,12 +137,7 @@ export default function PortalPage() {
                             </div>
                         </motion.form>
 
-                        {/* Utility links */}
-                        <motion.div {...fadeUp(0.25)} className="mt-8 flex items-center justify-center gap-5 text-[10px] text-white/20 font-bold tracking-widest uppercase">
-                            <button type="button" className="hover:text-white/50 transition-colors duration-150">Help</button>
-                            <span className="w-px h-3 bg-white/10" />
-                            <button type="button" className="hover:text-white/50 transition-colors duration-150">Privacy</button>
-                        </motion.div>
+
                     </div>
                 </div>
 
@@ -156,43 +151,31 @@ export default function PortalPage() {
             <div className="hidden lg:block w-px self-stretch bg-gradient-to-b from-transparent via-white/[0.07] to-transparent flex-shrink-0" />
 
             {/* ─── RIGHT PANEL : Brand ──────────────────────────────── */}
-            <div className="hidden lg:flex flex-1 relative flex-col overflow-hidden">
+            <div className="hidden lg:flex flex-1 relative flex-col overflow-hidden bg-[#020204]">
 
                 {/* Ambient art */}
                 <div className="absolute inset-0">
-                    <div className="portal-orb-violet w-[80%] h-[80%] top-[-30%] right-[-30%]" />
-                    <div className="portal-orb-fuchsia w-[70%] h-[70%] bottom-[-30%] left-[-20%]" />
-                    <div className="portal-orb-indigo w-[50%] h-[50%] top-[30%] left-[10%]" />
-                    {/* Fine grid */}
-                    <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:60px_60px]" />
+                    <DomeGallery
+                        fit={0.9}
+                        minRadius={400}
+                        segments={28}
+                        dragDampening={1.8}
+                    />
                     {/* Fade edges — left side fades toward divider */}
-                    <div className="absolute inset-0 bg-gradient-to-l from-transparent to-[#020204]/60" />
-                    <div className="absolute inset-0 bg-gradient-to-b from-[#020204]/30 via-transparent to-[#020204]/40" />
+                    <div className="absolute inset-0 bg-gradient-to-l from-transparent to-[#020204]/60 pointer-events-none" />
+                    <div className="absolute inset-0 bg-gradient-to-b from-[#020204]/30 via-transparent to-[#020204]/40 pointer-events-none" />
                 </div>
 
                 {/* Content */}
-                <div className="relative z-10 flex flex-col h-full p-14 xl:p-16">
-                    {/* Logomark */}
-                    <motion.div {...fadeUp(0)} className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600/40 to-violet-900/30 border border-violet-500/30 flex items-center justify-center">
-                            <Layers className="w-4 h-4 text-violet-300" />
-                        </div>
-                        <span className="text-white/80 font-semibold text-sm tracking-wide">CreativeVision</span>
-                    </motion.div>
-
+                <div className="relative z-10 flex flex-col h-full p-14 xl:p-16 pointer-events-none">
                     {/* Main wordmark — bottom anchored */}
-                    <div className="mt-auto">
-                        <motion.div {...fadeUp(0.1)} className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white/[0.05] border border-white/[0.08] mb-10">
-                            <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
-                            <span className="text-[10px] font-semibold tracking-[0.22em] uppercase text-white/50">Accepting New Clients</span>
-                        </motion.div>
-
-                        <motion.h1 {...fadeUp(0.2)} className="font-display text-[4.5rem] xl:text-[5.5rem] font-medium leading-[0.88] tracking-tight text-glow-premium mb-8">
+                    <div className="mt-auto pointer-events-auto w-fit">
+                        <motion.h1 {...fadeUp(0)} className="font-display text-[4.5rem] xl:text-[5.5rem] font-medium leading-[0.88] tracking-tight drop-shadow-2xl mb-8">
                             Creative<br />
-                            <span className="italic text-violet-400 text-glow-violet">Vision.</span>
+                            <span className="italic text-violet-400 drop-shadow-[0_0_20px_rgba(139,92,246,0.3)]">Vision.</span>
                         </motion.h1>
 
-                        <motion.p {...fadeUp(0.3)} className="text-white/35 font-light text-lg max-w-xs leading-relaxed">
+                        <motion.p {...fadeUp(0.1)} className="text-white/80 font-light text-lg max-w-xs leading-relaxed drop-shadow-md">
                             Cinematic content engineered to hook audiences and drive real conversions.
                         </motion.p>
                     </div>
