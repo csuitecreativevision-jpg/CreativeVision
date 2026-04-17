@@ -1,12 +1,9 @@
+import React from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Video, Film, Layers, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-interface StartProjectPageProps {
-  onBack?: () => void;
-}
-
-export default function StartProjectPage({ onBack }: StartProjectPageProps) {
+export default function StartProjectPage() {
   const navigate = useNavigate();
 
   const options = [
@@ -15,22 +12,22 @@ export default function StartProjectPage({ onBack }: StartProjectPageProps) {
       title: 'Short Form',
       subtitle: 'Viral Architecture',
       description: 'High-impact vertical content engineered for virality, retention, and immediate audience engagement.',
-      icon: Video,
+      icon: Video
     },
     {
       id: 'long-form',
       title: 'Long Form',
       subtitle: 'Cinematic Narratives',
       description: 'Deep-dive storytelling and widescreen cinematic production that builds unwavering brand authority.',
-      icon: Film,
+      icon: Film
     },
     {
       id: 'mixed',
       title: 'Ecosystem',
       subtitle: 'Omnichannel Dominance',
       description: 'A strategic, relentless blend of both formats to completely saturate your market.',
-      icon: Layers,
-    },
+      icon: Layers
+    }
   ];
 
   return (
@@ -39,7 +36,7 @@ export default function StartProjectPage({ onBack }: StartProjectPageProps) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      className="min-h-screen bg-[#0a0a0c] text-white selection:bg-violet-500/30 flex flex-col overflow-hidden font-sans relative"
+      className="h-screen h-[100dvh] bg-[#0a0a0c] text-white selection:bg-violet-500/30 flex flex-col overflow-hidden font-sans relative"
     >
       <div className="bg-noise opacity-30 pointer-events-none z-50 fixed inset-0" />
 
@@ -48,9 +45,9 @@ export default function StartProjectPage({ onBack }: StartProjectPageProps) {
         <motion.div
           animate={{
             scale: [1, 1.1, 1],
-            opacity: [0.15, 0.25, 0.15],
+            opacity: [0.15, 0.25, 0.15]
           }}
-          transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
           className="w-[80vw] h-[80vw] max-w-[800px] max-h-[800px] bg-violet-600/20 rounded-full blur-[120px]"
         />
       </div>
@@ -59,70 +56,58 @@ export default function StartProjectPage({ onBack }: StartProjectPageProps) {
       <motion.nav
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1, ease: 'easeOut' }}
-        className="relative z-40 w-full p-6 md:p-10 flex justify-between items-center"
+        transition={{ duration: 1, ease: "easeOut" }}
+        className="relative z-40 w-full p-4 md:p-8 flex justify-between items-center"
       >
         <button
-          onClick={() => onBack ? onBack() : navigate('/')}
-          className="group flex items-center gap-3 text-xs font-bold tracking-[0.2em] uppercase text-white/50 hover:text-white transition-colors bg-[#1a1a1a]/50 border border-white/10 px-6 py-3 rounded-full backdrop-blur-md"
+          onClick={() => navigate('/', { state: { target: 'services' } })}
+          className="group flex items-center gap-2 text-[10px] md:text-xs font-bold tracking-[0.2em] uppercase text-white/50 hover:text-white transition-colors bg-[#1a1a1a]/50 border border-white/10 px-4 md:px-6 py-2.5 md:py-3 rounded-full backdrop-blur-md"
         >
-          <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+          <ArrowLeft className="w-3.5 h-3.5 md:w-4 md:h-4 transition-transform group-hover:-translate-x-1" />
           Return
         </button>
       </motion.nav>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col z-10 px-6 md:px-10 pb-20">
+      <main className="flex-1 flex flex-col justify-center z-10 px-4 md:px-10 pb-4">
 
-        {/* Header */}
-        <div className="flex flex-col items-center text-center mt-4 md:mt-8 mb-12 md:mb-16">
+        {/* Header Section */}
+        <div className="flex flex-col items-center text-center mb-6 md:mb-8">
           <motion.div
             initial={{ opacity: 0, y: 30, filter: 'blur(10px)' }}
             animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
             transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-            style={{ willChange: 'transform, filter, opacity' }}
           >
-            <h1 className="font-display text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight leading-[1.1] mb-6">
+            <h1 className="font-display text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.1] mb-4 md:mb-6">
               <span className="text-white/90">Choose your</span><br />
               <span className="italic text-violet-400 text-glow-violet">Ecosystem.</span>
             </h1>
-            <p className="text-base md:text-lg text-white/50 font-light max-w-2xl mx-auto tracking-wide leading-relaxed">
+            <p className="text-sm md:text-base text-white/50 font-light max-w-2xl mx-auto tracking-wide leading-relaxed">
               Every detail acts as a leverage point. Every frame is calculated.<br className="hidden md:block" />
               Select the architecture that aligns with your vision.
             </p>
           </motion.div>
         </div>
 
-        {/* Premium List Cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full max-w-3xl mx-auto flex flex-col gap-5 relative z-10"
-        >
+        {/* Premium List Containers */}
+        <div className="w-full max-w-3xl mx-auto flex flex-col gap-4 md:gap-5 relative z-10">
           {options.map((option, i) => (
-            <motion.div
+            <div
               key={option.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 + i * 0.1, ease: [0.16, 1, 0.3, 1] }}
               onClick={() => navigate(`/pricing/${option.id}`)}
-              className="group relative flex items-center gap-6 p-6 md:p-8 rounded-[2rem] border border-white/5 bg-white/[0.02] backdrop-blur-xl hover:bg-white/[0.04] hover:border-violet-500/30 transition-all duration-500 cursor-pointer w-full text-left overflow-hidden shadow-lg hover:shadow-[0_0_40px_rgba(139,92,246,0.15)] hover:-translate-y-1"
+              className="group relative flex items-center gap-5 md:gap-6 p-5 md:p-6 rounded-[1.5rem] md:rounded-[2rem] border border-white/5 bg-white/[0.02] backdrop-blur-xl hover:bg-white/[0.04] hover:border-violet-500/30 transition-all duration-500 cursor-pointer w-full text-left overflow-hidden shadow-lg hover:shadow-[0_0_40px_rgba(139,92,246,0.15)] hover:-translate-y-1"
             >
               {/* Subtle background gradient on hover */}
-              <div className="absolute inset-0 bg-gradient-to-r from-violet-500/0 to-violet-500/0 group-hover:from-violet-500/5 group-hover:to-transparent transition-all duration-500" />
+              <div className="absolute inset-0 bg-gradient-to-r from-violet-500/0 via-violet-500/0 to-violet-500/0 group-hover:from-violet-500/5 group-hover:to-transparent transition-all duration-500" />
 
-              {/* Icon */}
-              <div className="relative w-16 h-16 rounded-full border border-violet-500/20 flex items-center justify-center shrink-0 bg-violet-500/10 group-hover:bg-violet-500/20 group-hover:border-violet-500/40 transition-all duration-500 shadow-[0_0_15px_rgba(139,92,246,0.2)] group-hover:shadow-[0_0_25px_rgba(139,92,246,0.4)]">
-                <option.icon
-                  className="w-7 h-7 text-violet-400 group-hover:text-violet-300 transition-all duration-500 group-hover:scale-110 group-hover:-rotate-6"
-                  strokeWidth={1.5}
-                />
+              {/* Icon Container */}
+              <div className="relative w-14 h-14 md:w-16 md:h-16 rounded-full border border-violet-500/20 flex items-center justify-center shrink-0 bg-violet-500/10 group-hover:bg-violet-500/20 group-hover:border-violet-500/40 transition-all duration-500 shadow-[0_0_15px_rgba(139,92,246,0.2)] group-hover:shadow-[0_0_25px_rgba(139,92,246,0.4)]">
+                <option.icon className="w-6 h-6 md:w-7 md:h-7 text-violet-400 group-hover:text-violet-300 transition-all duration-500 group-hover:scale-110 group-hover:-rotate-6" strokeWidth={1.5} />
               </div>
 
-              {/* Text */}
+              {/* Text Content */}
               <div className="flex-1 relative z-10">
-                <h3 className="text-2xl font-sans font-extrabold text-white mb-1 group-hover:text-glow-premium transition-all duration-500">
+                <h3 className="text-2xl md:text-3xl font-sans font-extrabold text-white mb-1 md:mb-1.5 group-hover:text-glow-premium transition-all duration-500">
                   {option.title}
                 </h3>
                 <p className="text-white/50 text-sm md:text-base font-light group-hover:text-white/70 transition-colors duration-500">
@@ -134,9 +119,9 @@ export default function StartProjectPage({ onBack }: StartProjectPageProps) {
               <div className="hidden md:flex items-center justify-center w-12 h-12 rounded-full bg-white/[0.03] border border-white/10 group-hover:bg-violet-500/20 group-hover:border-violet-500/40 transition-all duration-500 shrink-0 relative z-10">
                 <ArrowRight className="w-5 h-5 text-white/40 group-hover:text-violet-300 group-hover:translate-x-1 transition-all duration-500" />
               </div>
-            </motion.div>
+            </div>
           ))}
-        </motion.div>
+        </div>
       </main>
     </motion.div>
   );

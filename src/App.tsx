@@ -66,24 +66,24 @@ export default function App() {
 
       {/* Global Floating Secret Portal Trigger - Bottom Left */}
       {location.pathname !== '/portal' &&
-       location.pathname !== '/admin-dashboard' &&
-       !location.pathname.startsWith('/admin-portal') &&
-       !location.pathname.startsWith('/editor-portal') &&
-       !location.pathname.startsWith('/client-portal') && (
-        <>
-          <div className="fixed left-6 bottom-6 z-50 opacity-10 hover:opacity-40 transition-opacity duration-300">
-            <img
-              src="/Untitled design (3).png"
-              alt="CV"
-              className="w-10 h-10 object-contain cursor-pointer"
-              width="40"
-              height="40"
-              onClick={handleSecretClick}
-            />
-          </div>
-          <MainChatbot />
-        </>
-      )}
+        location.pathname !== '/admin-dashboard' &&
+        !location.pathname.startsWith('/admin-portal') &&
+        !location.pathname.startsWith('/editor-portal') &&
+        !location.pathname.startsWith('/client-portal') && (
+          <>
+            <div className="fixed left-6 bottom-6 z-50 opacity-10 hover:opacity-40 transition-opacity duration-300">
+              <img
+                src="/Untitled design (3).png"
+                alt="CV"
+                className="w-10 h-10 object-contain cursor-pointer"
+                width="40"
+                height="40"
+                onClick={handleSecretClick}
+              />
+            </div>
+            {location.pathname !== '/' && <MainChatbot />}
+          </>
+        )}
 
       {/* Main Routing */}
       <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-black text-white" />}>
