@@ -467,15 +467,17 @@ function Scene4() {
             return (
               <motion.div
                 key={index}
+                initial={{ x: "-50%", y: "-50%", scale: 0.8, opacity: 0 }}
                 animate={{
-                  x: `${offset * 18}vw`,
+                  x: `calc(-50% + ${offset * 22}vw)`,
+                  y: "-50%",
                   scale: 1 - Math.abs(offset) * 0.15,
                   opacity: Math.abs(offset) > 1 ? 0 : 1,
                   filter: offset === 0 ? "blur(0px)" : "blur(40px)",
                   zIndex: 30 - Math.abs(offset) * 10,
                 }}
                 transition={{ type: "spring", stiffness: 150, damping: 25 }}
-                className={`absolute rounded-2xl md:rounded-3xl overflow-hidden shadow-[0_0_40px_rgba(139,92,246,0.2)] border border-white/10 bg-black/50 backdrop-blur-sm cursor-pointer flex items-center justify-center ${work.type === 'short' ? 'h-full aspect-[9/16]' : 'w-[85vw] md:w-[60vw] max-w-5xl aspect-video'
+                className={`absolute top-1/2 left-1/2 rounded-2xl md:rounded-3xl overflow-hidden shadow-[0_0_40px_rgba(139,92,246,0.2)] border border-white/10 bg-black/50 backdrop-blur-sm cursor-pointer flex items-center justify-center ${work.type === 'short' ? 'h-full aspect-[9/16]' : 'w-[85vw] md:w-[60vw] max-w-5xl aspect-video'
                   }`}
                 onClick={() => setActiveIndex(index)}
               >

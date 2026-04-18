@@ -3,8 +3,8 @@ import { useGesture } from '@use-gesture/react';
 import './DomeGallery.css';
 
 const getYoutubeId = (url: string) => {
-    const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})/);
-    return match ? match[1] : null;
+  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})/);
+  return match ? match[1] : null;
 };
 
 const DEFAULT_VIDEOS = [
@@ -119,7 +119,7 @@ export default function DomeGallery({
   imageBorderRadius = '30px',
   openedImageBorderRadius = '30px',
   grayscale = true,
-  autoRotationSpeed = 0.05
+  autoRotationSpeed = 0.1
 }: any) {
   const rootRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
@@ -376,8 +376,8 @@ export default function DomeGallery({
         overlay.remove();
         if (refDiv) refDiv.remove();
         if (parent) {
-            parent.style.setProperty('--rot-y-delta', '0deg');
-            parent.style.setProperty('--rot-x-delta', '0deg');
+          parent.style.setProperty('--rot-y-delta', '0deg');
+          parent.style.setProperty('--rot-x-delta', '0deg');
         }
         el.style.visibility = '';
         el.style.zIndex = '0';
@@ -409,12 +409,12 @@ export default function DomeGallery({
         const clonedMedia = originalMedia.cloneNode() as HTMLElement;
         clonedMedia.style.cssText = 'width:100%;height:100%;object-fit:cover;';
         if (originalMedia.tagName === 'VIDEO') {
-            (clonedMedia as HTMLVideoElement).autoplay = true;
-            (clonedMedia as HTMLVideoElement).loop = true;
-            (clonedMedia as HTMLVideoElement).muted = true;
-            (clonedMedia as HTMLVideoElement).playsInline = true;
+          (clonedMedia as HTMLVideoElement).autoplay = true;
+          (clonedMedia as HTMLVideoElement).loop = true;
+          (clonedMedia as HTMLVideoElement).muted = true;
+          (clonedMedia as HTMLVideoElement).playsInline = true;
         } else if (originalMedia.tagName === 'IFRAME') {
-            clonedMedia.style.border = 'none';
+          clonedMedia.style.border = 'none';
         }
         animatingOverlay.appendChild(clonedMedia);
       }
@@ -433,12 +433,12 @@ export default function DomeGallery({
         originalTilePositionRef.current = null;
         if (refDiv) refDiv.remove();
         if (parent) {
-            parent.style.transition = 'none';
-            parent.style.setProperty('--rot-y-delta', '0deg');
-            parent.style.setProperty('--rot-x-delta', '0deg');
+          parent.style.transition = 'none';
+          parent.style.setProperty('--rot-y-delta', '0deg');
+          parent.style.setProperty('--rot-x-delta', '0deg');
         }
         el.style.transition = 'none';
-        
+
         requestAnimationFrame(() => {
           el.style.visibility = '';
           el.style.opacity = '0';
@@ -533,26 +533,26 @@ export default function DomeGallery({
       const rawSrc = parent.dataset.src || el.querySelector('video')?.src || el.querySelector('img')?.dataset?.fullsrc || el.querySelector('img')?.src || '';
       const isVideo = rawSrc.match(/\.(mp4|webm|ogg)$/i) || el.querySelector('video');
       const ytId = getYoutubeId(rawSrc);
-      
+
       let mediaNode;
       if (ytId) {
-          mediaNode = document.createElement('iframe');
-          mediaNode.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&loop=1&playlist=${ytId}&controls=0&rel=0&modestbranding=1&playsinline=1`;
-          mediaNode.style.cssText = 'width:100%;height:100%;object-fit:cover;border:none;';
-          mediaNode.setAttribute('allow', 'autoplay');
-          mediaNode.dataset.type = 'youtube';
+        mediaNode = document.createElement('iframe');
+        mediaNode.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&loop=1&playlist=${ytId}&controls=0&rel=0&modestbranding=1&playsinline=1`;
+        mediaNode.style.cssText = 'width:100%;height:100%;object-fit:cover;border:none;';
+        mediaNode.setAttribute('allow', 'autoplay');
+        mediaNode.dataset.type = 'youtube';
       } else if (isVideo) {
-          mediaNode = document.createElement('video');
-          mediaNode.src = rawSrc;
-          mediaNode.autoplay = true;
-          mediaNode.loop = true;
-          mediaNode.muted = true;
-          mediaNode.playsInline = true;
+        mediaNode = document.createElement('video');
+        mediaNode.src = rawSrc;
+        mediaNode.autoplay = true;
+        mediaNode.loop = true;
+        mediaNode.muted = true;
+        mediaNode.playsInline = true;
       } else {
-          mediaNode = document.createElement('img');
-          mediaNode.src = rawSrc;
+        mediaNode = document.createElement('img');
+        mediaNode.src = rawSrc;
       }
-      
+
       overlay.appendChild(mediaNode);
       viewerRef.current!.appendChild(overlay);
       const tx0 = tileR.left - frameR.left;
@@ -581,10 +581,10 @@ export default function DomeGallery({
           overlay.removeEventListener('transitionend', onFirstEnd);
           const prevTransition = overlay.style.transition;
           overlay.style.transition = 'none';
-          
+
           const tempWidth = isLandscape ? '450px' : (openedImageWidth || `${frameR.width}px`);
           const tempHeight = isLandscape ? '253px' : (openedImageHeight || `${frameR.height}px`);
-          
+
           overlay.style.width = tempWidth;
           overlay.style.height = tempHeight;
           const newRect = overlay.getBoundingClientRect();
@@ -683,11 +683,11 @@ export default function DomeGallery({
                   onPointerUp={onTilePointerUp}
                 >
                   {it.src.match(/\.(mp4|webm|ogg)$/i) ? (
-                      <video src={it.src} autoPlay loop muted playsInline draggable={false} disablePictureInPicture />
+                    <video src={it.src} autoPlay loop muted playsInline draggable={false} disablePictureInPicture />
                   ) : getYoutubeId(it.src) ? (
-                      <img src={`https://img.youtube.com/vi/${getYoutubeId(it.src)}/hqdefault.jpg`} data-fullsrc={it.src} draggable={false} alt={it.alt} />
+                    <img src={`https://img.youtube.com/vi/${getYoutubeId(it.src)}/hqdefault.jpg`} data-fullsrc={it.src} draggable={false} alt={it.alt} />
                   ) : (
-                      <img src={it.src} draggable={false} alt={it.alt} />
+                    <img src={it.src} draggable={false} alt={it.alt} />
                   )}
                 </div>
               </div>
