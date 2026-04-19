@@ -21,14 +21,18 @@ export function PortalOnboarding({ isOpen: controlledIsOpen = false, onClose, st
     const [isOpen, setIsOpen] = useState(controlledIsOpen);
     const [currentStep, setCurrentStep] = useState(0);
 
+    // Scope the storage key to the logged-in account so each user gets their own onboarding flag
+    const userEmail = localStorage.getItem('portal_user_email') || 'guest';
+    const scopedKey = `${storageKey}__${userEmail}`;
+
     useEffect(() => {
         if (autoShow) {
-            const hasSeen = localStorage.getItem(storageKey);
+            const hasSeen = localStorage.getItem(scopedKey);
             if (!hasSeen) {
                 setIsOpen(true);
             }
         }
-    }, [autoShow, storageKey]);
+    }, [autoShow, scopedKey]);
 
     useEffect(() => {
         if (controlledIsOpen !== undefined && controlledIsOpen !== false) {
@@ -38,7 +42,7 @@ export function PortalOnboarding({ isOpen: controlledIsOpen = false, onClose, st
 
     const handleClose = () => {
         setIsOpen(false);
-        localStorage.setItem(storageKey, 'true');
+        localStorage.setItem(scopedKey, 'true');
         if (onClose) onClose();
         setTimeout(() => setCurrentStep(0), 300); // Reset step after closing animation
     };
@@ -66,7 +70,6 @@ export function PortalOnboarding({ isOpen: controlledIsOpen = false, onClose, st
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        onClick={handleClose}
                         className="absolute inset-0 bg-black/80 backdrop-blur-sm"
                     />
 

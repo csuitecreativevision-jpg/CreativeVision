@@ -138,7 +138,11 @@ function EditorPortalContent() {
     };
 
     const handleLogout = () => {
+        // Preserve per-account onboarding flags so they don't re-appear after re-login
+        const onboardingKeys = Object.keys(localStorage).filter(k => k.includes('_onboarding_seen'));
+        const preserved = onboardingKeys.map(k => [k, localStorage.getItem(k)] as [string, string]);
         localStorage.clear();
+        preserved.forEach(([k, v]) => localStorage.setItem(k, v));
         navigate('/portal');
     };
 

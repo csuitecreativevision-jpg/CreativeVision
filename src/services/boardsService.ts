@@ -169,23 +169,40 @@ export async function createUser(
     }
 }
 
+/** Domain → role mapping for CreativeVision portals */
+const DOMAIN_ROLE_MAP: Record<string, UserRole> = {
+    'editors.cv': 'editor',
+    'clients.cv': 'client',
+    'admin.cv':   'admin',
+};
+
 /**
- * Login user with email and password
+ * Login user with email and password.
+ * Also enforces that the email domain matches the user's assigned role
+ * (e.g. @editors.cv must be an editor, @clients.cv must be a client).
  */
 export async function loginUser(email: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
     try {
         const password_hash = await hashPassword(password);
+        const normalizedEmail = email.toLowerCase();
 
         const { data, error } = await supabase
             .from('users')
             .select('*')
-            .eq('email', email.toLowerCase())
+            .eq('email', normalizedEmail)
             .eq('password_hash', password_hash)
             .maybeSingle();
 
         if (error || !data) {
             console.error('Login failed:', error);
             return { success: false, error: 'Invalid email or password' };
+        }
+
+        // Enforce domain ↔ role match
+        const domain = normalizedEmail.split('@')[1] ?? '';
+        const expectedRole = DOMAIN_ROLE_MAP[domain];
+        if (expectedRole && data.role !== expectedRole) {
+            return { success: false, error: 'Access denied. This account is not authorized for this portal.' };
         }
 
         return { success: true, user: data };
