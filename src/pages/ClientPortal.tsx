@@ -157,7 +157,7 @@ function ClientPortalContent() {
                             key={board.id}
                             isClientItem
                             icon={<Briefcase className="w-4 h-4" />}
-                            label="Main"
+                            label={boards.length === 1 ? 'Main' : board.name.replace(/fulfillment board/i, '').replace(/fullfilment board/i, '').replace(/\(inactive\)/i, '').replace(/\(CF.*?\)/i, '').replace(/\(C-F.*?\)/i, '').replace(/\(c-w-[\w-]+\)/gi, '').replace(/-/g, ' ').trim()}
                             active={selectedBoard?.id === board.id}
                             onClick={async () => {
                                 setInitialItemId(undefined);

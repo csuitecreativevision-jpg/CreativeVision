@@ -376,7 +376,7 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
                                                     key={`dl-${idx}`}
                                                     onClick={() => setSelectedDeadline(p)}
                                                     className={`text-[10px] font-bold px-2 py-1 rounded border bg-rose-500/10 border-rose-500/20 text-rose-400 truncate w-full cursor-pointer hover:bg-rose-500/20 transition-colors ${p.isApproved ? 'line-through opacity-50' : ''}`}
-                                                    title={`${p.name} (${isOwn ? 'Assigned Project' : p.client}) - ${p.status}${p.type ? ` [${p.type}]` : ''}`}
+                                                    title={`${p.name} (${p.client}) - ${p.status}${p.type ? ` [${p.type}]` : ''}`}
                                                 >
                                                     <div className="flex items-center gap-1.5 overflow-hidden">
                                                         <Target className="w-3 h-3 flex-shrink-0" />
@@ -477,7 +477,7 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
                                                         {label}
                                                     </p>
                                                     <p className="text-white font-medium text-lg">
-                                                        {isOwn ? 'Assigned Project' : selectedDeadline.client}
+                                                        {selectedDeadline.client}
                                                     </p>
                                                 </>
                                             );

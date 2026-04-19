@@ -159,7 +159,7 @@ function EditorPortalContent() {
                         <SidebarItem
                             key={board.id}
                             icon={<Briefcase className="w-4 h-4" />}
-                            label="Main"
+                            label={boards.length === 1 ? 'Main' : board.name.replace(/- Workspace/i, '').replace(/\(c-w-[\w-]+\)/gi, '').trim()}
                             active={selectedBoard?.id === board.id}
                             onClick={async () => {
                                 setInitialItemId(undefined);
