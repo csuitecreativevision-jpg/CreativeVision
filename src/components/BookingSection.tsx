@@ -9,6 +9,7 @@ interface BookingSectionProps {
 }
 
 export default function BookingSection({ id }: BookingSectionProps) {
+    const REQUIRED_SECRET_CLICKS = 2;
     const [clickCount, setClickCount] = useState(0);
     const [lastClickTime, setLastClickTime] = useState(0);
 
@@ -17,11 +18,13 @@ export default function BookingSection({ id }: BookingSectionProps) {
         if (now - lastClickTime > 2000) {
             setClickCount(1);
         } else {
-            const newCount = clickCount + 1;
-            setClickCount(newCount);
-            if (newCount >= 5) {
-                window.location.href = '/portal';
-            }
+            setClickCount((previousCount) => {
+                const newCount = previousCount + 1;
+                if (newCount >= REQUIRED_SECRET_CLICKS) {
+                    window.location.href = '/portal';
+                }
+                return newCount;
+            });
         }
         setLastClickTime(now);
     };

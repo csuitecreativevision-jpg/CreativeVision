@@ -35,6 +35,7 @@ const AdminCalendar = lazy(() => import('./pages/admin/AdminCalendar'));
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
+  const REQUIRED_SECRET_CLICKS = 2;
 
   // Secret portal logic
   const [clickCount, setClickCount] = useState(0);
@@ -44,9 +45,13 @@ export default function App() {
     if (now - lastClickTime > 2000) {
       setClickCount(1);
     } else {
-      const newCount = clickCount + 1;
-      setClickCount(newCount);
-      if (newCount >= 5) window.location.href = '/portal';
+      setClickCount((previousCount) => {
+        const newCount = previousCount + 1;
+        if (newCount >= REQUIRED_SECRET_CLICKS) {
+          window.location.href = '/portal';
+        }
+        return newCount;
+      });
     }
     setLastClickTime(now);
   };
