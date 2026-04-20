@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { QueryProvider } from './providers/QueryProvider';
 import App from './App.tsx';
 import './index.css';
+import 'sweetalert2/dist/sweetalert2.min.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

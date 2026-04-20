@@ -8,6 +8,7 @@ import { YouTubeModal } from '../ui/YouTubeModal';
 import { getCycleFromDate } from '../../features/performance-dashboard/utils/dateUtils';
 import { getBoardColumns, getAssetPublicUrl, normalizeMondayFileUrl } from '../../services/mondayService';
 import { checkDeadlineNotifications } from '../../services/notificationService';
+import { buildSubmissionRowsForBoard, EditorSubmissionBoardPanel } from './EditorSubmissionHub';
 
 interface ProjectSelectionViewProps {
     boardData: any;
@@ -113,7 +114,7 @@ export const EditorProjectSelectionView = ({
         }
     }, [initialItemId, boardData]);
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
-    const [viewMode, setViewMode] = useState<'all' | 'cycles'>('cycles'); // NEW: View Mode
+    const [viewMode, setViewMode] = useState<'all' | 'cycles' | 'submissions'>('cycles');
     const [expandedCycles, setExpandedCycles] = useState<Set<string>>(new Set());
     const [statusFilter, setStatusFilter] = useState('All');
     const [mirrorOptions, setMirrorOptions] = useState<Record<string, any[]>>({});
@@ -419,6 +420,28 @@ export const EditorProjectSelectionView = ({
         return items;
     }, [allItems, searchTerm, sortOrder, statusFilter, boardData]);
 
+    const submissionRowsAll = useMemo(() => {
+        if (!boardData || !selectedBoardId) return [];
+        return buildSubmissionRowsForBoard(boardData, selectedBoardId, boardData.name);
+    }, [boardData, selectedBoardId]);
+
+    const filteredSubmissionRows = useMemo(() => {
+        let rows = submissionRowsAll;
+        if (searchTerm) {
+            const t = searchTerm.toLowerCase();
+            rows = rows.filter((r) => r.item.name.toLowerCase().includes(t));
+        }
+        if (statusFilter !== 'All') {
+            rows = rows.filter((r) => getStatusText(r.item) === statusFilter);
+        }
+        rows = [...rows].sort((a, b) => {
+            const dateA = new Date(a.item.created_at).getTime();
+            const dateB = new Date(b.item.created_at).getTime();
+            return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+        });
+        return rows;
+    }, [submissionRowsAll, searchTerm, statusFilter, sortOrder, boardData]);
+
     // --- CYCLE LOGIC (Ported) ---
 
 
@@ -536,10 +559,10 @@ export const EditorProjectSelectionView = ({
                     {/* View Switcher */}
                     <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 relative flex-shrink-0">
                         <div className="relative flex gap-1">
-                            {['all', 'cycles'].map((mode) => (
+                            {(['all', 'cycles', 'submissions'] as const).map((mode) => (
                                 <button
                                     key={mode}
-                                    onClick={() => setViewMode(mode as 'all' | 'cycles')}
+                                    onClick={() => setViewMode(mode)}
                                     className={`relative px-4 py-2 rounded-lg text-xs font-bold transition-all z-10 ${viewMode === mode ? 'text-white' : 'text-gray-400 hover:text-white'}`}
                                 >
                                     {viewMode === mode && (
@@ -549,7 +572,7 @@ export const EditorProjectSelectionView = ({
                                             transition={{ type: "spring", stiffness: 300, damping: 30 }}
                                         />
                                     )}
-                                    {mode === 'all' ? 'All Projects' : 'Cycles Trend'}
+                                    {mode === 'all' ? 'All Projects' : mode === 'cycles' ? 'Cycles Trend' : 'Submissions'}
                                 </button>
                             ))}
                         </div>
@@ -591,7 +614,7 @@ export const EditorProjectSelectionView = ({
                         {sortOrder === 'newest' ? 'Newest First' : 'Oldest First'}
                     </button>
                     <div className="px-4 py-2 bg-violet-500/10 border border-violet-500/20 rounded-xl text-xs font-bold text-violet-400">
-                        {filteredItems.length} PROJECTS
+                        {viewMode === 'submissions' ? filteredSubmissionRows.length : filteredItems.length} PROJECTS
                     </div>
                 </div>
             </div>
@@ -716,7 +739,23 @@ export const EditorProjectSelectionView = ({
                 </div>
             )}
 
-            {filteredItems.length === 0 && (
+            {viewMode === 'submissions' && selectedBoardId && (
+                <div className="space-y-4">
+                    <p className="text-xs text-gray-500 font-medium -mt-2">
+                        Upload videos or files to Monday <span className="text-violet-400/90">Submission Preview</span> without
+                        opening each project card.
+                    </p>
+                    <EditorSubmissionBoardPanel
+                        boardData={boardData}
+                        boardId={selectedBoardId}
+                        rows={filteredSubmissionRows}
+                        onRefresh={() => refreshBoardDetails(selectedBoardId, true)}
+                        onOpenItem={(item) => setSelectedProject(item)}
+                    />
+                </div>
+            )}
+
+            {viewMode === 'all' && filteredItems.length === 0 && (
                 <div className="text-center py-20 text-gray-500">
                     No projects found matching your search.
                 </div>
@@ -805,7 +844,6 @@ export const EditorProjectSelectionView = ({
                                                     col.type !== 'name' &&
                                                     !col.title.startsWith('C-F-') &&
                                                     !col.title.toLowerCase().startsWith('c-w-') &&
-                                                    !col.title.toLowerCase().includes('submission') &&
                                                     !col.title.toLowerCase().includes('subitems')
                                                 ).map((col: any) => (
                                                     <div key={col.id} className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl hover:bg-white/[0.03] transition-colors border-b border-white/[0.02] last:border-0 gap-2">

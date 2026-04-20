@@ -6,13 +6,16 @@ interface PremiumModalProps {
     onClose: () => void;
     children: React.ReactNode;
     maxWidth?: string; // Tailwind class like 'max-w-2xl', 'max-w-5xl'
+    /** Match portal chrome; defaults to dark for standalone modals */
+    tone?: 'dark' | 'light';
 }
 
 export const PremiumModal = ({
     isOpen,
     onClose,
     children,
-    maxWidth = 'max-w-2xl'
+    maxWidth = 'max-w-2xl',
+    tone = 'dark'
 }: PremiumModalProps) => {
     if (typeof document === 'undefined') return null;
 
@@ -26,7 +29,9 @@ export const PremiumModal = ({
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-black/80 backdrop-blur-xl cursor-pointer"
+                        className={`fixed inset-0 backdrop-blur-xl cursor-pointer ${
+                            tone === 'dark' ? 'bg-black/80' : 'bg-black/40'
+                        }`}
                     />
 
                     {/* Modal Container */}
@@ -35,7 +40,11 @@ export const PremiumModal = ({
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
                         onClick={(e) => e.stopPropagation()} // Prevent closing when clicking content
-                        className={`w-full ${maxWidth} bg-[#0E0E1A] border border-white/10 rounded-3xl shadow-2xl overflow-hidden cursor-default relative flex flex-col max-h-[90vh] z-10`}
+                        className={`w-full ${maxWidth} rounded-3xl shadow-2xl overflow-hidden cursor-default relative flex flex-col max-h-[90vh] z-10 ${
+                            tone === 'dark'
+                                ? 'bg-[#0E0E1A] border border-white/10'
+                                : 'bg-white border border-zinc-200 ring-1 ring-black/5'
+                        }`}
                     >
                         {children}
                     </motion.div>

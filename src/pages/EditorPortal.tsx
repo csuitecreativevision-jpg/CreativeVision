@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Briefcase,
@@ -6,14 +6,15 @@ import {
     Sparkles,
     LogOut,
     Menu,
-    Calendar
+    Calendar,
+    Settings
 } from 'lucide-react';
 import { PortalLayout } from '../components/shared/PortalLayout';
 import { SidebarItem } from '../components/shared/SidebarItem';
 import { EditorProjectSelectionView } from '../components/views/EditorProjectSelectionView';
 import { PortalCalendar } from '../components/views/PortalCalendar';
 import { getAllBoards, getBoardItems } from '../services/mondayService';
-import { supabase } from '../services/boardsService';
+import { supabase, isMissingIsFullTimerSchemaError } from '../services/boardsService';
 import { FilePreviewModal, useProtectedPreview } from '../components/ui/FilePreviewModal';
 import { LeaveRequestModal } from '../components/views/LeaveRequestModal';
 import { PortalOnboarding } from '../components/shared/PortalOnboarding';
@@ -21,12 +22,101 @@ import { useNavigate } from 'react-router-dom';
 import { RefreshProvider, useRefresh } from '../contexts/RefreshContext';
 import { TimeTracker } from '../components/shared/TimeTracker';
 import { NotificationBell } from '../components/shared/NotificationBell';
+import AdminSettings from './admin/AdminSettings';
+import { usePortalTheme } from '../contexts/PortalThemeContext';
+
+function EditorPortalMainChrome({ onOpenMobileMenu }: { onOpenMobileMenu: () => void }) {
+    const { isDark } = usePortalTheme();
+    return (
+        <>
+            <div className="absolute top-4 left-4 z-50 lg:hidden">
+                <button
+                    type="button"
+                    onClick={onOpenMobileMenu}
+                    className={`p-2 rounded-lg transition-colors ${
+                        isDark
+                            ? 'glass-panel text-white hover:bg-white/10'
+                            : 'bg-white border border-zinc-200 text-zinc-900 shadow-sm hover:bg-zinc-50'
+                    }`}
+                >
+                    <Menu className="w-6 h-6" />
+                </button>
+            </div>
+            <div className="absolute top-4 right-4 z-50">
+                <NotificationBell />
+            </div>
+        </>
+    );
+}
+
+function EditorSidebarUserProfile({ name }: { name: string }) {
+    const { isDark } = usePortalTheme();
+    if (!name) return null;
+    return (
+        <div className="flex items-center gap-2.5 px-3 py-2.5 mb-1">
+            <div
+                className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 border ${
+                    isDark
+                        ? 'bg-violet-500/12 border-violet-500/20 text-violet-300'
+                        : 'bg-violet-100 border-violet-200 text-violet-800'
+                }`}
+            >
+                {name.charAt(0).toUpperCase()}
+            </div>
+            <div className="overflow-hidden min-w-0">
+                <div
+                    className={`text-[12px] font-semibold truncate ${
+                        isDark ? 'text-white/90' : 'text-zinc-900'
+                    }`}
+                >
+                    {name}
+                </div>
+                <div
+                    className={`text-[9px] tracking-widest font-medium ${
+                        isDark ? 'text-violet-400/55' : 'text-violet-600'
+                    }`}
+                >
+                    EDITOR
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function EditorSidebarLowerNav({
+    selectedBoard,
+    onSelectCalendar,
+    onSelectSettings
+}: {
+    selectedBoard: unknown;
+    onSelectCalendar: () => void;
+    onSelectSettings: () => void;
+}) {
+    const { isDark } = usePortalTheme();
+    const divider = isDark ? 'border-white/[0.04]' : 'border-zinc-200';
+    return (
+        <div className={`pt-2 mt-1 border-t ${divider}`}>
+            <SidebarItem
+                icon={<Calendar className="w-4 h-4" />}
+                label="My Calendar"
+                active={selectedBoard === 'calendar'}
+                onClick={onSelectCalendar}
+            />
+            <SidebarItem
+                icon={<Settings className="w-4 h-4" />}
+                label="Settings"
+                active={selectedBoard === 'settings'}
+                onClick={onSelectSettings}
+            />
+        </div>
+    );
+}
 
 function EditorPortalContent() {
     const navigate = useNavigate();
     const { previewFile, isLoading: isPreviewLoading, setPreviewFile, closePreview } = useProtectedPreview();
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-    const { refreshKey, triggerRefresh } = useRefresh();
+    const { refreshKey } = useRefresh();
     const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
     const [initialItemId, setInitialItemId] = useState<string | undefined>(undefined);
     const [isProcessingNavigation, setIsProcessingNavigation] = useState(false);
@@ -34,13 +124,26 @@ function EditorPortalContent() {
     // State
     const [loading, setLoading] = useState(true);
     const [boards, setBoards] = useState<any[]>([]);
-    const [selectedBoard, setSelectedBoard] = useState<any | null>(null);
+    const [selectedBoard, setSelectedBoard] = useState<any | null | 'calendar' | 'settings'>(null);
+    const selectedBoardRef = useRef<typeof selectedBoard>(null);
     const [sortOption, setSortOption] = useState<'name' | 'count'>('name');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
     const [discordThreadId, setDiscordThreadId] = useState<string | null>(null);
 
-    // User info
-    const currentUserName = localStorage.getItem('portal_user_name') || 'Editor';
+    // User info (synced when profile is edited in Settings)
+    const [sidebarUserName, setSidebarUserName] = useState(() => localStorage.getItem('portal_user_name') || 'Editor');
+
+    useEffect(() => {
+        const sync = () => setSidebarUserName(localStorage.getItem('portal_user_name') || 'Editor');
+        window.addEventListener('cv-portal-profile-updated', sync);
+        return () => window.removeEventListener('cv-portal-profile-updated', sync);
+    }, []);
+
+    useEffect(() => {
+        selectedBoardRef.current = selectedBoard;
+    }, [selectedBoard]);
+
+    const currentUserName = sidebarUserName;
 
     // Format stored name into proper display name
     // Handles: "juanCruz" → "Juan Cruz", "juan_cruz" → "Juan Cruz", "Joshua Santos" → "Joshua Santos"
@@ -87,17 +190,33 @@ function EditorPortalContent() {
             let allowedBoardIds: string[] = [];
 
             if (email) {
-                const { data } = await supabase
+                let { data, error } = await supabase
                     .from('users')
-                    .select('allowed_board_ids, discord_thread_id')
+                    .select('allowed_board_ids, discord_thread_id, is_full_timer')
                     .eq('email', email)
                     .single();
+
+                if (error && isMissingIsFullTimerSchemaError(error.message)) {
+                    localStorage.removeItem('portal_editor_full_timer');
+                    ({ data, error } = await supabase
+                        .from('users')
+                        .select('allowed_board_ids, discord_thread_id')
+                        .eq('email', email)
+                        .single());
+                }
 
                 if (data?.allowed_board_ids) {
                     allowedBoardIds = data.allowed_board_ids;
                 }
                 if (data?.discord_thread_id) {
                     setDiscordThreadId(data.discord_thread_id);
+                }
+                if (data && 'is_full_timer' in data) {
+                    if ((data as { is_full_timer?: boolean }).is_full_timer) {
+                        localStorage.setItem('portal_editor_full_timer', '1');
+                    } else {
+                        localStorage.removeItem('portal_editor_full_timer');
+                    }
                 }
             }
 
@@ -120,13 +239,28 @@ function EditorPortalContent() {
 
             setBoards(workspaceBoards);
 
-            // Auto-enter the first assigned workspace directly
-            if (workspaceBoards.length > 0) {
-                try {
-                    const fullBoardData = await getBoardItems(workspaceBoards[0].id, true);
-                    setSelectedBoard(fullBoardData);
-                } catch {
-                    setSelectedBoard(workspaceBoards[0]);
+            if (workspaceBoards.length === 0) {
+                setSelectedBoard(null);
+            } else {
+                const prev = selectedBoardRef.current;
+                if (prev === 'calendar' || prev === 'settings') {
+                    /* keep user on calendar/settings; board list still refreshed */
+                } else {
+                    const prevId =
+                        prev && typeof prev === 'object' && prev !== null && typeof prev.id === 'string'
+                            ? prev.id
+                            : null;
+                    const targetId =
+                        prevId && workspaceBoards.some((b: any) => b.id === prevId)
+                            ? prevId
+                            : workspaceBoards[0].id;
+                    try {
+                        const fullBoardData = await getBoardItems(targetId, true);
+                        setSelectedBoard(fullBoardData);
+                    } catch {
+                        const bare = workspaceBoards.find((b: any) => b.id === targetId) || workspaceBoards[0];
+                        setSelectedBoard(bare);
+                    }
                 }
             }
 
@@ -144,6 +278,16 @@ function EditorPortalContent() {
         localStorage.clear();
         preserved.forEach(([k, v]) => localStorage.setItem(k, v));
         navigate('/portal');
+    };
+
+    const openCalendar = () => {
+        setSelectedBoard('calendar');
+        setInitialItemId(undefined);
+    };
+
+    const openSettings = () => {
+        setSelectedBoard('settings');
+        setInitialItemId(undefined);
     };
 
     // Helper for refresh
@@ -176,30 +320,17 @@ function EditorPortalContent() {
                             }}
                         />
                     ))}
-                    <div className="pt-2 mt-1 border-t border-white/[0.04]">
-                        <SidebarItem
-                            icon={<Calendar className="w-4 h-4" />}
-                            label="My Calendar"
-                            active={selectedBoard === 'calendar'}
-                            onClick={() => { setSelectedBoard('calendar'); setInitialItemId(undefined); }}
-                        />
-                    </div>
+                    <EditorSidebarLowerNav
+                        selectedBoard={selectedBoard}
+                        onSelectCalendar={openCalendar}
+                        onSelectSettings={openSettings}
+                    />
                 </div>
             }
             sidebarFooter={
                 <div className="space-y-1">
                     <TimeTracker />
-                    {currentUserName && (
-                        <div className="flex items-center gap-2.5 px-3 py-2.5 mb-1">
-                            <div className="w-7 h-7 rounded-lg bg-violet-500/12 border border-violet-500/20 flex items-center justify-center text-violet-300 font-bold text-xs flex-shrink-0">
-                                {currentUserName.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="overflow-hidden">
-                                <div className="text-white/80 text-[12px] font-semibold truncate">{currentUserName}</div>
-                                <div className="text-[9px] tracking-widest font-medium" style={{ color: 'rgba(139,92,246,0.5)' }}>EDITOR</div>
-                            </div>
-                        </div>
-                    )}
+                    <EditorSidebarUserProfile name={currentUserName} />
                     <a
                         href={discordThreadId ? `https://discord.com/channels/1157004682905014292/${discordThreadId}` : `https://discord.com/channels/1157004682905014292`}
                         target="_blank"
@@ -246,29 +377,19 @@ function EditorPortalContent() {
                         )}
                     </AnimatePresence>
 
-                    {/* Mobile Menu Trigger */}
-                    <div className="absolute top-4 left-4 z-50 lg:hidden">
-                        <button
-                            onClick={() => setIsMobileSidebarOpen(true)}
-                            className="p-2 rounded-lg glass-panel text-white hover:bg-white/10 transition-colors"
-                        >
-                            <Menu className="w-6 h-6" />
-                        </button>
-                    </div>
+                    <EditorPortalMainChrome onOpenMobileMenu={() => setIsMobileSidebarOpen(true)} />
 
-                    {/* Notification Bell - Top Right */}
-                    <div className="absolute top-4 right-4 z-50">
-                        <NotificationBell />
-                    </div>
-
-                    {/* Ambient orbs inside content area */}
-                    <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-violet-500/[0.03] rounded-full blur-[160px] pointer-events-none" />
-                    <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-indigo-500/[0.03] rounded-full blur-[140px] pointer-events-none" />
+                    {selectedBoard !== 'settings' && (
+                        <>
+                            <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-violet-500/[0.03] rounded-full blur-[160px] pointer-events-none" />
+                            <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-indigo-500/[0.03] rounded-full blur-[140px] pointer-events-none" />
+                        </>
+                    )}
 
                     <PortalOnboarding
                         steps={onboardingSteps}
                         storageKey="editor_portal_onboarding_seen"
-                        autoShow={true}
+                        autoShow={selectedBoard !== 'settings'}
                     />
 
                     <AnimatePresence mode="wait">
@@ -376,6 +497,17 @@ function EditorPortalContent() {
                                     }
                                 }}
                             />
+                        ) : selectedBoard === 'settings' ? (
+                            <motion.div
+                                key="settings"
+                                initial={{ opacity: 0, y: 8 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -8 }}
+                                transition={{ duration: 0.25 }}
+                                className="flex-1 flex flex-col min-h-0 z-10"
+                            >
+                                <AdminSettings />
+                            </motion.div>
                         ) : (
                             /* --- DETAIL VIEW --- */
                             <motion.div

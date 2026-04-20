@@ -20,6 +20,7 @@ import { FolderTreeItem } from '../../components/shared/FolderTree';
 import { BoardCell } from '../../components/shared/BoardCell';
 import { FilePreviewModal } from '../../components/ui/FilePreviewModal';
 import { GlobalCycleView } from '../../components/views/GlobalCycleView';
+import { usePortalTheme } from '../../contexts/PortalThemeContext';
 
 // --- Helpers ---
 const getBoardIcon = (name: string) => {
@@ -30,6 +31,8 @@ const getBoardIcon = (name: string) => {
 };
 
 export default function AdminBoards() {
+    const { isDark } = usePortalTheme();
+
     // Data State
     const [boards, setBoards] = useState<any[]>([]);
     const [folders, setFolders] = useState<any[]>([]);
@@ -266,15 +269,60 @@ export default function AdminBoards() {
     //     ? folders.filter(f => String(f.workspace?.id || '') === selectedWorkspaceId)
     //     : folders;
 
+    const shellBg = isDark ? 'bg-[#050511]' : 'bg-zinc-100';
+    const sidebarChrome = isDark ? 'border-white/5 bg-[#0a0a16]' : 'border-zinc-200 bg-white';
+    const panelDivider = isDark ? 'border-white/5' : 'border-zinc-200';
+    const fieldShell = isDark
+        ? 'bg-[#1a1a2e] border-white/10 text-gray-300 placeholder:text-gray-600'
+        : 'bg-white border-zinc-200 text-zinc-900 placeholder:text-zinc-400';
+    const subtleText = isDark ? 'text-gray-500' : 'text-zinc-500';
+    const boardRowIdle = isDark
+        ? 'text-gray-400 hover:text-gray-200 hover:bg-[#1C212E]'
+        : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/80';
+    const createBoardBtn = isDark
+        ? 'text-gray-400 hover:text-white hover:bg-white/5 hover:border-white/5'
+        : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 border-zinc-200 hover:border-zinc-300';
+    const mainChrome = isDark ? 'bg-[#050511]' : 'bg-zinc-100';
+    const headerBar = isDark ? 'border-white/5 bg-black/20' : 'border-zinc-200 bg-white';
+    const titleClr = isDark ? 'text-white' : 'text-zinc-900';
+    const iconBoxIdle = isDark ? 'bg-white/5 text-gray-400' : 'bg-zinc-100 text-zinc-500';
+    const headerIconBtn = isDark
+        ? 'text-gray-400 hover:text-white hover:bg-white/5'
+        : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100';
+    const groupSticky = isDark ? 'bg-[#050511] hover:border-white/5' : 'bg-zinc-100 hover:border-zinc-200';
+    const tableCard = isDark
+        ? 'border-white/5 bg-[#0e0e1a]/50 hover:border-white/10'
+        : 'border-zinc-200 bg-white hover:border-zinc-300';
+    const theadRow = isDark ? 'border-white/5 bg-white/[0.02]' : 'border-zinc-200 bg-zinc-50';
+    const thStickyBg = isDark
+        ? 'bg-[#0e0e1a] shadow-[1px_0_0_rgba(255,255,255,0.05)]'
+        : 'bg-white shadow-[1px_0_0_rgba(0,0,0,0.06)]';
+    const pulseBar = isDark ? 'bg-white/5' : 'bg-zinc-200';
+    const tableDivide = isDark ? 'divide-white/5' : 'divide-zinc-200';
+    const rowHover = isDark ? 'hover:bg-white/[0.02]' : 'hover:bg-zinc-50';
+    const firstCell = isDark
+        ? 'text-gray-200 bg-[#0e0e1a] group-hover/row:bg-[#131325] border-r border-white/5 shadow-[1px_0_0_rgba(255,255,255,0.05)]'
+        : 'text-zinc-900 bg-white group-hover/row:bg-zinc-50 border-r border-zinc-200 shadow-[1px_0_0_rgba(0,0,0,0.06)]';
+    const groupCountBadge = isDark ? 'text-gray-600 bg-white/5' : 'text-zinc-600 bg-zinc-100';
+    const emptyRowText = isDark ? 'text-gray-600' : 'text-zinc-500';
+    const modalBackdrop = isDark ? 'bg-black/90' : 'bg-black/50';
+    const modalShell = isDark ? 'bg-[#1a1a2e] border-white/10' : 'bg-white border-zinc-200 shadow-xl';
+    const modalInput = isDark
+        ? 'bg-black/50 border-white/20 text-white'
+        : 'bg-zinc-50 border-zinc-200 text-zinc-900';
+    const modalTitle = isDark ? 'text-white' : 'text-zinc-900';
+    const modalCancel = isDark ? 'text-gray-400 hover:text-white' : 'text-zinc-600 hover:text-zinc-900';
+    const chevronClr = isDark ? 'text-gray-500' : 'text-zinc-500';
+
     return (
-        <div className="flex h-full w-full overflow-hidden bg-[#050511] relative animate-in fade-in duration-500">
+        <div className={`flex h-full w-full overflow-hidden relative animate-in fade-in duration-500 ${shellBg}`}>
             {/* Left Sidebar - Board List */}
-            <div className="w-80 border-r border-white/5 bg-[#0a0a16] flex flex-col flex-shrink-0">
-                <div className="p-4 border-b border-white/5 space-y-4">
+            <div className={`w-80 border-r flex flex-col flex-shrink-0 ${sidebarChrome}`}>
+                <div className={`p-4 border-b space-y-4 ${panelDivider}`}>
                     {/* Workspace Selector */}
                     {workspaces.length > 0 && (
                         <select
-                            className="w-full bg-[#1a1a2e] border border-white/10 rounded-lg px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-custom-bright/50"
+                            className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-custom-bright/50 [color-scheme:${isDark ? 'dark' : 'light'}] ${fieldShell}`}
                             value={selectedWorkspaceId || ''}
                             onChange={(e) => setSelectedWorkspaceId(e.target.value || null)}
                         >
@@ -286,11 +334,13 @@ export default function AdminBoards() {
                     )}
 
                     <div className="relative group">
-                        <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-custom-bright transition-colors" />
+                        <Search
+                            className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-custom-bright transition-colors ${subtleText}`}
+                        />
                         <input
                             type="text"
                             placeholder="Find a board..."
-                            className="w-full bg-[#1a1a2e] border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm text-white focus:outline-none focus:border-custom-bright/50 transition-all placeholder:text-gray-600"
+                            className={`w-full border rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-custom-bright/50 transition-all ${fieldShell}`}
                         />
                     </div>
                 </div>
@@ -299,7 +349,7 @@ export default function AdminBoards() {
                     {/* Create Board Button */}
                     <button
                         onClick={() => setIsCreateBoardOpen(true)}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors mb-2 text-sm font-medium border border-transparent hover:border-white/5 border-dashed"
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors mb-2 text-sm font-medium border border-dashed border-transparent ${createBoardBtn}`}
                     >
                         <Plus className="w-4 h-4" />
                         <span>Create New Board</span>
@@ -425,20 +475,20 @@ export default function AdminBoards() {
                                             onClick={() => setSelectedBoardId(board.id)}
                                             className={`flex items-center gap-2 px-3 py-1.5 mx-2 rounded-md cursor-pointer transition-all mb-0.5 ${selectedBoardId === board.id
                                                 ? 'bg-[#0073ea] text-white shadow-lg shadow-blue-900/20 font-medium'
-                                                : 'text-gray-400 hover:text-gray-200 hover:bg-[#1C212E]'
+                                                : boardRowIdle
                                                 }`}
                                         >
-                                            <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${selectedBoardId === board.id ? 'text-white' : 'text-gray-500'}`} />
+                                            <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${selectedBoardId === board.id ? 'text-white' : isDark ? 'text-gray-500' : 'text-zinc-500'}`} />
                                             <span className="text-[13px] truncate">{board.name}</span>
                                         </div>
                                     );
                                 })}
 
                                 {loading && (
-                                    <div className="p-4 text-center text-gray-500 text-xs animate-pulse">Loading workspace...</div>
+                                    <div className={`p-4 text-center text-xs animate-pulse ${subtleText}`}>Loading workspace...</div>
                                 )}
                                 {!loading && visibleBoards.length === 0 && visibleFolders.length === 0 && (
-                                    <div className="p-4 text-center text-gray-500 text-xs opacity-50 flex flex-col gap-2">
+                                    <div className={`p-4 text-center text-xs opacity-50 flex flex-col gap-2 ${subtleText}`}>
                                         <span>Empty Workspace</span>
                                         <span className="text-[10px]">(or Main Workspace selected)</span>
                                     </div>
@@ -450,22 +500,22 @@ export default function AdminBoards() {
             </div>
 
             {/* Main Board View */}
-            <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#050511] relative">
+            <div className={`flex-1 flex flex-col h-full overflow-hidden relative ${mainChrome}`}>
                 {/* Board Header */}
                 {boardData ? (
-                    <div className="h-16 px-6 border-b border-white/5 flex items-center justify-between bg-black/20 flex-shrink-0">
+                    <div className={`h-16 px-6 border-b flex items-center justify-between flex-shrink-0 ${headerBar}`}>
                         <div className="flex items-center gap-4">
-                            <div className={`p-2 rounded-lg ${selectedBoardId ? 'bg-custom-bright/10 text-custom-bright' : 'bg-white/5 text-gray-400'}`}>
+                            <div className={`p-2 rounded-lg ${selectedBoardId ? 'bg-custom-bright/10 text-custom-bright' : iconBoxIdle}`}>
                                 {(() => {
                                     const Icon = getBoardIcon(boardData.name);
                                     return <Icon className="w-5 h-5" />;
                                 })()}
                             </div>
                             <div>
-                                <h2 className="text-white font-bold text-lg leading-tight">{boardData.name}</h2>
-                                <div className="text-xs text-gray-500 flex items-center gap-2">
+                                <h2 className={`font-bold text-lg leading-tight ${titleClr}`}>{boardData.name}</h2>
+                                <div className={`text-xs flex items-center gap-2 ${subtleText}`}>
                                     <span>{boardData.items?.length || 0} Items</span>
-                                    <span className="w-1 h-1 rounded-full bg-gray-700"></span>
+                                    <span className={`w-1 h-1 rounded-full ${isDark ? 'bg-gray-700' : 'bg-zinc-300'}`}></span>
                                     <span>Last updated: Just now</span>
                                 </div>
                             </div>
@@ -479,18 +529,18 @@ export default function AdminBoards() {
                                 <Plus className="w-4 h-4" />
                                 New Group
                             </button>
-                            <button className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
+                            <button type="button" className={`p-2 rounded-lg transition-colors ${headerIconBtn}`}>
                                 <Search className="w-5 h-5" />
                             </button>
-                            <button className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
+                            <button type="button" className={`p-2 rounded-lg transition-colors ${headerIconBtn}`}>
                                 <MoreHorizontal className="w-5 h-5" />
                             </button>
                         </div>
                     </div>
                 ) : (
-                    <div className="h-16 px-6 border-b border-white/5 flex items-center justify-between bg-black/20">
+                    <div className={`h-16 px-6 border-b flex items-center justify-between ${headerBar}`}>
                         <div className="flex items-center gap-2">
-                            <div className="w-32 h-6 bg-white/5 rounded animate-pulse" />
+                            <div className={`w-32 h-6 rounded animate-pulse ${pulseBar}`} />
                         </div>
                     </div>
                 )}
@@ -498,7 +548,7 @@ export default function AdminBoards() {
                 {/* Board Content */}
                 <div className="flex-1 overflow-auto custom-scrollbar p-6">
                     {loading ? (
-                        <div className="flex flex-col items-center justify-center h-[50vh] text-gray-500 gap-4">
+                        <div className={`flex flex-col items-center justify-center h-[50vh] gap-4 ${subtleText}`}>
                             <Loader2 className="w-8 h-8 animate-spin text-custom-bright" />
                             <p className="text-sm font-medium animate-pulse">Loading Board Data...</p>
                         </div>
@@ -518,44 +568,44 @@ export default function AdminBoards() {
                                     <div key={group.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                         {/* Group Header */}
                                         <div
-                                            className="flex items-center gap-3 mb-3 group/header cursor-pointer select-none sticky top-0 bg-[#050511] z-10 py-2 border-b border-transparent hover:border-white/5 transition-colors"
+                                            className={`flex items-center gap-3 mb-3 group/header cursor-pointer select-none sticky top-0 z-10 py-2 border-b border-transparent transition-colors ${groupSticky}`}
                                             onClick={() => toggleGroup(group.id)}
                                         >
                                             <div
                                                 className={`w-4 h-4 rounded flex items-center justify-center transition-transform ${collapsedGroups.has(group.id) ? '-rotate-90' : 'rotate-0'}`}
                                             // style={{ color: group.color }}
                                             >
-                                                <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg" className="fill-current text-gray-500">
+                                                <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg" className={`fill-current ${chevronClr}`}>
                                                     <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                                 </svg>
                                             </div>
                                             <h3 className="text-sm font-bold truncate flex-1" style={{ color: group.color }}>
                                                 {group.title}
                                             </h3>
-                                            <span className="text-xs text-gray-600 font-medium px-2 py-0.5 rounded-full bg-white/5">
+                                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${groupCountBadge}`}>
                                                 {boardData.items.filter((i: any) => i.group.id === group.id).length}
                                             </span>
                                         </div>
 
                                         {/* Group Items Table */}
                                         {!collapsedGroups.has(group.id) && (
-                                            <div className="border border-white/5 rounded-xl overflow-hidden bg-[#0e0e1a]/50 shadow-sm transition-all hover:shadow-md hover:border-white/10">
+                                            <div className={`border rounded-xl overflow-hidden shadow-sm transition-all hover:shadow-md ${tableCard}`}>
                                                 <div className="overflow-x-auto">
                                                     <table className="w-full text-left border-collapse">
                                                         <thead>
-                                                            <tr className="border-b border-white/5 bg-white/[0.02]">
-                                                                <th className="py-3 px-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider w-[280px] sticky left-0 bg-[#0e0e1a] z-20 shadow-[1px_0_0_rgba(255,255,255,0.05)]">Item Name</th>
+                                                            <tr className={`border-b ${theadRow}`}>
+                                                                <th className={`py-3 px-4 text-[11px] font-bold uppercase tracking-wider w-[280px] sticky left-0 z-20 ${subtleText} ${thStickyBg}`}>Item Name</th>
                                                                 {boardData.columns.slice(0, 8).map((col: any) => (
-                                                                    <th key={col.id} className="py-3 px-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider min-w-[140px] whitespace-nowrap">
+                                                                    <th key={col.id} className={`py-3 px-4 text-[11px] font-bold uppercase tracking-wider min-w-[140px] whitespace-nowrap ${subtleText}`}>
                                                                         {col.title}
                                                                     </th>
                                                                 ))}
                                                             </tr>
                                                         </thead>
-                                                        <tbody className="divide-y divide-white/5">
+                                                        <tbody className={`divide-y ${tableDivide}`}>
                                                             {boardData.items.filter((i: any) => i.group.id === group.id).length === 0 ? (
                                                                 <tr>
-                                                                    <td colSpan={boardData.columns.length + 1} className="py-8 text-center text-gray-600 text-sm italic">
+                                                                    <td colSpan={boardData.columns.length + 1} className={`py-8 text-center text-sm italic ${emptyRowText}`}>
                                                                         This group is empty
                                                                     </td>
                                                                 </tr>
@@ -563,8 +613,8 @@ export default function AdminBoards() {
                                                                 boardData.items
                                                                     .filter((i: any) => i.group.id === group.id)
                                                                     .map((item: any) => (
-                                                                        <tr id={`item-${item.id}`} key={item.id} className="group/row hover:bg-white/[0.02] transition-colors">
-                                                                            <td className="py-2 px-4 text-sm font-medium text-gray-200 sticky left-0 bg-[#0e0e1a] group-hover/row:bg-[#131325] transition-colors z-10 border-r border-white/5 shadow-[1px_0_0_rgba(255,255,255,0.05)]">
+                                                                        <tr id={`item-${item.id}`} key={item.id} className={`group/row transition-colors ${rowHover}`}>
+                                                                            <td className={`py-2 px-4 text-sm font-medium sticky left-0 transition-colors z-10 ${firstCell}`}>
                                                                                 <div className="flex items-center gap-2 max-w-[250px]">
                                                                                     <div className="w-1 h-8 rounded-full bg-gradient-to-b from-transparent via-custom-bright/50 to-transparent opacity-0 group-hover/row:opacity-100 absolute left-0 top-1/2 -translate-y-1/2 transition-opacity" />
                                                                                     <span className="truncate" title={item.name}>{item.name}</span>
@@ -594,7 +644,7 @@ export default function AdminBoards() {
                             </div>
                         )
                     ) : (
-                        <div className="flex flex-col items-center justify-center h-full text-gray-500 opacity-50">
+                        <div className={`flex flex-col items-center justify-center h-full opacity-50 ${subtleText}`}>
                             <LayoutDashboard className="w-16 h-16 mb-4 stroke-1" />
                             <p className="text-lg">Select a board to view contents</p>
                         </div>
@@ -604,20 +654,20 @@ export default function AdminBoards() {
 
             {/* Modals */}
             {isCreateBoardOpen && (
-                <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center animate-in fade-in duration-200">
-                    <div className="bg-[#1a1a2e] p-6 rounded-2xl border border-white/10 w-full max-w-md shadow-2xl">
-                        <h3 className="text-xl font-bold text-white mb-4">Create New Board</h3>
+                <div className={`fixed inset-0 z-50 flex items-center justify-center animate-in fade-in duration-200 ${modalBackdrop}`}>
+                    <div className={`p-6 rounded-2xl border w-full max-w-md ${modalShell}`}>
+                        <h3 className={`text-xl font-bold mb-4 ${modalTitle}`}>Create New Board</h3>
                         <input
                             autoFocus
                             type="text"
-                            className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-3 text-white focus:border-custom-bright outline-none mb-6"
+                            className={`w-full border rounded-xl px-4 py-3 focus:border-custom-bright outline-none mb-6 ${modalInput}`}
                             placeholder="Board Name"
                             value={newBoardName}
                             onChange={(e) => setNewBoardName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleCreateBoard()}
                         />
                         <div className="flex justify-end gap-3">
-                            <button onClick={() => setIsCreateBoardOpen(false)} className="px-4 py-2 text-gray-400 hover:text-white transition-colors">Cancel</button>
+                            <button type="button" onClick={() => setIsCreateBoardOpen(false)} className={`px-4 py-2 transition-colors ${modalCancel}`}>Cancel</button>
                             <button
                                 onClick={handleCreateBoard}
                                 disabled={loading || !newBoardName.trim()}
@@ -632,20 +682,20 @@ export default function AdminBoards() {
 
             {/* Create Group Modal */}
             {isCreateGroupOpen && (
-                <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center animate-in fade-in duration-200">
-                    <div className="bg-[#1a1a2e] p-6 rounded-2xl border border-white/10 w-full max-w-md shadow-2xl">
-                        <h3 className="text-xl font-bold text-white mb-4">Create New Group</h3>
+                <div className={`fixed inset-0 z-50 flex items-center justify-center animate-in fade-in duration-200 ${modalBackdrop}`}>
+                    <div className={`p-6 rounded-2xl border w-full max-w-md ${modalShell}`}>
+                        <h3 className={`text-xl font-bold mb-4 ${modalTitle}`}>Create New Group</h3>
                         <input
                             autoFocus
                             type="text"
-                            className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-3 text-white focus:border-custom-bright outline-none mb-6"
+                            className={`w-full border rounded-xl px-4 py-3 focus:border-custom-bright outline-none mb-6 ${modalInput}`}
                             placeholder="Group Name"
                             value={newGroupName}
                             onChange={(e) => setNewGroupName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleCreateGroup()}
                         />
                         <div className="flex justify-end gap-3">
-                            <button onClick={() => setIsCreateGroupOpen(false)} className="px-4 py-2 text-gray-400 hover:text-white transition-colors">Cancel</button>
+                            <button type="button" onClick={() => setIsCreateGroupOpen(false)} className={`px-4 py-2 transition-colors ${modalCancel}`}>Cancel</button>
                             <button
                                 onClick={handleCreateGroup}
                                 disabled={loading || !newGroupName.trim()}

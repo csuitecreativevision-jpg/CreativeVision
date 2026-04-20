@@ -71,6 +71,7 @@ export function UserManagement() {
     const [isUserListOpen, setIsUserListOpen] = useState(false);
     const [userError, setUserError] = useState<string | null>(null);
     const [editingUserId, setEditingUserId] = useState<string | null>(null);
+    const [newUserFullTimer, setNewUserFullTimer] = useState(false);
 
     // --- Checker State ---
     const [checkers, setCheckers] = useState<Checker[]>([]);
@@ -142,10 +143,12 @@ export function UserManagement() {
     const handleEditUser = (user: any) => {
         setEditingUserId(user.id);
         setNewUserName(user.name);
-        setNewUserRole(user.role);
+        const normalizedRole = String(user.role || 'editor').toLowerCase() as 'admin' | 'editor' | 'client';
+        setNewUserRole(normalizedRole);
         setNewUserEmail(user.email);
         setSelectedUserWorkspace(user.workspace_id || '');
         setSelectedBoardIds(user.allowed_board_ids || []);
+        setNewUserFullTimer(user.is_full_timer === true || user.is_full_timer === 'true');
         setNewUserPassword('');
         setIsUserListOpen(false);
     };
@@ -157,6 +160,7 @@ export function UserManagement() {
         setNewUserRole('editor');
         setSelectedUserWorkspace('');
         setSelectedBoardIds([]);
+        setNewUserFullTimer(false);
         setUserError(null);
         setUserSuccess(null);
     };
@@ -198,11 +202,19 @@ export function UserManagement() {
                 role: newUserRole,
                 workspace_id: selectedUserWorkspace,
                 allowed_board_ids: selectedBoardIds,
-                name: newUserName.trim()
+                name: newUserName.trim(),
+                is_full_timer: newUserRole === 'editor' ? newUserFullTimer : false
             });
             setIsCreatingUser(false);
             if (result.success) {
-                setUserSuccess(`User updated successfully!`);
+                if (result.fullTimerOmittedBecauseSchema && newUserRole === 'editor' && newUserFullTimer) {
+                    setUserError(
+                        'Other details were saved, but the database has no is_full_timer column yet. Run database/add-users-is-full-timer.sql in the Supabase SQL editor, then save again.'
+                    );
+                    fetchUsers();
+                    return;
+                }
+                setUserSuccess('User updated successfully!');
                 handleCancelEdit();
                 fetchUsers();
             } else {
@@ -215,7 +227,8 @@ export function UserManagement() {
                 newUserPassword,
                 newUserRole,
                 selectedUserWorkspace || undefined,
-                selectedBoardIds
+                selectedBoardIds,
+                newUserRole === 'editor' ? newUserFullTimer : undefined
             );
             setIsCreatingUser(false);
             if (result.success) {
@@ -233,6 +246,7 @@ export function UserManagement() {
                 setNewUserName('');
                 setNewUserPassword('');
                 setNewUserRole('editor');
+                setNewUserFullTimer(false);
                 setSelectedUserWorkspace('');
                 setSelectedBoardIds([]);
                 fetchUsers();
@@ -342,6 +356,23 @@ export function UserManagement() {
                                 ))}
                             </div>
                         </div>
+
+                        {newUserRole === 'editor' && (
+                            <label className="flex items-start gap-3 p-4 rounded-xl border border-white/10 bg-[#131322]/80 cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={newUserFullTimer}
+                                    onChange={(e) => setNewUserFullTimer(e.target.checked)}
+                                    className="mt-1 rounded border-white/20 bg-[#131322] text-violet-500 focus:ring-violet-500/40"
+                                />
+                                <div>
+                                    <div className="text-sm font-bold text-white">Full-time shift (strict hours)</div>
+                                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                                        Scheduled shift <span className="text-gray-400">4:00 PM – 12:00 AM</span> (device local time). Dinner break is only <span className="text-gray-400">6:00 PM – 9:00 PM</span>. Starting dinner outside that window is blocked in the editor portal.
+                                    </p>
+                                </div>
+                            </label>
+                        )}
 
                         {/* Basic Info */}
                         <div className="grid grid-cols-1 gap-4">
@@ -460,7 +491,7 @@ export function UserManagement() {
                                                 type={showPassword ? "text" : "password"}
                                                 value={newUserPassword}
                                                 onChange={e => setNewUserPassword(e.target.value)}
-                                                placeholder="••••••••"
+                                                placeholder=""
                                                 className="pr-10"
                                             />
                                             <button
@@ -649,12 +680,19 @@ export function UserManagement() {
                                             <div className="text-xs text-gray-500 font-mono">{user.email}</div>
                                         </td>
                                         <td className="p-4">
-                                            <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${user.role === 'admin' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
-                                                user.role === 'editor' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
-                                                    'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                                }`}>
-                                                {user.role}
-                                            </span>
+                                            <div className="flex flex-col gap-1.5 items-start">
+                                                <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${user.role === 'admin' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
+                                                    user.role === 'editor' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                                                        'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                    }`}>
+                                                    {user.role}
+                                                </span>
+                                                {user.role === 'editor' && user.is_full_timer && (
+                                                    <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-violet-500/15 text-violet-300 border border-violet-500/25">
+                                                        Full-time
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="p-4">
                                             {user.workspace_id ? (

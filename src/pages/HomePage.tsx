@@ -177,7 +177,7 @@ function Scene1() {
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           transition={{ duration: 1, delay: 0.5 }}
-          className="text-base md:text-lg lg:text-xl text-white/50 max-w-2xl mx-auto leading-relaxed font-light px-4 md:px-0"
+          className="select-text text-base md:text-lg lg:text-xl text-white/50 max-w-2xl mx-auto leading-relaxed font-light px-4 md:px-0"
         >
           Stop posting content that gets ignored. We engineer cinematic videos that hook audiences and drive conversions.
         </motion.p>
@@ -229,7 +229,7 @@ function Scene2() {
             whileInView={{ opacity: 1 }}
             viewport={{ amount: 0.3 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-base md:text-lg text-white/50 max-w-md leading-relaxed font-light"
+            className="select-text text-base md:text-lg text-white/50 max-w-md leading-relaxed font-light"
           >
             You're paying for production, ads, and distribution—but your videos aren't converting. The market is saturated with amateur edits and weak hooks.
           </motion.p>
@@ -310,7 +310,7 @@ function Scene3() {
           whileInView={{ opacity: 1 }}
           viewport={{ amount: 0.3 }}
           transition={{ duration: 0.8, delay: 0.2 }}
-          className="text-[10px] font-medium tracking-[0.3em] uppercase text-white/40 mb-16 md:mb-24"
+          className="select-text text-[10px] font-medium tracking-[0.3em] uppercase text-white/40 mb-16 md:mb-24"
         >
           Delivering impact at scale
         </motion.p>
@@ -432,7 +432,7 @@ function Scene4() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ amount: 0.3 }}
             transition={{ duration: 1, delay: 0.2, ease: "easeOut" }}
-            className="text-sm md:text-base text-white/50 font-light max-w-xl tracking-wide leading-relaxed"
+            className="select-text text-sm md:text-base text-white/50 font-light max-w-xl tracking-wide leading-relaxed"
           >
             A curated selection of our most impactful campaigns. We blend high-end production with data-driven strategy to create videos that don't just look beautiful—they perform.
           </motion.p>
@@ -593,7 +593,7 @@ function Scene5() {
             whileInView={{ opacity: 1 }}
             viewport={{ amount: 0.3 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-white/50 max-w-sm text-sm md:text-base font-light pb-2"
+            className="select-text text-white/50 max-w-sm text-sm md:text-base font-light pb-2"
           >
             We don't just edit videos. We engineer attention. Choose your path to excellence below.
           </motion.p>
@@ -621,7 +621,7 @@ function Scene5() {
                 <Zap className="w-6 h-6 md:w-7 md:h-7" />
               </div>
               <h3 className="font-sans text-4xl md:text-5xl font-black mb-4 tracking-tight">Hire CreativeVision</h3>
-              <p className="text-white/60 mb-8 md:mb-10 max-w-lg text-base md:text-lg font-light">
+              <p className="select-text text-white/60 mb-8 md:mb-10 max-w-lg text-base md:text-lg font-light">
                 Transform your raw footage into high-converting assets with professional turnaround.
               </p>
 
@@ -654,7 +654,7 @@ function Scene5() {
           transition={{ duration: 0.8, delay: 0.5 }}
           className="mt-8 md:mt-12 text-center md:text-left px-4"
         >
-          <p className="text-sm md:text-base text-white/40 font-light">
+          <p className="select-text text-sm md:text-base text-white/40 font-light">
             Are you a world-class editor?{' '}
             <button
               onClick={() => navigate('/join')}
@@ -730,9 +730,9 @@ function Scene6() {
                       exit={{ height: 0, opacity: 0 }}
                       transition={{ duration: 0.3, ease: "easeInOut" }}
                     >
-                      <div className="px-6 pb-6 md:px-8 md:pb-8 text-sm md:text-base text-white/60 leading-relaxed max-w-3xl">
+                      <p className="select-text px-6 pb-6 md:px-8 md:pb-8 text-sm md:text-base text-white/60 leading-relaxed max-w-3xl">
                         {faq.answer}
-                      </div>
+                      </p>
                     </motion.div>
                   )}
                 </AnimatePresence>

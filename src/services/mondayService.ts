@@ -1,4 +1,5 @@
 const MONDAY_API_URL = "https://api.monday.com/v2";
+const MONDAY_FILE_API_URL = "https://api.monday.com/v2/file";
 const MONDAY_API_TOKEN = import.meta.env.VITE_MONDAY_API_TOKEN;
 import { supabase } from '../lib/supabaseClient';
 import { getCycleDates, isDateInCycle } from '../features/performance-dashboard/utils/dateUtils';
@@ -744,6 +745,100 @@ export async function updateItemValue(boardId: string, itemId: string, columnId:
     }`;
     const data = await mondayRequest(query);
     return data;
+}
+
+/**
+ * Upload a file into a Monday.com **file** column (e.g. Submission Preview).
+ * Browser → `api.monday.com/v2/file` is blocked by CORS, so we POST via Supabase Edge when configured.
+ */
+export async function uploadFileToItemColumn(itemId: string, columnId: string, file: File): Promise<void> {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+
+    if (supabaseUrl && supabaseAnonKey) {
+        const formData = new FormData();
+        formData.append('file', file, file.name);
+        formData.append('itemId', itemId);
+        formData.append('columnId', columnId);
+
+        const networkHint =
+            'Could not reach the upload service. Save `.env`, restart the dev server (needed after `vite.config` changes), deploy `monday-file-upload` with `verify_jwt = false`, and set Edge secret `MONDAY_API_TOKEN` (Dashboard → Edge Functions → Secrets). `VITE_MONDAY_API_TOKEN` in `.env` does not configure the function.';
+
+        // In dev, post via Vite proxy (same origin) to avoid CORS blocking cross-origin calls to *.supabase.co.
+        const uploadUrl = import.meta.env.DEV
+            ? '/functions/v1/monday-file-upload'
+            : `${supabaseUrl.replace(/\/$/, '')}/functions/v1/monday-file-upload`;
+
+        let response: Response;
+        try {
+            response = await fetch(uploadUrl, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${supabaseAnonKey}`,
+                    apikey: supabaseAnonKey,
+                },
+                body: formData,
+            });
+        } catch {
+            throw new Error(networkHint);
+        }
+
+        const text = await response.text();
+        let json: { error?: string; success?: boolean };
+        try {
+            json = JSON.parse(text) as { error?: string; success?: boolean };
+        } catch {
+            throw new Error(
+                `Upload proxy failed (${response.status}): ${text.slice(0, 200) || 'Invalid response'}`
+            );
+        }
+
+        if (!response.ok || json.error) {
+            throw new Error(json.error || `Upload failed (${response.status})`);
+        }
+        return;
+    }
+
+    // Fallback: direct Monday (works only in non-browser or if CORS allows — usually fails in the app)
+    if (!MONDAY_API_TOKEN || MONDAY_API_TOKEN === 'YOUR_MONDAY_API_TOKEN') {
+        throw new Error(
+            'Configure VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY and deploy the monday-file-upload edge function (browser uploads require the proxy).'
+        );
+    }
+
+    const mutation = `mutation ($file: File!) {
+        add_file_to_column (
+            file: $file,
+            item_id: ${Number(itemId)},
+            column_id: ${JSON.stringify(columnId)}
+        ) {
+            id
+        }
+    }`;
+
+    const formData = new FormData();
+    formData.append('query', mutation);
+    formData.append('variables[file]', file, file.name);
+
+    const response = await limiter.add(() =>
+        fetch(MONDAY_FILE_API_URL, {
+            method: 'POST',
+            headers: {
+                Authorization: MONDAY_API_TOKEN,
+            },
+            body: formData,
+        })
+    );
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Monday file upload failed (${response.status}): ${text.slice(0, 200)}`);
+    }
+
+    const json = await response.json();
+    if (json.errors?.length) {
+        throw new Error(json.errors.map((e: { message?: string }) => e.message || 'Unknown error').join('; '));
+    }
 }
 
 /**
