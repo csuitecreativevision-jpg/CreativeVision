@@ -794,13 +794,13 @@ export async function updateSourceColumn(sourceBoardId: string | number, sourceI
 
 // Refactored to use getBoardItems which provides Caching & Pagination
 // and uses the global RateLimiter (limit=2) to prevent concurrency issues.
-export async function getMultipleBoardItems(boardIds: string[]) {
+export async function getMultipleBoardItems(boardIds: string[], forceSync: boolean = false) {
     if (boardIds.length === 0) return [];
 
     // Use Promise.all to fetch concurrently (limited by RateLimiter)
     // This leverages the 'cache_monday_board_items' automatically
     const results = await Promise.all(
-        boardIds.map(id => getBoardItems(id).catch(err => {
+        boardIds.map(id => getBoardItems(id, forceSync).catch(err => {
             console.error(`Failed to fetch board ${id}:`, err);
             return null;
         }))
@@ -1578,7 +1578,7 @@ async function getApprovalItemsFresh(forceSync: boolean = false) {
 
     // 2. Fetch Items
     const boardIds = workspaceBoards.map((b: any) => b.id);
-    const boardsWithItems = await getMultipleBoardItems(boardIds);
+    const boardsWithItems = await getMultipleBoardItems(boardIds, forceSync);
 
     const approvalItems: any[] = [];
 

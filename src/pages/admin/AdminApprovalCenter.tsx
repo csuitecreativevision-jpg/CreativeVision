@@ -18,10 +18,10 @@ export default function AdminApprovalCenter() {
 
     useEffect(() => { loadData(); }, []);
 
-    const loadData = async () => {
+    const loadData = async (forceRefresh: boolean = false) => {
         setLoading(true);
         try {
-            const data = await getApprovalItems();
+            const data = await getApprovalItems(forceRefresh);
             setItems(data);
         } catch (error) {
             console.error('Failed to load approvals', error);
@@ -65,7 +65,7 @@ export default function AdminApprovalCenter() {
             subtitle={`${items.length} project${items.length !== 1 ? 's' : ''} awaiting review`}
             action={
                 <button
-                    onClick={loadData}
+                    onClick={() => loadData(true)}
                     className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.04] border border-white/[0.07] hover:bg-white/[0.07] text-white/60 hover:text-white text-xs font-semibold transition-all duration-150"
                 >
                     <RefreshCw className="w-3.5 h-3.5" />
@@ -153,7 +153,7 @@ export default function AdminApprovalCenter() {
                             const idx = items.findIndex(i => i.id === selectedApprovalItem.id);
                             if (idx > 0) handleReviewProject(items[idx - 1]);
                         }}
-                        refreshBoardDetails={async () => { await loadData(); }}
+                        refreshBoardDetails={async () => { await loadData(true); }}
                         setPreviewFile={setPreviewFile}
                     />
                 )}
