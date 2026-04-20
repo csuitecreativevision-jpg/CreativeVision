@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.monday-file-upload]
 verify_jwt = false
+
+[functions.monday-webhook]
+verify_jwt = false
+
+[functions.monday-webhook-sync]
+verify_jwt = false

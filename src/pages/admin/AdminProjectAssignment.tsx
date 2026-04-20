@@ -121,6 +121,13 @@ export default function AdminProjectAssignment() {
     const [projectTypes, setProjectTypes] = useState<string[]>([]);
     const [projectPriorities, setProjectPriorities] = useState<string[]>([]);
 
+    const normalizePersonName = (value: string) =>
+        value
+            .toLowerCase()
+            .replace(/\(.*?\)/g, '')
+            .replace(/[^a-z0-9]+/g, '')
+            .trim();
+
     const activeProject = projects[activeProjectIndex];
 
     const updateCurrentProject = (updates: any) => {
@@ -241,13 +248,19 @@ export default function AdminProjectAssignment() {
                             const { data: allEditorUsers, error: fetchErr } = await supabase
                                 .from('users').select('email, name, allowed_board_ids').eq('role', 'editor');
                             if (!fetchErr) {
-                                const matchedUser = allEditorUsers?.find(u => u.allowed_board_ids?.includes(teamEntry.id));
+                                const matchedUser = allEditorUsers?.find(u => {
+                                    const allowedBoardMatch = u.allowed_board_ids?.includes(teamEntry.id);
+                                    const nameMatch = normalizePersonName(u.name || '') === normalizePersonName(project.editor);
+                                    return allowedBoardMatch || nameMatch;
+                                });
                                 if (matchedUser?.email) {
                                     const deadlineStr = project.deadline ? ` | Deadline: ${new Date(project.deadline).toLocaleDateString()}` : '';
+                                    const checkerStr = project.checkerName ? ` | Checker: ${project.checkerName}` : '';
+                                    const typeStr = project.projectType ? ` | Type: ${project.projectType}` : '';
                                     await createNotification({
                                         user_email: matchedUser.email, type: 'assignment',
                                         title: 'New Project Assigned',
-                                        message: `You've been assigned "${project.projectName}" for ${project.client || 'N/A'}${deadlineStr}.`,
+                                        message: `You've been assigned "${project.projectName}" for ${project.client || 'N/A'}${typeStr}${deadlineStr}${checkerStr}.`,
                                         source_type: 'project', source_id: project.projectName
                                     });
                                 }

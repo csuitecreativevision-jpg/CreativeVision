@@ -80,7 +80,11 @@ function getNotificationColor(type: string) {
 
 // ─── Component ──────────────────────────────────────────────────────────
 
-export function NotificationBell() {
+interface NotificationBellProps {
+    onNotificationClick?: (notification: Notification) => void | Promise<void>;
+}
+
+export function NotificationBell({ onNotificationClick }: NotificationBellProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
@@ -295,7 +299,11 @@ export function NotificationBell() {
                                                         ? 'hover:bg-white/[0.03]'
                                                         : 'bg-white/[0.03] hover:bg-white/[0.06]'
                                                 }`}
-                                                onClick={() => {
+                                                onClick={async () => {
+                                                    if (onNotificationClick) {
+                                                        await onNotificationClick(notification);
+                                                        setIsOpen(false);
+                                                    }
                                                     if (!notification.is_read) handleMarkAsRead(notification.id);
                                                 }}
                                             >

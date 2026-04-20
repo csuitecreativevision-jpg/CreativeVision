@@ -20,6 +20,78 @@ import { useNavigate } from 'react-router-dom';
 import { RefreshProvider, useRefresh } from '../contexts/RefreshContext';
 import { NotificationBell } from '../components/shared/NotificationBell';
 import { PortalCalendar } from '../components/views/PortalCalendar';
+import { createNotification } from '../services/notificationService';
+import type { Notification } from '../services/notificationService';
+
+function getStatusColumnIds(board: any): string[] {
+    if (!board?.columns) return [];
+    return board.columns
+        .filter((col: any) => {
+            const title = String(col.title || '').toLowerCase();
+            const type = String(col.type || '').toLowerCase();
+            return title.includes('status') || title.includes('phase') || title.includes('stage') || type === 'status' || type === 'color';
+        })
+        .map((col: any) => col.id);
+}
+
+function getItemStatusText(item: any, statusColumnIds: string[]): string {
+    if (!item?.column_values?.length || statusColumnIds.length === 0) return '';
+    for (const colId of statusColumnIds) {
+        const value = item.column_values.find((cv: any) => cv.id === colId);
+        const text = String(value?.text || value?.display_value || '').trim();
+        if (text) return text;
+    }
+    return '';
+}
+
+async function syncWaitingForClientNotifications(userEmail: string, boardsWithItems: any[]) {
+    if (!userEmail || !boardsWithItems.length) return;
+
+    const waitingItems: { sourceId: string; itemId: string; itemName: string; statusText: string }[] = [];
+
+    for (const board of boardsWithItems) {
+        const statusColumnIds = getStatusColumnIds(board);
+        if (!statusColumnIds.length) continue;
+
+        for (const item of board.items || []) {
+            const statusText = getItemStatusText(item, statusColumnIds);
+            if (!statusText) continue;
+
+            const normalized = statusText.toLowerCase();
+            if (!normalized.includes('waiting for client')) continue;
+
+            waitingItems.push({
+                sourceId: `waiting_client_${item.id}`,
+                itemId: item.id,
+                itemName: item.name,
+                statusText
+            });
+        }
+    }
+
+    if (waitingItems.length === 0) return;
+
+    const sourceIds = waitingItems.map((entry) => entry.sourceId);
+    const { data: existing } = await supabase
+        .from('notifications')
+        .select('source_id')
+        .eq('user_email', userEmail)
+        .in('source_id', sourceIds);
+
+    const existingIds = new Set((existing || []).map((row: { source_id: string }) => row.source_id));
+
+    for (const entry of waitingItems) {
+        if (existingIds.has(entry.sourceId)) continue;
+        await createNotification({
+            user_email: userEmail,
+            type: 'info',
+            title: 'Video Waiting For Your Review',
+            message: `"${entry.itemName}" is now ${entry.statusText}.`,
+            source_type: 'project',
+            source_id: entry.sourceId
+        });
+    }
+}
 
 function ClientPortalContent() {
     const navigate = useNavigate();
@@ -32,6 +104,69 @@ function ClientPortalContent() {
     const { refreshKey, triggerRefresh } = useRefresh();
     const [initialItemId, setInitialItemId] = useState<string | undefined>(undefined);
     const [isProcessingNavigation, setIsProcessingNavigation] = useState(false);
+    const [webhookSyncDone, setWebhookSyncDone] = useState(false);
+
+    const extractItemIdFromNotificationSource = (sourceId?: string) => {
+        if (!sourceId) return null;
+        if (sourceId.startsWith('waiting_client_')) {
+            return sourceId.replace('waiting_client_', '').trim() || null;
+        }
+        return sourceId.trim();
+    };
+
+    const openItemFromNotification = async (notification: Notification) => {
+        if (notification.source_type !== 'project') return;
+
+        const itemId = extractItemIdFromNotificationSource(notification.source_id);
+        if (!itemId) return;
+
+        setIsProcessingNavigation(true);
+        try {
+            for (const board of boards) {
+                const fullBoardData = await getBoardItems(board.id, true);
+                const hasItem = (fullBoardData?.items || []).some((item: any) => item.id === itemId);
+                if (!hasItem) continue;
+
+                setInitialItemId(itemId);
+                setSelectedBoard(fullBoardData);
+                return;
+            }
+        } catch (error) {
+            console.error('Failed to open item from notification:', error);
+        } finally {
+            setIsProcessingNavigation(false);
+        }
+    };
+
+    const ensureBoardWebhooks = async (boardIds: string[]) => {
+        if (!boardIds.length) return;
+        try {
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+            const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+            if (!supabaseUrl || !supabaseAnonKey) return;
+
+            const endpoint = import.meta.env.DEV
+                ? '/functions/v1/monday-webhook-sync'
+                : `${supabaseUrl.replace(/\/$/, '')}/functions/v1/monday-webhook-sync`;
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${supabaseAnonKey}`,
+                    apikey: supabaseAnonKey,
+                },
+                body: JSON.stringify({ board_ids: boardIds }),
+            });
+
+            if (!response.ok) {
+                const text = await response.text();
+                console.error('Failed to auto-sync Monday webhooks:', text);
+            }
+        } catch (error) {
+            console.error('Failed to call monday-webhook-sync:', error);
+        }
+    };
 
     useEffect(() => {
         setCurrentUserName(localStorage.getItem('portal_user_name'));
@@ -134,6 +269,56 @@ function ClientPortalContent() {
     useEffect(() => {
         loadData();
     }, [refreshKey]);
+
+    useEffect(() => {
+        if (webhookSyncDone || boards.length === 0) return;
+        const boardIds = boards.map((b) => b.id).filter(Boolean);
+        if (boardIds.length === 0) return;
+        ensureBoardWebhooks(boardIds).finally(() => setWebhookSyncDone(true));
+    }, [boards, webhookSyncDone]);
+
+    useEffect(() => {
+        const userEmail = localStorage.getItem('portal_user_email') || '';
+        if (!userEmail || boards.length === 0) return;
+
+        let cancelled = false;
+        const POLL_INTERVAL_MS = 5000;
+
+        const pollMondayStatusForNotifications = async () => {
+            try {
+                const boardIds = boards.map((b) => b.id);
+                const freshBoards = await Promise.all(
+                    boardIds.map((boardId) => getBoardItems(boardId, true).catch(() => null))
+                );
+                const validBoards = freshBoards.filter(Boolean) as any[];
+
+                if (cancelled || validBoards.length === 0) return;
+                await syncWaitingForClientNotifications(userEmail, validBoards);
+            } catch (error) {
+                console.error('Failed to poll Monday statuses for client notifications:', error);
+            }
+        };
+
+        pollMondayStatusForNotifications();
+        const interval = setInterval(pollMondayStatusForNotifications, POLL_INTERVAL_MS);
+        const handleWindowFocus = () => {
+            pollMondayStatusForNotifications();
+        };
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                pollMondayStatusForNotifications();
+            }
+        };
+        window.addEventListener('focus', handleWindowFocus);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+            window.removeEventListener('focus', handleWindowFocus);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [boards]);
 
     const handleLogout = () => {
         // Preserve per-account onboarding flags so they don't re-appear after re-login
@@ -238,7 +423,7 @@ function ClientPortalContent() {
 
                     {/* Notification Bell - Top Right */}
                     <div className="absolute top-4 right-4 z-50">
-                        <NotificationBell />
+                        <NotificationBell onNotificationClick={openItemFromNotification} />
                     </div>
 
                     {/* Ambient orbs */}

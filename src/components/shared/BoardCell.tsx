@@ -446,16 +446,59 @@ export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dro
                     })();
                 }
 
-                // 2. APPROVAL NEEDED → Notify all admins
-                const needsApproval = val.includes('approval') || val.includes('review') || val.includes('q&a');
-                if (needsApproval) {
+                // 2. FOR APPROVAL → Notify all admins (editor finished output)
+                const movedToForApproval = val.includes('for approval');
+                if (movedToForApproval) {
                     createNotificationsForRole('admin', {
-                        type: 'info',
-                        title: 'Project Needs Approval',
-                        message: `"${item.name}" has been moved to ${newValue} and requires review.`,
+                        type: 'warning',
+                        title: 'Video Ready For Approval',
+                        message: `"${item.name}" is now ${newValue}.`,
                         source_type: 'project',
                         source_id: item.id
                     }).catch(err => console.error('[Notification] Failed to notify admins:', err));
+                } else {
+                    // 3. Other review/approval states → generic admin notification
+                    const needsApproval = val.includes('approval') || val.includes('review') || val.includes('q&a');
+                    if (needsApproval) {
+                        createNotificationsForRole('admin', {
+                            type: 'info',
+                            title: 'Project Needs Approval',
+                            message: `"${item.name}" has been moved to ${newValue} and requires review.`,
+                            source_type: 'project',
+                            source_id: item.id
+                        }).catch(err => console.error('[Notification] Failed to notify admins:', err));
+                    }
+                }
+
+                // 4. WAITING FOR CLIENT → Notify matching client users
+                const waitingForClient = val.includes('waiting for client');
+                if (waitingForClient) {
+                    (async () => {
+                        try {
+                            if (!boardId) return;
+                            const { data: clientUsers } = await supabase
+                                .from('users')
+                                .select('email, allowed_board_ids')
+                                .eq('role', 'client');
+
+                            const matchedClients = clientUsers?.filter(u =>
+                                u.allowed_board_ids?.includes(boardId)
+                            ) || [];
+
+                            for (const client of matchedClients) {
+                                await createNotification({
+                                    user_email: client.email,
+                                    type: 'info',
+                                    title: 'Video Waiting For Your Review',
+                                    message: `"${item.name}" is now ${newValue}.`,
+                                    source_type: 'project',
+                                    source_id: `waiting_client_${item.id}`
+                                });
+                            }
+                        } catch (err) {
+                            console.error('[Notification] Failed to notify client (waiting for client):', err);
+                        }
+                    })();
                 }
             }
         } catch (err) {

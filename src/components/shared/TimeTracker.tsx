@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Play, Square, Loader2, Clock, Pause, Utensils, CookingPot } from 'lucide-react';
 import { supabase, isMissingIsFullTimerSchemaError } from '../../services/boardsService';
+import { createNotificationsForRole } from '../../services/notificationService';
 import {
     isWithinFullTimerShift,
     isWithinDinnerWindow,
@@ -212,6 +213,13 @@ export const TimeTracker = () => {
                 setStatus('active');
                 setTotalPausedSeconds(0);
                 setLastPausedAt(null);
+                createNotificationsForRole('admin', {
+                    type: 'info',
+                    title: 'Editor Timed In',
+                    message: `${userName} timed in.`,
+                    source_type: 'time_log',
+                    source_id: data.id
+                }).catch(err => console.error('[Notification] Failed to notify admins for time in:', err));
             }
         } catch (error) {
             console.error('Error clocking in:', error);
@@ -268,6 +276,13 @@ export const TimeTracker = () => {
             setDinnerFlag(activeLogId);
             setStatus('paused');
             setLastPausedAt(now);
+            createNotificationsForRole('admin', {
+                type: 'info',
+                title: 'Editor Dinner Out',
+                message: `${userName} started dinner break.`,
+                source_type: 'time_log',
+                source_id: activeLogId
+            }).catch(err => console.error('[Notification] Failed to notify admins for dinner out:', err));
             await swalDinnerOutEatwell();
         } catch (error) {
             console.error('Error starting dinner break:', error);
@@ -303,6 +318,13 @@ export const TimeTracker = () => {
             setLastPausedAt(null);
             setTotalPausedSeconds(newTotal);
             if (wasDinnerBreak) {
+                createNotificationsForRole('admin', {
+                    type: 'info',
+                    title: 'Editor Dinner In',
+                    message: `${userName} ended dinner break and resumed work.`,
+                    source_type: 'time_log',
+                    source_id: activeLogId
+                }).catch(err => console.error('[Notification] Failed to notify admins for dinner in:', err));
                 await swalDinnerInResumeShift();
             }
         } catch (error) {
@@ -339,6 +361,13 @@ export const TimeTracker = () => {
                 .eq('id', activeLogId);
 
             if (error) throw error;
+            createNotificationsForRole('admin', {
+                type: 'info',
+                title: 'Editor Timed Out',
+                message: `${userName} timed out.`,
+                source_type: 'time_log',
+                source_id: activeLogId
+            }).catch(err => console.error('[Notification] Failed to notify admins for time out:', err));
 
             if (activeLogId) {
                 clearDinnerFlag(activeLogId);
