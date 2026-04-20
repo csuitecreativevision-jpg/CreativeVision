@@ -2,3 +2,6 @@ project_id = "murdekixacjoescjsmmk"
 
 [functions.discord-bot]
 verify_jwt = false
+
+[functions.monday-file-upload]
+verify_jwt = false

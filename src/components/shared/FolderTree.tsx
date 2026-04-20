@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LayoutDashboard, FileText, Table } from 'lucide-react';
+import { usePortalThemeOptional } from '../../contexts/PortalThemeContext';
 
 // --- Helpers ---
 const getBoardIcon = (name: string) => {
@@ -21,6 +22,8 @@ interface FolderTreeItemProps {
 
 export const FolderTreeItem = ({ folder, allFolders, allBoards, onSelectBoard, selectedBoardId, depth = 0 }: FolderTreeItemProps) => {
     const [isOpen, setIsOpen] = useState(false);
+    const theme = usePortalThemeOptional();
+    const isDark = theme?.isDark ?? true;
 
     // Custom Sort Logic
     const FOLDER_ORDER = ["Hiring and Onboarding", "Management", "Editors", "Clients", "Old"];
@@ -80,12 +83,30 @@ export const FolderTreeItem = ({ folder, allFolders, allBoards, onSelectBoard, s
     return (
         <div className="select-none text-[13px] font-sans">
             <div
-                className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg cursor-pointer transition-all mb-0.5 group ${isOpen ? 'text-white' : 'hover:bg-white/5 text-gray-400 hover:text-gray-200'}`}
+                className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg cursor-pointer transition-all mb-0.5 group ${
+                    isOpen
+                        ? isDark
+                            ? 'text-white'
+                            : 'text-zinc-900'
+                        : isDark
+                          ? 'hover:bg-white/5 text-gray-400 hover:text-gray-200'
+                          : 'hover:bg-zinc-100 text-zinc-600 hover:text-zinc-900'
+                }`}
                 style={{ paddingLeft: `${depth * 12 + 12}px` }}
                 onClick={() => setIsOpen(!isOpen)}
             >
                 <div className="w-4 h-4 flex-shrink-0 flex items-center justify-center transition-colors">
-                    <div className={`transition-transform duration-200 ${isOpen ? 'rotate-90 text-white' : 'text-gray-500 group-hover:text-gray-300'}`}>
+                    <div
+                        className={`transition-transform duration-200 ${
+                            isOpen
+                                ? isDark
+                                    ? 'rotate-90 text-white'
+                                    : 'rotate-90 text-zinc-800'
+                                : isDark
+                                  ? 'text-gray-500 group-hover:text-gray-300'
+                                  : 'text-zinc-500 group-hover:text-zinc-700'
+                        }`}
+                    >
                         <svg width="6" height="8" viewBox="0 0 6 8" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
                             <path d="M0 0L6 4L0 8V0Z" />
                         </svg>
@@ -127,10 +148,15 @@ export const FolderTreeItem = ({ folder, allFolders, allBoards, onSelectBoard, s
                                 <div
                                     key={board.id}
                                     onClick={() => onSelectBoard(board.id)}
-                                    className={`flex items-center gap-2.5 px-3 py-1.5 mx-2 rounded-lg cursor-pointer transition-all mb-0.5 relative group/item
-                                        ${isSelected
-                                            ? 'bg-custom-bright/10 text-white font-semibold'
-                                            : 'text-gray-400 hover:text-gray-200 hover:bg-white/5 font-medium'}`}
+                                    className={`flex items-center gap-2.5 px-3 py-1.5 mx-2 rounded-lg cursor-pointer transition-all mb-0.5 relative group/item font-medium ${
+                                        isSelected
+                                            ? isDark
+                                                ? 'bg-custom-bright/10 text-white font-semibold'
+                                                : 'bg-violet-100 text-violet-950 font-semibold'
+                                            : isDark
+                                              ? 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
+                                              : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
+                                    }`}
                                     style={{ paddingLeft: `${(depth + 1) * 12 + 12}px` }}
                                     title={board.name} // Show full name on hover
                                 >
@@ -139,7 +165,15 @@ export const FolderTreeItem = ({ folder, allFolders, allBoards, onSelectBoard, s
                                         <div className="absolute left-0 top-1.5 bottom-1.5 w-0.5 bg-custom-bright rounded-r-full shadow-[0_0_8px_rgba(124,58,237,0.5)]" />
                                     )}
 
-                                    <Icon className={`w-3.5 h-3.5 flex-shrink-0 transition-colors ${isSelected ? 'text-custom-bright' : 'text-gray-500 group-hover/item:text-gray-400'}`} />
+                                    <Icon
+                                        className={`w-3.5 h-3.5 flex-shrink-0 transition-colors ${
+                                            isSelected
+                                                ? 'text-custom-bright'
+                                                : isDark
+                                                  ? 'text-gray-500 group-hover/item:text-gray-400'
+                                                  : 'text-zinc-500 group-hover/item:text-zinc-700'
+                                        }`}
+                                    />
                                     <span className="truncate tracking-wide">{displayName}</span>
                                 </div>
                             );

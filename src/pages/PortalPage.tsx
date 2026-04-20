@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Lock, Mail, ArrowRight, Layers } from 'lucide-react';
+import { ArrowLeft, Lock, Mail, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { loginUser } from '../services/boardsService';
+import { PORTAL_CACHED_PASSWORD_KEY } from '../lib/portalPasswordCache';
 import DomeGallery from '../components/ui/DomeGallery';
 const fadeUp = (delay = 0) => ({
     initial: { opacity: 0, y: 16 },
@@ -14,6 +15,7 @@ export default function PortalPage() {
     const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -33,6 +35,13 @@ export default function PortalPage() {
         localStorage.setItem('portal_user_email', result.user.email);
         localStorage.setItem('portal_user_role', result.user.role);
         localStorage.setItem('portal_user_name', result.user.name);
+        if (result.user.role === 'editor' && result.user.is_full_timer) {
+            localStorage.setItem('portal_editor_full_timer', '1');
+        } else {
+            localStorage.removeItem('portal_editor_full_timer');
+        }
+        localStorage.setItem(PORTAL_CACHED_PASSWORD_KEY, password);
+        window.dispatchEvent(new CustomEvent('cv-portal-login-password-cached'));
         if (result.user.workspace_id) {
             localStorage.setItem('portal_user_workspace', result.user.workspace_id);
         } else {
@@ -51,7 +60,7 @@ export default function PortalPage() {
             <div className="bg-noise" />
 
             {/* ─── LEFT PANEL : Auth ──────────────────────────────── */}
-            <div className="flex-1 lg:flex-none lg:w-[460px] xl:w-[500px] flex flex-col relative bg-[#020204]">
+            <div className="flex-1 lg:flex-none lg:w-[460px] xl:w-[500px] flex flex-col relative bg-[#020204] [color-scheme:dark]">
 
                 {/* Back link */}
                 <button
@@ -104,15 +113,25 @@ export default function PortalPage() {
 
                             {/* Password */}
                             <div className="group relative">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/20 group-focus-within:text-violet-400/80 transition-colors duration-200 z-10" />
+                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/20 group-focus-within:text-violet-400/80 transition-colors duration-200 z-10 pointer-events-none" />
                                 <input
-                                    type="password"
+                                    type={showPassword ? 'text' : 'password'}
                                     value={password}
                                     onChange={e => setPassword(e.target.value)}
-                                    placeholder="Passkey"
+                                    placeholder="Type your password here"
                                     disabled={isLoading}
-                                    className="w-full bg-white/[0.03] border border-white/[0.07] hover:border-white/[0.11] rounded-2xl pl-11 pr-5 py-3.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-violet-500/35 focus:bg-white/[0.05] focus:ring-1 focus:ring-violet-500/20 transition-all duration-200 font-medium"
+                                    autoComplete="current-password"
+                                    className="w-full bg-white/[0.03] border border-white/[0.07] hover:border-white/[0.11] rounded-2xl pl-11 pr-12 py-3.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-violet-500/35 focus:bg-white/[0.05] focus:ring-1 focus:ring-violet-500/20 transition-all duration-200 font-medium"
                                 />
+                                <button
+                                    type="button"
+                                    disabled={isLoading}
+                                    onClick={() => setShowPassword((v) => !v)}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-xl text-white/35 hover:text-white/80 hover:bg-white/[0.06] transition-colors duration-200 z-10 disabled:opacity-30 disabled:pointer-events-none"
+                                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                >
+                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                </button>
                             </div>
 
                             {/* CTA */}

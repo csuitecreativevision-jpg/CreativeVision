@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { Loader2, PlayCircle, FileText, Eye, Check } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Loader2, PlayCircle, FileText, Eye, Upload } from 'lucide-react';
 import { useUpdateItemValue, useUpdateSourceColumn } from '../../hooks/useMondayData';
-import { normalizeMondayFileUrl } from '../../services/mondayService';
+import { normalizeMondayFileUrl, uploadFileToItemColumn } from '../../services/mondayService';
 import { MondayItem, MondayColumn } from '../../types/monday';
 import { createNotification, createNotificationsForRole } from '../../services/notificationService';
 import { supabase } from '../../lib/supabaseClient';
@@ -17,12 +17,103 @@ interface BoardCellProps {
     onPreview: (url: string, name: string, assetId?: string) => void;
 }
 
+/** Resolve source item + column for a mirror/lookup so file upload hits the real Monday file column. */
+function extractMirrorSourceIds(item: MondayItem, column: MondayColumn): { itemId: string; columnId: string } | null {
+    if (column.type !== 'mirror' && column.type !== 'lookup') return null;
+    if (!column.settings_str) return null;
+
+    let sourceColumnId = '';
+    let relationColId = '';
+
+    try {
+        const settings = JSON.parse(column.settings_str);
+        if (settings.displayed_linked_columns) {
+            const boardIds = Object.keys(settings.displayed_linked_columns);
+            if (boardIds.length > 0) {
+                const linkedCols = settings.displayed_linked_columns[boardIds[0]];
+                if (linkedCols && linkedCols.length > 0) {
+                    sourceColumnId = linkedCols[0];
+                }
+            }
+        }
+        if (settings.relation_column) {
+            const relKeys = Object.keys(settings.relation_column);
+            if (relKeys.length > 0) {
+                relationColId = relKeys[0];
+            }
+        }
+    } catch {
+        return null;
+    }
+
+    if (!relationColId || !sourceColumnId) return null;
+
+    const relationColValue = item.column_values.find((c) => c.id === relationColId);
+    if (!relationColValue) return null;
+
+    let sourceItemId = '';
+    const rawLinked = (relationColValue as { linked_item_ids?: string[] }).linked_item_ids;
+    if (rawLinked && Array.isArray(rawLinked) && rawLinked.length > 0) {
+        sourceItemId = String(rawLinked[0]);
+    } else if (relationColValue.value) {
+        try {
+            const parsedRel = JSON.parse(relationColValue.value);
+            if (parsedRel?.linkedPulseIds?.length > 0) {
+                sourceItemId = String(parsedRel.linkedPulseIds[0].linkedPulseId);
+            }
+        } catch {
+            /* ignore */
+        }
+    }
+
+    if (!sourceItemId) return null;
+    return { itemId: sourceItemId, columnId: sourceColumnId };
+}
+
+/** Item + column IDs for Monday `add_file_to_column` (native file col, or Submission mirror → source file col). */
+export function getMondayFileUploadTarget(item: MondayItem, column: MondayColumn): { itemId: string; columnId: string } | null {
+    if (column.type === 'file') {
+        return { itemId: item.id, columnId: column.id };
+    }
+    const title = column.title.toLowerCase();
+    if (!title.includes('submission')) return null;
+    if (column.type === 'mirror' || column.type === 'lookup') {
+        return extractMirrorSourceIds(item, column);
+    }
+    return null;
+}
+
 export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dropdownOptions, onUpdate, onPreview }: BoardCellProps) => {
     const [isEditing, setIsEditing] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [optimisticValue, setOptimisticValue] = useState<string | null>(null);
+    const [fileDropActive, setFileDropActive] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const { mutateAsync: updateItem } = useUpdateItemValue();
     const { mutateAsync: updateSourceCol } = useUpdateSourceColumn();
+
+    const handleMondayFileUpload = async (files: FileList | null) => {
+        const file = files?.[0];
+        if (!file || !boardId) return;
+        const target = getMondayFileUploadTarget(item, column);
+        if (!target) {
+            alert(
+                'This column is not a Monday File column (or a Submission mirror linked to one). Ask an admin to use a File-type Submission Preview column, or link the project row in Monday.'
+            );
+            return;
+        }
+        setIsLoading(true);
+        try {
+            await uploadFileToItemColumn(target.itemId, target.columnId, file);
+            await onUpdate();
+        } catch (err) {
+            console.error(err);
+            alert(err instanceof Error ? err.message : 'Could not upload file to Monday.');
+        } finally {
+            setIsLoading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
 
     // ... existing displayValue logic ...
     // Find value for this column
@@ -533,68 +624,176 @@ export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dro
 
     const shouldRenderAsFile = (column.type === 'file' && linkUrl) || (linkUrl && (isVideo || isImage || isPdf));
 
+    const fileColumnAccept = 'video/*,image/*,.pdf,.mp4,.mov,.webm';
+    const uploadTarget = getMondayFileUploadTarget(item, column);
+    const isSubmissionTitle = column.title.toLowerCase().includes('submission');
+
     if (shouldRenderAsFile) {
+        const replaceControl = uploadTarget ? (
+            <>
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept={fileColumnAccept}
+                    onChange={(e) => handleMondayFileUpload(e.target.files)}
+                />
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        fileInputRef.current?.click();
+                    }}
+                    className="inline-flex items-center gap-1 mt-1.5 px-2 py-1 rounded-md bg-white/10 hover:bg-white/15 border border-white/10 text-[10px] font-bold uppercase tracking-wide text-gray-200"
+                >
+                    <Upload className="w-3 h-3" />
+                    Replace file
+                </button>
+            </>
+        ) : null;
+
         if (isVideo) {
             const thumbUrl = thumbnailUrl;
             const isRawVideo = /\.(mp4|mov|webm|ogg)$/i.test(linkUrl || '');
             const showVideoTag = isRawVideo && !thumbUrl;
 
             return (
-                <div
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onPreview(linkUrl!, displayValue, assetId);
-                    }}
-                    className="relative group/video w-full max-w-[240px] aspect-video bg-black/40 rounded-lg overflow-hidden border border-white/10 cursor-pointer shadow-sm hover:shadow-md transition-all hover:border-emerald-500/30"
-                >
-                    {thumbUrl ? (
-                        <img src={thumbUrl} alt={displayValue} className="w-full h-full object-cover opacity-80 group-hover/video:opacity-100 transition-opacity" referrerPolicy="no-referrer" />
-                    ) : showVideoTag ? (
-                        <video
-                            src={linkUrl!}
-                            className="w-full h-full object-cover opacity-80 group-hover/video:opacity-100 transition-opacity"
-                            muted
-                            loop
-                            playsInline
-                            preload="metadata"
-                            onMouseOver={e => e.currentTarget.play().catch(() => { })}
-                            onMouseOut={e => e.currentTarget.pause()}
-                            // @ts-ignore
-                            referrerPolicy="no-referrer"
-                        />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-[#0e0e1a]">
-                            <PlayCircle className="w-8 h-8 text-white/20" />
-                        </div>
-                    )}
+                <div className="flex flex-col items-start gap-0">
+                    <div
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onPreview(linkUrl!, displayValue, assetId);
+                        }}
+                        className="relative group/video w-full max-w-[240px] aspect-video bg-black/40 rounded-lg overflow-hidden border border-white/10 cursor-pointer shadow-sm hover:shadow-md transition-all hover:border-emerald-500/30"
+                    >
+                        {thumbUrl ? (
+                            <img src={thumbUrl} alt={displayValue} className="w-full h-full object-cover opacity-80 group-hover/video:opacity-100 transition-opacity" referrerPolicy="no-referrer" />
+                        ) : showVideoTag ? (
+                            <video
+                                src={linkUrl!}
+                                className="w-full h-full object-cover opacity-80 group-hover/video:opacity-100 transition-opacity"
+                                muted
+                                loop
+                                playsInline
+                                preload="metadata"
+                                onMouseOver={e => e.currentTarget.play().catch(() => { })}
+                                onMouseOut={e => e.currentTarget.pause()}
+                                // @ts-ignore
+                                referrerPolicy="no-referrer"
+                            />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-[#0e0e1a]">
+                                <PlayCircle className="w-8 h-8 text-white/20" />
+                            </div>
+                        )}
 
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover/video:bg-transparent transition-all">
-                        <div className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center border border-white/20 group-hover/video:scale-110 transition-transform">
-                            <PlayCircle className="w-5 h-5 text-white/90 fill-white/20" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover/video:bg-transparent transition-all">
+                            <div className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center border border-white/20 group-hover/video:scale-110 transition-transform">
+                                <PlayCircle className="w-5 h-5 text-white/90 fill-white/20" />
+                            </div>
                         </div>
                     </div>
+                    {replaceControl}
                 </div>
             );
         }
 
         return (
-            <button
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onPreview(linkUrl!, displayValue, assetId);
-                }}
-                className={`flex items-center gap-2 py-1.5 px-3 rounded-lg border transition-all group max-w-full text-left relative overflow-hidden
+            <div className="flex flex-col items-start gap-1 max-w-full">
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onPreview(linkUrl!, displayValue, assetId);
+                    }}
+                    className={`flex items-center gap-2 py-1.5 px-3 rounded-lg border transition-all group max-w-full text-left relative overflow-hidden
                     ${isPdf ? 'bg-orange-500/10 border-orange-500/20 hover:bg-orange-500/20 text-orange-400' :
                         'bg-[#0073ea]/10 border-[#0073ea]/20 hover:bg-[#0073ea]/20 text-[#0073ea]'}`}
-                title={displayValue}
-            >
-                {isPdf ? <FileText className="w-4 h-4 flex-shrink-0" /> :
-                    <Eye className="w-4 h-4 flex-shrink-0" />}
+                    title={displayValue}
+                >
+                    {isPdf ? <FileText className="w-4 h-4 flex-shrink-0" /> :
+                        <Eye className="w-4 h-4 flex-shrink-0" />}
 
-                <span className="text-[11px] font-bold truncate group-hover:underline decoration-current">
-                    {displayValue}
-                </span>
-            </button>
+                    <span className="text-[11px] font-bold truncate group-hover:underline decoration-current">
+                        {displayValue}
+                    </span>
+                </button>
+                {replaceControl}
+            </div>
+        );
+    }
+
+    if (uploadTarget && !linkUrl) {
+        return (
+            <div
+                className={`w-full max-w-md rounded-xl border-2 border-dashed transition-colors px-4 py-8 flex flex-col items-center justify-center gap-3 text-center cursor-pointer select-none ${
+                    fileDropActive
+                        ? 'border-violet-400 bg-violet-500/15'
+                        : 'border-white/20 bg-white/[0.03] hover:border-violet-500/50 hover:bg-violet-500/5'
+                }`}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        fileInputRef.current?.click();
+                    }
+                }}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                }}
+                onDragEnter={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setFileDropActive(true);
+                }}
+                onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }}
+                onDragLeave={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                    setFileDropActive(false);
+                }}
+                onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setFileDropActive(false);
+                    handleMondayFileUpload(e.dataTransfer.files);
+                }}
+            >
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept={fileColumnAccept}
+                    onChange={(e) => handleMondayFileUpload(e.target.files)}
+                    onClick={(e) => e.stopPropagation()}
+                />
+                <div className="w-12 h-12 rounded-full bg-violet-500/20 flex items-center justify-center">
+                    <Upload className="w-6 h-6 text-violet-300" />
+                </div>
+                <div>
+                    <p className="text-sm font-bold text-white">
+                        {isSubmissionTitle ? 'Upload submission preview' : 'Upload file'}
+                    </p>
+                    <p className="text-[11px] text-gray-400 mt-1">
+                        Drag and drop a video, image, or PDF here — or click to choose. Sends directly to Monday&apos;s file column.
+                    </p>
+                </div>
+                <span className="text-[10px] text-gray-500">MP4, MOV, WebM, images, PDF · up to Monday&apos;s size limits</span>
+            </div>
+        );
+    }
+
+    if (isSubmissionTitle && !linkUrl && !uploadTarget) {
+        return (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-200/90 max-w-md">
+                Submission upload needs a Monday <strong className="text-amber-100">File</strong> column, or a{' '}
+                <strong className="text-amber-100">mirror</strong> of one, with this row linked in the connect column.
+            </div>
         );
     }
 
@@ -613,7 +812,7 @@ export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dro
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="text-[#0073ea] hover:text-white hover:underline truncate text-sm flex items-center gap-1 group"
+                className="select-text text-[#0073ea] hover:text-white hover:underline truncate text-sm flex items-center gap-1 group"
                 title={urlToUse}
             >
                 <span className="truncate">{displayValue || urlToUse}</span>
@@ -641,7 +840,7 @@ export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dro
     return (
         <div
             onClick={() => setIsEditing(true)}
-            className="cursor-text hover:bg-white/5 px-2 py-1 rounded-md transition-colors text-gray-200 text-sm min-h-[28px] w-full border border-transparent hover:border-white/5 flex items-center"
+            className="select-text cursor-text hover:bg-white/5 px-2 py-1 rounded-md transition-colors text-gray-200 text-sm min-h-[28px] w-full border border-transparent hover:border-white/5 flex items-center"
         >
             {displayValue || <span className="text-gray-600 text-xs italic">Empty</span>}
         </div>

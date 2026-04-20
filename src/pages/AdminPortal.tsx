@@ -22,12 +22,93 @@ import { RefreshProvider, useRefresh } from '../contexts/RefreshContext';
 import { getAllBoards, getAllFolders, getWorkspaceAnalytics, prefetchOverviewData } from '../services/mondayService';
 import { AdminChatbot } from '../components/admin/AdminChatbot';
 import { NotificationBell } from '../components/shared/NotificationBell';
+import { PORTAL_CACHED_PASSWORD_KEY } from '../lib/portalPasswordCache';
+import { usePortalTheme } from '../contexts/PortalThemeContext';
+
+function AdminSidebarFooter({
+    currentUserName,
+    currentUserRole,
+    onLogout
+}: {
+    currentUserName: string;
+    currentUserRole: string;
+    onLogout: () => void;
+}) {
+    const { isDark } = usePortalTheme();
+    const nameCls = isDark ? 'text-white/80' : 'text-zinc-800';
+    const roleStyle = isDark
+        ? { color: 'rgba(139,92,246,0.5)' }
+        : { color: 'rgba(109,40,217,0.72)' };
+    const avatarRing = isDark ? 'border-violet-500/20 bg-violet-500/12 text-violet-300' : 'border-violet-200 bg-violet-100 text-violet-700';
+    const logoutCls = isDark
+        ? 'text-gray-500 hover:text-red-400 hover:bg-red-500/5'
+        : 'text-zinc-600 hover:text-red-600 hover:bg-red-50';
+
+    return (
+        <div className="space-y-1">
+            {currentUserName && (
+                <div className="flex items-center gap-2.5 px-3 py-2.5 mb-1">
+                    <div
+                        className={`w-7 h-7 rounded-lg border flex items-center justify-center font-bold text-xs flex-shrink-0 ${avatarRing}`}
+                    >
+                        {currentUserName.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="overflow-hidden">
+                        <div className={`text-[12px] font-semibold truncate ${nameCls}`}>{currentUserName}</div>
+                        <div className="text-[9px] tracking-widest font-medium" style={roleStyle}>
+                            {currentUserRole.toUpperCase()}
+                        </div>
+                    </div>
+                </div>
+            )}
+            <button
+                type="button"
+                onClick={onLogout}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${logoutCls}`}
+            >
+                <LogOut className="w-4 h-4 flex-shrink-0 transition-colors" />
+                <span className="text-[13px] font-medium">Log Out</span>
+            </button>
+        </div>
+    );
+}
+
+function AdminPortalMainHeader({ onOpenMobileMenu }: { onOpenMobileMenu: () => void }) {
+    const { isDark } = usePortalTheme();
+    return (
+        <>
+            <div className="absolute top-4 left-4 z-50 lg:hidden">
+                <button
+                    type="button"
+                    onClick={onOpenMobileMenu}
+                    className={`p-2 rounded-lg transition-colors ${
+                        isDark
+                            ? 'glass-panel text-white hover:bg-white/10'
+                            : 'bg-white border border-zinc-200 text-zinc-900 shadow-sm hover:bg-zinc-50'
+                    }`}
+                >
+                    <Menu className="w-6 h-6" />
+                </button>
+            </div>
+            <div className="absolute top-4 right-4 z-50">
+                <NotificationBell />
+            </div>
+        </>
+    );
+}
 
 function AdminPortalContent() {
     const navigate = useNavigate();
     const location = useLocation();
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const [sidebarUserName, setSidebarUserName] = useState(() => localStorage.getItem('portal_user_name') || '');
     const { triggerRefresh } = useRefresh();
+
+    useEffect(() => {
+        const sync = () => setSidebarUserName(localStorage.getItem('portal_user_name') || '');
+        window.addEventListener('cv-portal-profile-updated', sync);
+        return () => window.removeEventListener('cv-portal-profile-updated', sync);
+    }, []);
 
     // Strict Role Check
     useEffect(() => {
@@ -62,11 +143,12 @@ function AdminPortalContent() {
         localStorage.removeItem('portal_user_role');
         localStorage.removeItem('portal_user_name');
         localStorage.removeItem('portal_user_workspace');
+        localStorage.removeItem(PORTAL_CACHED_PASSWORD_KEY);
         navigate('/portal');
     };
 
     const currentUserRole = localStorage.getItem('portal_user_role') || 'admin';
-    const currentUserName = localStorage.getItem('portal_user_name') || '';
+    const currentUserName = sidebarUserName;
 
     // Determine active tab based on path
     const getActiveTab = () => {
@@ -191,44 +273,15 @@ function AdminPortalContent() {
                 </>
             }
             sidebarFooter={
-                <div className="space-y-1">
-                    {currentUserName && (
-                        <div className="flex items-center gap-2.5 px-3 py-2.5 mb-1">
-                            <div className="w-7 h-7 rounded-lg bg-violet-500/12 border border-violet-500/20 flex items-center justify-center text-violet-300 font-bold text-xs flex-shrink-0">
-                                {currentUserName.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="overflow-hidden">
-                                <div className="text-white/80 text-[12px] font-semibold truncate">{currentUserName}</div>
-                                <div className="text-[9px] tracking-widest font-medium" style={{ color: 'rgba(139,92,246,0.5)' }}>{currentUserRole.toUpperCase()}</div>
-                            </div>
-                        </div>
-                    )}
-                    <button
-                        onClick={handleLogout}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:text-red-400 hover:bg-red-500/5 transition-all duration-200 group"
-                    >
-                        <LogOut className="w-4 h-4 flex-shrink-0 transition-colors" />
-                        <span className="text-[13px] font-medium">Log Out</span>
-                    </button>
-                </div>
+                <AdminSidebarFooter
+                    currentUserName={currentUserName}
+                    currentUserRole={currentUserRole}
+                    onLogout={handleLogout}
+                />
             }
             mainContent={
                 <>
-                    {/* Mobile Menu Trigger (Floating) */}
-                    <div className="absolute top-4 left-4 z-50 lg:hidden">
-                        <button
-                            onClick={() => setIsMobileSidebarOpen(true)}
-                            className="p-2 rounded-lg glass-panel text-white hover:bg-white/10 transition-colors"
-                        >
-                            <Menu className="w-6 h-6" />
-                        </button>
-                    </div>
-
-
-                    {/* Notification Bell - Top Right */}
-                    <div className="absolute top-4 right-4 z-50">
-                        <NotificationBell />
-                    </div>
+                    <AdminPortalMainHeader onOpenMobileMenu={() => setIsMobileSidebarOpen(true)} />
 
                     {/* Content Area */}
                     <div className="flex-1 overflow-hidden flex relative">

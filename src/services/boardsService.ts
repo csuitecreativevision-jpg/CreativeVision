@@ -104,6 +104,12 @@ export async function checkSupabaseHealth(): Promise<boolean> {
 // User Management Functions
 // ============================================
 
+/** True when PostgREST reports `is_full_timer` is missing (migration not applied yet). */
+export function isMissingIsFullTimerSchemaError(message: string | undefined | null): boolean {
+    const m = String(message ?? '').toLowerCase();
+    return m.includes('is_full_timer') && (m.includes('column') || m.includes('schema'));
+}
+
 export interface User {
     id: string;
     email: string;
@@ -112,6 +118,8 @@ export interface User {
     workspace_id?: string;
     allowed_board_ids?: string[];
     discord_thread_id?: string;
+    /** When true, editor is subject to strict 4PM–12AM shift prompts in Time Tracker */
+    is_full_timer?: boolean;
     created_at: string;
     updated_at: string;
 }
@@ -139,7 +147,8 @@ export async function createUser(
     password: string,
     role: UserRole,
     workspace_id?: string,
-    allowed_board_ids?: string[]
+    allowed_board_ids?: string[],
+    is_full_timer?: boolean
 ): Promise<{ success: boolean; user?: User; error?: string }> {
     try {
         const password_hash = await hashPassword(password);
@@ -151,12 +160,21 @@ export async function createUser(
         if (allowed_board_ids) {
             insertData.allowed_board_ids = allowed_board_ids;
         }
+        if (role === 'editor' && is_full_timer) {
+            insertData.is_full_timer = true;
+        }
 
-        const { data, error } = await supabase
-            .from('users')
-            .insert([insertData])
-            .select()
-            .single();
+        let { data, error } = await supabase.from('users').insert([insertData]).select().single();
+
+        if (error && isMissingIsFullTimerSchemaError(error.message) && 'is_full_timer' in insertData) {
+            const { is_full_timer: _, ...rest } = insertData;
+            ({ data, error } = await supabase.from('users').insert([rest]).select().single());
+            if (!error) {
+                console.warn(
+                    '[CreativeVision] Created user without is_full_timer: add column via database/add-users-is-full-timer.sql for full-timer shift prompts.'
+                );
+            }
+        }
 
         if (error) {
             console.error('Error creating user:', error);
@@ -253,25 +271,72 @@ export async function deleteUser(id: string): Promise<{ success: boolean; error?
     }
 }
 
-/**
- * Update user details
- */
-export async function updateUser(id: string, updates: { role?: UserRole, workspace_id?: string, name?: string, allowed_board_ids?: string[] }): Promise<{ success: boolean; error?: string }> {
-    try {
-        const updateData: any = { ...updates, updated_at: new Date().toISOString() };
+export type UpdateUserResult = {
+    success: boolean;
+    error?: string;
+    /** True when DB has no `is_full_timer` column — other fields saved, flag was skipped */
+    fullTimerOmittedBecauseSchema?: boolean;
+};
 
-        // If workspace_id is empty string, set it to null for DB
-        if (updates.workspace_id === '') {
-            updateData.workspace_id = null;
+/**
+ * Update user details (explicit payload so booleans and nulls are not lost to object spread edge cases)
+ */
+export async function updateUser(
+    id: string,
+    updates: {
+        role?: UserRole;
+        workspace_id?: string;
+        name?: string;
+        allowed_board_ids?: string[];
+        is_full_timer?: boolean;
+    }
+): Promise<UpdateUserResult> {
+    try {
+        const updateData: Record<string, unknown> = {
+            updated_at: new Date().toISOString()
+        };
+        if (updates.name !== undefined) updateData.name = updates.name;
+        if (updates.role !== undefined) updateData.role = updates.role;
+        if (updates.workspace_id !== undefined) {
+            updateData.workspace_id = updates.workspace_id === '' ? null : updates.workspace_id;
+        }
+        if (updates.allowed_board_ids !== undefined) {
+            updateData.allowed_board_ids = updates.allowed_board_ids;
+        }
+        if (updates.is_full_timer !== undefined) {
+            updateData.is_full_timer = updates.is_full_timer;
         }
 
-        const { error } = await supabase
-            .from('users')
-            .update(updateData)
-            .eq('id', id);
+        let { error } = await supabase.from('users').update(updateData).eq('id', id);
+
+        if (error && isMissingIsFullTimerSchemaError(error.message) && 'is_full_timer' in updateData) {
+            const { is_full_timer: _omit, ...rest } = updateData;
+            ({ error } = await supabase.from('users').update(rest).eq('id', id));
+            if (!error) {
+                console.warn(
+                    '[CreativeVision] Updated user without is_full_timer: run database/add-users-is-full-timer.sql in Supabase.'
+                );
+                return { success: true, fullTimerOmittedBecauseSchema: true };
+            }
+        }
 
         if (error) {
             return { success: false, error: error.message };
+        }
+
+        if (updates.is_full_timer === true) {
+            const { data: row, error: selErr } = await supabase
+                .from('users')
+                .select('is_full_timer')
+                .eq('id', id)
+                .maybeSingle();
+            if (!selErr && row && row.is_full_timer !== true) {
+                return {
+                    success: false,
+                    error:
+                        'Full-time shift did not save. In Supabase SQL Editor run database/add-users-is-full-timer.sql, then Settings → API → restart or wait for schema cache. Also check RLS policies allow updating is_full_timer.'
+                };
+            }
         }
 
         return { success: true };
