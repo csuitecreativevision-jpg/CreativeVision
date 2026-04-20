@@ -35,7 +35,7 @@ export const AdminChatbot = () => {
                         </button>
                     </div>
                     <iframe
-                        src="https://creativevisionph.app.n8n.cloud/webhook/b4a60e45-014e-4b5a-8357-58ff10607ba1/chat"
+                        src="https://creativevisionph.app.n8n.cloud/webhook/c6003eb5-9968-4cf2-b5ab-ecb1e16b958a/chat"
                         className="w-full flex-1 border-none bg-[#1a1b26]"
                         style={{ colorScheme: 'dark' }}
                         title="Admin Assistant Chat"
