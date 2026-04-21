@@ -1,7 +1,8 @@
 import { useState, useMemo, useRef } from 'react';
-import { Upload, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
-import { uploadFileToItemColumn } from '../../services/mondayService';
+import { Upload, Loader2, CheckCircle2, AlertCircle, Link2 } from 'lucide-react';
+import { updateSourceColumn, uploadFileToItemColumn } from '../../services/mondayService';
 import { getMondayFileUploadTarget } from '../shared/BoardCell';
+import { fireCvSwal } from '../../lib/swalTheme';
 
 export interface SubmissionRow {
     boardId: string;
@@ -10,6 +11,77 @@ export interface SubmissionRow {
     submissionColumn: any;
     uploadTarget: { itemId: string; columnId: string };
     hasFile: boolean;
+}
+
+function getSubmissionUpdateTarget(row: SubmissionRow): { boardId: string; itemId: string; columnId: string } | null {
+    const col = row.submissionColumn;
+    if (!col) return null;
+    if (col.type === 'file' || col.type === 'link' || col.type === 'text') {
+        return { boardId: row.boardId, itemId: row.item.id, columnId: col.id };
+    }
+    if ((col.type === 'mirror' || col.type === 'lookup') && col.settings_str) {
+        let sourceBoardId = '';
+        let sourceColumnId = '';
+        let relationColId = '';
+        try {
+            const settings = JSON.parse(col.settings_str);
+            if (settings.displayed_linked_columns) {
+                const boardIds = Object.keys(settings.displayed_linked_columns);
+                if (boardIds.length > 0) {
+                    sourceBoardId = boardIds[0];
+                    const linkedCols = settings.displayed_linked_columns[boardIds[0]];
+                    if (linkedCols && linkedCols.length > 0) {
+                        sourceColumnId = linkedCols[0];
+                    }
+                }
+            }
+            if (settings.relation_column) {
+                const relKeys = Object.keys(settings.relation_column);
+                if (relKeys.length > 0) {
+                    relationColId = relKeys[0];
+                }
+            }
+        } catch {
+            return null;
+        }
+        if (!relationColId || !sourceColumnId || !sourceBoardId) return null;
+        const relationColValue = row.item.column_values?.find((c: any) => c.id === relationColId);
+        if (!relationColValue) return null;
+        let sourceItemId = '';
+        const rawLinked = (relationColValue as { linked_item_ids?: string[] }).linked_item_ids;
+        if (rawLinked && Array.isArray(rawLinked) && rawLinked.length > 0) {
+            sourceItemId = String(rawLinked[0]);
+        } else if (relationColValue.value) {
+            try {
+                const parsedRel = JSON.parse(relationColValue.value);
+                if (parsedRel?.linkedPulseIds?.length > 0) {
+                    sourceItemId = String(parsedRel.linkedPulseIds[0].linkedPulseId);
+                }
+            } catch {
+                return null;
+            }
+        }
+        if (!sourceItemId) return null;
+        return { boardId: sourceBoardId, itemId: sourceItemId, columnId: sourceColumnId };
+    }
+    return null;
+}
+
+function getSubmissionDisplayValue(row: SubmissionRow): string {
+    const val = row.item?.column_values?.find((v: any) => v.id === row.submissionColumn?.id);
+    if (!val) return '';
+    if (val.value) {
+        try {
+            const parsed = JSON.parse(val.value);
+            if (parsed?.url) return String(parsed.url).trim();
+            if (parsed?.files?.length > 0) return String(parsed.files[0]?.name || '').trim();
+        } catch {
+            /* ignore */
+        }
+    }
+    const dv = String(val.display_value || '').trim();
+    if (dv) return dv;
+    return String(val.text || '').trim();
 }
 
 function displayWorkspaceName(raw: string): string {
@@ -112,6 +184,9 @@ export function EditorSubmissionBoardPanel({
     rows: rowsProp
 }: EditorSubmissionBoardPanelProps) {
     const [uploadingKey, setUploadingKey] = useState<string | null>(null);
+    const [savingLinkKey, setSavingLinkKey] = useState<string | null>(null);
+    const [deletingLinkKey, setDeletingLinkKey] = useState<string | null>(null);
+    const [linkDrafts, setLinkDrafts] = useState<Record<string, string>>({});
     const fileInputsRef = useRef<Record<string, HTMLInputElement | null>>({});
 
     const rows = useMemo(() => {
@@ -130,11 +205,126 @@ export function EditorSubmissionBoardPanel({
             await onRefresh();
         } catch (err) {
             console.error(err);
-            alert(err instanceof Error ? err.message : 'Upload failed');
+            await fireCvSwal({
+                icon: 'error',
+                title: 'Upload failed',
+                text: err instanceof Error ? err.message : 'Upload failed',
+            });
         } finally {
             setUploadingKey(null);
             const inp = fileInputsRef.current[key];
             if (inp) inp.value = '';
+        }
+    };
+
+    const handleSaveLink = async (row: SubmissionRow) => {
+        const key = `${row.boardId}-${row.item.id}`;
+        const url = String(linkDrafts[key] || '').trim();
+        if (!url) return;
+        const isHttp = /^https?:\/\//i.test(url);
+        if (!isHttp) {
+            await fireCvSwal({
+                icon: 'warning',
+                title: 'Invalid link',
+                text: 'Please enter a valid URL that starts with http:// or https://',
+            });
+            return;
+        }
+        if (row.submissionColumn?.type === 'file') {
+            await fireCvSwal({
+                icon: 'info',
+                title: 'This Submission column is file-only',
+                text: 'Use Upload for this project, or ask admin to map Submission to a Link column for Drive links.',
+            });
+            return;
+        }
+        const target = getSubmissionUpdateTarget(row);
+        if (!target) {
+            await fireCvSwal({
+                icon: 'error',
+                title: 'Cannot save link',
+                text: 'Submission column is not linked to an editable source column.',
+            });
+            return;
+        }
+        setSavingLinkKey(key);
+        try {
+            const linkPayload = JSON.stringify({ url, text: row.item.name || 'Submission Link' });
+            await updateSourceColumn(target.boardId, target.itemId, target.columnId, linkPayload);
+            await onRefresh();
+            setLinkDrafts((prev) => ({ ...prev, [key]: '' }));
+            await fireCvSwal({
+                icon: 'success',
+                title: 'Submission link saved',
+                text: 'The link was synced to Monday Submission.',
+                timer: 1300,
+                showConfirmButton: false,
+            });
+        } catch (err) {
+            console.error(err);
+            await fireCvSwal({
+                icon: 'error',
+                title: 'Failed to save link',
+                text: err instanceof Error ? err.message : 'Could not update Monday submission link.',
+            });
+        } finally {
+            setSavingLinkKey(null);
+        }
+    };
+
+    const handleDeleteLink = async (row: SubmissionRow) => {
+        const key = `${row.boardId}-${row.item.id}`;
+        const target = getSubmissionUpdateTarget(row);
+        if (!target) {
+            await fireCvSwal({
+                icon: 'error',
+                title: 'Cannot delete link',
+                text: 'Submission column is not linked to an editable source column.',
+            });
+            return;
+        }
+        if (row.submissionColumn?.type === 'file') {
+            await fireCvSwal({
+                icon: 'info',
+                title: 'File submission detected',
+                text: 'This row is using a file submission column. Use Monday file controls to remove uploaded files.',
+            });
+            return;
+        }
+        const confirm = await fireCvSwal({
+            icon: 'warning',
+            title: 'Delete submission link?',
+            text: 'This will remove the link from CreativeVision and Monday.',
+            showCancelButton: true,
+            confirmButtonText: 'Delete Link',
+            cancelButtonText: 'Cancel',
+            customClass: {
+                confirmButton:
+                    '!rounded-xl !px-5 !py-2.5 !font-semibold !text-white !bg-red-600 hover:!bg-red-500 focus:!outline-none',
+            },
+        });
+        if (!confirm.isConfirmed) return;
+
+        setDeletingLinkKey(key);
+        try {
+            await updateSourceColumn(target.boardId, target.itemId, target.columnId, JSON.stringify({ url: '', text: '' }));
+            await onRefresh();
+            setLinkDrafts((prev) => ({ ...prev, [key]: '' }));
+            await fireCvSwal({
+                icon: 'success',
+                title: 'Submission link deleted',
+                timer: 1200,
+                showConfirmButton: false,
+            });
+        } catch (err) {
+            console.error(err);
+            await fireCvSwal({
+                icon: 'error',
+                title: 'Failed to delete link',
+                text: err instanceof Error ? err.message : 'Could not remove link from Monday.',
+            });
+        } finally {
+            setDeletingLinkKey(null);
         }
     };
 
@@ -174,6 +364,8 @@ export function EditorSubmissionBoardPanel({
             {rows.map((row) => {
                 const key = `${row.boardId}-${row.item.id}`;
                 const busy = uploadingKey === key;
+                const submissionValue = getSubmissionDisplayValue(row);
+                const hasHttpLink = /^https?:\/\//i.test(submissionValue);
                 return (
                     <li
                         key={key}
@@ -217,6 +409,40 @@ export function EditorSubmissionBoardPanel({
                                 )}
                                 {busy ? 'Uploading…' : 'Upload'}
                             </button>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="url"
+                                    placeholder="Paste Drive/link URL"
+                                    value={linkDrafts[key] || ''}
+                                    onChange={(e) => setLinkDrafts((prev) => ({ ...prev, [key]: e.target.value }))}
+                                    className="w-52 sm:w-64 bg-[#0e0e1a] border border-white/10 rounded-lg px-3 py-2 text-[11px] text-white placeholder-white/25 focus:outline-none focus:border-violet-500/50"
+                                />
+                                <button
+                                    type="button"
+                                    disabled={busy || savingLinkKey === key || deletingLinkKey === key || !String(linkDrafts[key] || '').trim()}
+                                    onClick={() => void handleSaveLink(row)}
+                                    className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-violet-500/35 text-violet-200 hover:bg-violet-500/15 disabled:opacity-50 text-[11px] font-bold uppercase tracking-wider"
+                                >
+                                    {savingLinkKey === key ? (
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                        <Link2 className="w-3.5 h-3.5" />
+                                    )}
+                                    {savingLinkKey === key ? 'Saving…' : 'Save Link'}
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={busy || savingLinkKey === key || deletingLinkKey === key || !hasHttpLink}
+                                    onClick={() => void handleDeleteLink(row)}
+                                    className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-red-500/35 text-red-200 hover:bg-red-500/15 disabled:opacity-50 text-[11px] font-bold uppercase tracking-wider"
+                                >
+                                    {deletingLinkKey === key ? (
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                        'Delete Link'
+                                    )}
+                                </button>
+                            </div>
                             <button
                                 type="button"
                                 onClick={() => onOpenItem(row.item)}

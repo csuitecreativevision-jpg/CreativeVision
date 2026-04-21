@@ -8,6 +8,7 @@ import { YouTubeModal } from '../ui/YouTubeModal';
 import { getCycleFromDate } from '../../features/performance-dashboard/utils/dateUtils';
 import { getBoardColumns, getAssetPublicUrl, normalizeMondayFileUrl } from '../../services/mondayService';
 import { ClientAnalytics } from '../analytics/ClientAnalytics';
+import { ProjectFeedbackPanel } from '../shared/ProjectFeedbackPanel';
 
 interface ProjectSelectionViewProps {
     boardData: any;
@@ -118,6 +119,76 @@ export const ProjectSelectionView = ({
     const [expandedCycles, setExpandedCycles] = useState<Set<string>>(new Set());
     const [statusFilter, setStatusFilter] = useState('All');
     const [mirrorOptions, setMirrorOptions] = useState<Record<string, any[]>>({});
+    const getProjectCardDate = (item: any): string => {
+        const cols = boardData?.columns || [];
+        const deadlineCol =
+            cols.find((c: any) => {
+                const t = String(c.title || '').toLowerCase();
+                return c.type === 'date' && (t.includes('deadline') || t.includes('due'));
+            }) ||
+            cols.find((c: any) => {
+                const t = String(c.title || '').toLowerCase();
+                return t.includes('deadline') || t.includes('due');
+            }) ||
+            cols.find((c: any) => c.type === 'date');
+        if (deadlineCol?.id) {
+            const cv = item?.column_values?.find((v: any) => v.id === deadlineCol.id);
+            const raw = String(cv?.text || cv?.display_value || '').trim();
+            if (raw) {
+                const iso = raw.match(/\d{4}-\d{2}-\d{2}/)?.[0];
+                if (iso) {
+                    const [y, m, d] = iso.split('-').map(Number);
+                    let hh = 12;
+                    let mm = 0;
+                    if (cv?.value) {
+                        try {
+                            const v = JSON.parse(cv.value) as { time?: string };
+                            if (v.time && /^\d{1,2}:\d{2}/.test(v.time)) {
+                                const [h, mi] = v.time.split(':').map(Number);
+                                if (!Number.isNaN(h) && !Number.isNaN(mi)) {
+                                    hh = h;
+                                    mm = mi;
+                                }
+                            }
+                        } catch {
+                            /* ignore */
+                        }
+                    }
+                    const dt = new Date(y, m - 1, d, hh, mm, 0, 0);
+                    return (hh !== 12 || mm !== 0)
+                        ? dt.toLocaleString(undefined, { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+                        : dt.toLocaleDateString();
+                }
+                const parsed = Date.parse(raw);
+                if (!Number.isNaN(parsed)) return new Date(parsed).toLocaleDateString();
+            }
+            if (cv?.value) {
+                try {
+                    const v = JSON.parse(cv.value) as { date?: string; time?: string; from?: string; to?: string };
+                    const base = v.date || v.from || '';
+                    if (/^\d{4}-\d{2}-\d{2}/.test(base)) {
+                        const [y, m, d] = base.slice(0, 10).split('-').map(Number);
+                        let hh = 12;
+                        let mm = 0;
+                        if (v.time && /^\d{1,2}:\d{2}/.test(v.time)) {
+                            const [h, mi] = v.time.split(':').map(Number);
+                            if (!Number.isNaN(h) && !Number.isNaN(mi)) {
+                                hh = h;
+                                mm = mi;
+                            }
+                        }
+                        const dt = new Date(y, m - 1, d, hh, mm, 0, 0);
+                        return (hh !== 12 || mm !== 0)
+                            ? dt.toLocaleString(undefined, { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+                            : dt.toLocaleDateString();
+                    }
+                } catch {
+                    /* ignore */
+                }
+            }
+        }
+        return new Date(item.created_at).toLocaleDateString();
+    };
 
     // Derived main asset for download & preview
     const mainAsset = useMemo(() => {
@@ -609,7 +680,7 @@ export const ProjectSelectionView = ({
                                         name={item.name}
                                         status={getStatusText(item)}
                                         color={getStatusColor(item)}
-                                        date={new Date(item.created_at).toLocaleDateString()}
+                                        date={getProjectCardDate(item)}
                                         onClick={() => setSelectedProject(item)}
                                     />
                                 ))}
@@ -675,7 +746,7 @@ export const ProjectSelectionView = ({
                                                                         name={item.name}
                                                                         status={getStatusText(item)}
                                                                         color={getStatusColor(item)}
-                                                                        date={new Date(item.created_at).toLocaleDateString()}
+                                                                        date={getProjectCardDate(item)}
                                                                         onClick={() => setSelectedProject(item)}
                                                                     />
                                                                 ))}
@@ -828,6 +899,17 @@ export const ProjectSelectionView = ({
                                                 </button>
                                             </div>
                                         </div>
+                                        <ProjectFeedbackPanel
+                                            boardId={selectedBoardId || boardData?.id || ''}
+                                            itemId={selectedProject.id}
+                                            projectName={selectedProject.name}
+                                            editorNameHint={
+                                                selectedProject.column_values?.find((cv: any) => {
+                                                    const c = boardData.columns?.find((x: any) => x.id === cv.id);
+                                                    return c?.title?.toLowerCase().includes('editor');
+                                                })?.text || ''
+                                            }
+                                        />
                                     </div>
                                 </div>
 

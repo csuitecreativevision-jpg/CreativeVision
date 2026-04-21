@@ -10,6 +10,7 @@ interface ProjectCardProps {
     color?: string;
     onClick?: () => void;
     index?: number;
+    emphasizeDeadline?: boolean;
 }
 
 // Maps a status string → a semantic color if Monday's own color isn't available
@@ -41,7 +42,8 @@ export const ProjectCard = forwardRef<HTMLDivElement, ProjectCardProps>((
         date,
         color = '#8b5cf6',
         onClick,
-        index = 0
+        index = 0,
+        emphasizeDeadline = false
     },
     ref
 ) => {
@@ -78,9 +80,11 @@ export const ProjectCard = forwardRef<HTMLDivElement, ProjectCardProps>((
                             </>
                         )}
                         {date && (
-                            <span className="text-[10px] text-white/25 font-medium flex items-center gap-1">
-                                <Calendar className="w-2.5 h-2.5" />
-                                {date}
+                            <span
+                                className={`font-semibold flex items-center gap-1 ${emphasizeDeadline ? 'text-[12px] text-amber-300/95' : 'text-[10px] text-white/25'}`}
+                            >
+                                <Calendar className={emphasizeDeadline ? 'w-3.5 h-3.5' : 'w-2.5 h-2.5'} />
+                                {emphasizeDeadline ? `Deadline: ${date}` : date}
                             </span>
                         )}
                     </div>

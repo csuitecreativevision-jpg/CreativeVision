@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { PortalLayout } from '../components/shared/PortalLayout';
 import { SidebarItem } from '../components/shared/SidebarItem';
 import { SidebarDropdown } from '../components/shared/SidebarDropdown';
@@ -24,6 +24,9 @@ import { AdminChatbot } from '../components/admin/AdminChatbot';
 import { NotificationBell } from '../components/shared/NotificationBell';
 import { PORTAL_CACHED_PASSWORD_KEY } from '../lib/portalPasswordCache';
 import { usePortalTheme } from '../contexts/PortalThemeContext';
+import { getUserNotifications, type Notification } from '../services/notificationService';
+import { parseFeedbackSourceId } from '../services/projectFeedbackService';
+import { fireCvSwal } from '../lib/swalTheme';
 
 function AdminSidebarFooter({
     currentUserName,
@@ -73,7 +76,13 @@ function AdminSidebarFooter({
     );
 }
 
-function AdminPortalMainHeader({ onOpenMobileMenu }: { onOpenMobileMenu: () => void }) {
+function AdminPortalMainHeader({
+    onOpenMobileMenu,
+    onNotificationClick,
+}: {
+    onOpenMobileMenu: () => void;
+    onNotificationClick?: (notification: Notification) => void | Promise<void>;
+}) {
     const { isDark } = usePortalTheme();
     return (
         <>
@@ -91,7 +100,7 @@ function AdminPortalMainHeader({ onOpenMobileMenu }: { onOpenMobileMenu: () => v
                 </button>
             </div>
             <div className="absolute top-4 right-4 z-50">
-                <NotificationBell />
+                <NotificationBell onNotificationClick={onNotificationClick} />
             </div>
         </>
     );
@@ -103,6 +112,7 @@ function AdminPortalContent() {
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [sidebarUserName, setSidebarUserName] = useState(() => localStorage.getItem('portal_user_name') || '');
     const { triggerRefresh } = useRefresh();
+    const feedbackPromptShownRef = useRef(false);
 
     useEffect(() => {
         const sync = () => setSidebarUserName(localStorage.getItem('portal_user_name') || '');
@@ -170,6 +180,41 @@ function AdminPortalContent() {
     };
 
     const activeTab = getActiveTab();
+
+    const openFeedbackFromNotification = async (notification: Notification) => {
+        if (notification.source_type !== 'project_feedback') return;
+        const parsed = parseFeedbackSourceId(notification.source_id);
+        if (!parsed) return;
+        navigate('/admin-portal/team', { state: { boardId: parsed.boardId, itemId: parsed.itemId } });
+    };
+
+    useEffect(() => {
+        const role = localStorage.getItem('portal_user_role');
+        const email = localStorage.getItem('portal_user_email') || '';
+        if (role !== 'admin' || !email || feedbackPromptShownRef.current) return;
+        const t = setTimeout(async () => {
+            try {
+                const res = await getUserNotifications(email);
+                const first = res.data?.find(n => !n.is_read && n.source_type === 'project_feedback');
+                if (!first) return;
+                feedbackPromptShownRef.current = true;
+                const r = await fireCvSwal({
+                    icon: 'info',
+                    title: 'Client feedback received',
+                    text: first.message,
+                    showCancelButton: true,
+                    confirmButtonText: 'Open',
+                    cancelButtonText: 'Later',
+                });
+                if (r.isConfirmed) {
+                    await openFeedbackFromNotification(first);
+                }
+            } catch (e) {
+                console.error('[Admin feedback prompt] failed', e);
+            }
+        }, 5000);
+        return () => clearTimeout(t);
+    }, [navigate, location.pathname]);
 
     // Mapping tabs to existing components or placeholders
     // Only Overview, Boards, Users are implemented separate pages currently.
@@ -281,7 +326,10 @@ function AdminPortalContent() {
             }
             mainContent={
                 <>
-                    <AdminPortalMainHeader onOpenMobileMenu={() => setIsMobileSidebarOpen(true)} />
+                    <AdminPortalMainHeader
+                        onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
+                        onNotificationClick={openFeedbackFromNotification}
+                    />
 
                     {/* Content Area */}
                     <div className="flex-1 overflow-hidden flex relative">

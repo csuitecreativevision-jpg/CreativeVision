@@ -573,72 +573,12 @@ export function UserManagement() {
                             ))}
                         </div>
                     </div>
-                    {/* Manage Checkers Section */}
+                    {/*
+                    Manage Checkers Section (temporarily hidden)
                     <div className="mt-8">
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
-                                <Users className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <h2 className="text-xl font-bold text-white tracking-tight">Checkers</h2>
-                                <p className="text-sm text-gray-400">Manage the dynamic list of Checkers for project assignments.</p>
-                            </div>
-                        </div>
-
-                        <GlassCard>
-                            <form onSubmit={handleCreateChecker} className="flex gap-4 mb-6">
-                                <input
-                                    type="text"
-                                    placeholder="New Checker Name..."
-                                    value={newCheckerName}
-                                    onChange={(e) => setNewCheckerName(e.target.value)}
-                                    className="flex-1 bg-[#1A1A2E]/50 border border-white/5 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
-                                />
-                                <button
-                                    type="submit"
-                                    className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold transition-colors flex items-center gap-2"
-                                >
-                                    <Plus className="w-5 h-5" />
-                                    Add Checker
-                                </button>
-                            </form>
-
-                            {checkerError && (
-                                <div className="mb-4 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-3">
-                                    <AlertCircle className="w-5 h-5 shrink-0" />
-                                    <p>{checkerError}</p>
-                                </div>
-                            )}
-                            {checkerSuccess && (
-                                <div className="mb-4 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm flex items-center gap-3">
-                                    <Check className="w-5 h-5 shrink-0" />
-                                    <p>{checkerSuccess}</p>
-                                </div>
-                            )}
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                                {isCheckersLoading ? (
-                                    <div className="col-span-full py-8 text-center text-gray-500">Loading checkers...</div>
-                                ) : checkers.length === 0 ? (
-                                    <div className="col-span-full py-8 text-center text-gray-500">No Checkers found. Add one above.</div>
-                                ) : (
-                                    checkers.map((checker) => (
-                                        <div key={checker.id} className="flex items-center justify-between bg-white/5 border border-white/5 rounded-xl p-4 group hover:bg-white/10 transition-colors">
-                                            <div className="font-bold text-white">{checker.name}</div>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleDeleteChecker(checker.id, checker.name)}
-                                                className="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100"
-                                                title="Delete Checker"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </GlassCard>
+                        ...
                     </div>
+                    */}
 
                 </div>
 

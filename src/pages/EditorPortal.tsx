@@ -24,8 +24,17 @@ import { TimeTracker } from '../components/shared/TimeTracker';
 import { NotificationBell } from '../components/shared/NotificationBell';
 import AdminSettings from './admin/AdminSettings';
 import { usePortalTheme } from '../contexts/PortalThemeContext';
+import { getUserNotifications, type Notification } from '../services/notificationService';
+import { parseFeedbackSourceId } from '../services/projectFeedbackService';
+import { fireCvSwal } from '../lib/swalTheme';
 
-function EditorPortalMainChrome({ onOpenMobileMenu }: { onOpenMobileMenu: () => void }) {
+function EditorPortalMainChrome({
+    onOpenMobileMenu,
+    onNotificationClick,
+}: {
+    onOpenMobileMenu: () => void;
+    onNotificationClick?: (notification: Notification) => void | Promise<void>;
+}) {
     const { isDark } = usePortalTheme();
     return (
         <>
@@ -43,7 +52,7 @@ function EditorPortalMainChrome({ onOpenMobileMenu }: { onOpenMobileMenu: () => 
                 </button>
             </div>
             <div className="absolute top-4 right-4 z-50">
-                <NotificationBell />
+                <NotificationBell onNotificationClick={onNotificationClick} />
             </div>
         </>
     );
@@ -129,6 +138,7 @@ function EditorPortalContent() {
     const [sortOption, setSortOption] = useState<'name' | 'count'>('name');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
     const [discordThreadId, setDiscordThreadId] = useState<string | null>(null);
+    const feedbackPromptShownRef = useRef(false);
 
     // User info (synced when profile is edited in Settings)
     const [sidebarUserName, setSidebarUserName] = useState(() => localStorage.getItem('portal_user_name') || 'Editor');
@@ -297,6 +307,89 @@ function EditorPortalContent() {
         if (!silent) setLoading(false);
     };
 
+    const openItemFromNotification = async (notification: Notification) => {
+        if (notification.source_type !== 'project_feedback') return;
+        const parsed = parseFeedbackSourceId(notification.source_id);
+        if (!parsed) return;
+        setIsProcessingNavigation(true);
+        try {
+            const sortedBoards = [...boards].sort((a: any, b: any) =>
+                a.id === parsed.boardId ? -1 : b.id === parsed.boardId ? 1 : 0
+            );
+            for (const board of sortedBoards) {
+                const fullBoardData = await getBoardItems(board.id, true);
+                const hasItem = (fullBoardData?.items || []).some((item: any) => item.id === parsed.itemId);
+                if (!hasItem) continue;
+                setInitialItemId(parsed.itemId);
+                setSelectedBoard(fullBoardData);
+                return;
+            }
+        } catch (error) {
+            console.error('Failed to open feedback item from notification:', error);
+        } finally {
+            setIsProcessingNavigation(false);
+        }
+    };
+
+    useEffect(() => {
+        if (feedbackPromptShownRef.current) return;
+        const role = localStorage.getItem('portal_user_role');
+        const email = localStorage.getItem('portal_user_email') || '';
+        if (role !== 'editor' || !email) return;
+        const t = setTimeout(async () => {
+            try {
+                const res = await getUserNotifications(email);
+                if (!res.success || !res.data?.length) return;
+                const first = res.data.find(n => !n.is_read && n.source_type === 'project_feedback');
+                if (!first) return;
+                feedbackPromptShownRef.current = true;
+                const r = await fireCvSwal({
+                    icon: 'info',
+                    title: 'Client feedback received',
+                    text: first.message,
+                    showCancelButton: true,
+                    confirmButtonText: 'Open',
+                    cancelButtonText: 'Later',
+                });
+                if (r.isConfirmed) {
+                    await openItemFromNotification(first);
+                }
+            } catch (e) {
+                console.error('[Feedback prompt] failed', e);
+            }
+        }, 5000);
+        return () => clearTimeout(t);
+    }, [boards]);
+
+    useEffect(() => {
+        if (!selectedBoard || selectedBoard === 'calendar' || selectedBoard === 'settings' || !selectedBoard.id) return;
+        let cancelled = false;
+        const REFRESH_MS = 15000;
+        const refreshSelectedBoard = async () => {
+            try {
+                const fresh = await getBoardItems(selectedBoard.id, true);
+                if (!cancelled) setSelectedBoard(fresh);
+            } catch (error) {
+                console.error('Failed to refresh selected editor board in real time:', error);
+            }
+        };
+        const interval = setInterval(refreshSelectedBoard, REFRESH_MS);
+        const onFocus = () => { void refreshSelectedBoard(); };
+        const onVisibility = () => {
+            if (document.visibilityState === 'visible') {
+                void refreshSelectedBoard();
+            }
+        };
+        window.addEventListener('focus', onFocus);
+        document.addEventListener('visibilitychange', onVisibility);
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+            window.removeEventListener('focus', onFocus);
+            document.removeEventListener('visibilitychange', onVisibility);
+        };
+    }, [selectedBoard?.id]);
+
     return (
         <PortalLayout
             isMobileSidebarOpen={isMobileSidebarOpen}
@@ -312,7 +405,7 @@ function EditorPortalContent() {
                             onClick={async () => {
                                 setInitialItemId(undefined);
                                 try {
-                                    const fullBoardData = await getBoardItems(board.id);
+                                    const fullBoardData = await getBoardItems(board.id, true);
                                     setSelectedBoard(fullBoardData);
                                 } catch (e) {
                                     setSelectedBoard(board);
@@ -377,7 +470,10 @@ function EditorPortalContent() {
                         )}
                     </AnimatePresence>
 
-                    <EditorPortalMainChrome onOpenMobileMenu={() => setIsMobileSidebarOpen(true)} />
+                    <EditorPortalMainChrome
+                        onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
+                        onNotificationClick={openItemFromNotification}
+                    />
 
                     {selectedBoard !== 'settings' && (
                         <>

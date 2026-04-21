@@ -22,6 +22,7 @@ import { NotificationBell } from '../components/shared/NotificationBell';
 import { PortalCalendar } from '../components/views/PortalCalendar';
 import { createNotification } from '../services/notificationService';
 import type { Notification } from '../services/notificationService';
+import { parseFeedbackSourceId } from '../services/projectFeedbackService';
 
 function getStatusColumnIds(board: any): string[] {
     if (!board?.columns) return [];
@@ -115,14 +116,28 @@ function ClientPortalContent() {
     };
 
     const openItemFromNotification = async (notification: Notification) => {
-        if (notification.source_type !== 'project') return;
+        let itemId: string | null = null;
+        let boardIdHint: string | null = null;
 
-        const itemId = extractItemIdFromNotificationSource(notification.source_id);
+        if (notification.source_type === 'project') {
+            itemId = extractItemIdFromNotificationSource(notification.source_id);
+        } else if (notification.source_type === 'project_feedback') {
+            const parsed = parseFeedbackSourceId(notification.source_id);
+            if (parsed) {
+                itemId = parsed.itemId;
+                boardIdHint = parsed.boardId;
+            }
+        } else {
+            return;
+        }
         if (!itemId) return;
 
         setIsProcessingNavigation(true);
         try {
-            for (const board of boards) {
+            const sortedBoards = boardIdHint
+                ? [...boards].sort((a: any, b: any) => (a.id === boardIdHint ? -1 : b.id === boardIdHint ? 1 : 0))
+                : boards;
+            for (const board of sortedBoards) {
                 const fullBoardData = await getBoardItems(board.id, true);
                 const hasItem = (fullBoardData?.items || []).some((item: any) => item.id === itemId);
                 if (!hasItem) continue;
@@ -278,6 +293,35 @@ function ClientPortalContent() {
     }, [boards, webhookSyncDone]);
 
     useEffect(() => {
+        if (!selectedBoard || selectedBoard === ('calendar' as any) || !selectedBoard.id) return;
+        let cancelled = false;
+        const REFRESH_MS = 15000;
+        const refreshSelectedBoard = async () => {
+            try {
+                const fresh = await getBoardItems(selectedBoard.id, true);
+                if (!cancelled) setSelectedBoard(fresh);
+            } catch (error) {
+                console.error('Failed to refresh selected client board in real time:', error);
+            }
+        };
+        const interval = setInterval(refreshSelectedBoard, REFRESH_MS);
+        const onFocus = () => { void refreshSelectedBoard(); };
+        const onVisibility = () => {
+            if (document.visibilityState === 'visible') {
+                void refreshSelectedBoard();
+            }
+        };
+        window.addEventListener('focus', onFocus);
+        document.addEventListener('visibilitychange', onVisibility);
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+            window.removeEventListener('focus', onFocus);
+            document.removeEventListener('visibilitychange', onVisibility);
+        };
+    }, [selectedBoard?.id]);
+
+    useEffect(() => {
         const userEmail = localStorage.getItem('portal_user_email') || '';
         if (!userEmail || boards.length === 0) return;
 
@@ -351,7 +395,7 @@ function ClientPortalContent() {
                             onClick={async () => {
                                 setInitialItemId(undefined);
                                 try {
-                                    const fullBoardData = await getBoardItems(board.id);
+                                    const fullBoardData = await getBoardItems(board.id, true);
                                     setSelectedBoard(fullBoardData);
                                 } catch (e) {
                                     setSelectedBoard(board);

@@ -9,6 +9,7 @@ import { getCycleFromDate } from '../../features/performance-dashboard/utils/dat
 import { getBoardColumns, getAssetPublicUrl, normalizeMondayFileUrl } from '../../services/mondayService';
 import { checkDeadlineNotifications } from '../../services/notificationService';
 import { buildSubmissionRowsForBoard, EditorSubmissionBoardPanel } from './EditorSubmissionHub';
+import { ProjectFeedbackPanel } from '../shared/ProjectFeedbackPanel';
 
 interface ProjectSelectionViewProps {
     boardData: any;
@@ -118,6 +119,84 @@ export const EditorProjectSelectionView = ({
     const [expandedCycles, setExpandedCycles] = useState<Set<string>>(new Set());
     const [statusFilter, setStatusFilter] = useState('All');
     const [mirrorOptions, setMirrorOptions] = useState<Record<string, any[]>>({});
+    const getProjectDeadlineDate = (item: any): Date | null => {
+        const cols = boardData?.columns || [];
+        const deadlineCol =
+            cols.find((c: any) => {
+                const t = String(c.title || '').toLowerCase();
+                return c.type === 'date' && (t.includes('deadline') || t.includes('due'));
+            }) ||
+            cols.find((c: any) => {
+                const t = String(c.title || '').toLowerCase();
+                return t.includes('deadline') || t.includes('due');
+            }) ||
+            cols.find((c: any) => c.type === 'date');
+        if (deadlineCol?.id) {
+            const cv = item?.column_values?.find((v: any) => v.id === deadlineCol.id);
+            const raw = String(cv?.text || cv?.display_value || '').trim();
+            if (raw) {
+                const iso = raw.match(/\d{4}-\d{2}-\d{2}/)?.[0];
+                if (iso) {
+                    const [y, m, d] = iso.split('-').map(Number);
+                    let hh = 12;
+                    let mm = 0;
+                    if (cv?.value) {
+                        try {
+                            const v = JSON.parse(cv.value) as { time?: string };
+                            if (v.time && /^\d{1,2}:\d{2}/.test(v.time)) {
+                                const [h, mi] = v.time.split(':').map(Number);
+                                if (!Number.isNaN(h) && !Number.isNaN(mi)) {
+                                    hh = h;
+                                    mm = mi;
+                                }
+                            }
+                        } catch {
+                            /* ignore */
+                        }
+                    }
+                    const dt = new Date(y, m - 1, d, hh, mm, 0, 0);
+                    return dt;
+                }
+                const parsed = Date.parse(raw);
+                if (!Number.isNaN(parsed)) return new Date(parsed);
+            }
+            if (cv?.value) {
+                try {
+                    const v = JSON.parse(cv.value) as { date?: string; time?: string; from?: string; to?: string };
+                    const base = v.date || v.from || '';
+                    if (/^\d{4}-\d{2}-\d{2}/.test(base)) {
+                        const [y, m, d] = base.slice(0, 10).split('-').map(Number);
+                        let hh = 12;
+                        let mm = 0;
+                        if (v.time && /^\d{1,2}:\d{2}/.test(v.time)) {
+                            const [h, mi] = v.time.split(':').map(Number);
+                            if (!Number.isNaN(h) && !Number.isNaN(mi)) {
+                                hh = h;
+                                mm = mi;
+                            }
+                        }
+                        const dt = new Date(y, m - 1, d, hh, mm, 0, 0);
+                        return dt;
+                    }
+                } catch {
+                    /* ignore */
+                }
+            }
+        }
+        return item?.created_at ? new Date(item.created_at) : null;
+    };
+
+    const getProjectCardDate = (item: any): string => {
+        const dt = getProjectDeadlineDate(item);
+        if (!dt || Number.isNaN(dt.getTime())) return '';
+        return dt.toLocaleString(undefined, {
+            month: 'numeric',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+        });
+    };
 
     // Check for approaching deadlines when board data loads
     useEffect(() => {
@@ -420,6 +499,36 @@ export const EditorProjectSelectionView = ({
         return items;
     }, [allItems, searchTerm, sortOrder, statusFilter, boardData]);
 
+    const dueBuckets = useMemo(() => {
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+        const dayAfterTomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
+
+        const dueToday: any[] = [];
+        const dueTomorrow: any[] = [];
+        const others: any[] = [];
+
+        filteredItems.forEach((item: any) => {
+            const due = getProjectDeadlineDate(item);
+            if (!due || Number.isNaN(due.getTime())) {
+                others.push(item);
+                return;
+            }
+            if (due >= todayStart && due < tomorrowStart) {
+                dueToday.push(item);
+                return;
+            }
+            if (due >= tomorrowStart && due < dayAfterTomorrowStart) {
+                dueTomorrow.push(item);
+                return;
+            }
+            others.push(item);
+        });
+
+        return { dueToday, dueTomorrow, others };
+    }, [filteredItems, boardData]);
+
     const submissionRowsAll = useMemo(() => {
         if (!boardData || !selectedBoardId) return [];
         return buildSubmissionRowsForBoard(boardData, selectedBoardId, boardData.name);
@@ -621,20 +730,74 @@ export const EditorProjectSelectionView = ({
 
             {/* --- ALL PROJECTS VIEW --- */}
             {viewMode === 'all' && (
-                <div className="space-y-2">
-                    <AnimatePresence mode='popLayout'>
-                        {filteredItems.map((item: any, index: number) => (
-                            <ProjectCard
-                                key={item.id}
-                                index={index}
-                                name={item.name}
-                                status={getStatusText(item)}
-                                color={getStatusColor(item)}
-                                date={new Date(item.created_at).toLocaleDateString()}
-                                onClick={() => setSelectedProject(item)}
-                            />
-                        ))}
-                    </AnimatePresence>
+                <div className="space-y-6">
+                    <div>
+                        <div className="mb-2 px-1 text-[11px] font-extrabold uppercase tracking-[0.14em] text-amber-300/90">
+                            Due Today ({dueBuckets.dueToday.length})
+                        </div>
+                        <div className="space-y-2">
+                            <AnimatePresence mode='popLayout'>
+                                {dueBuckets.dueToday.map((item: any, index: number) => (
+                                    <ProjectCard
+                                        key={item.id}
+                                        index={index}
+                                        name={item.name}
+                                        status={getStatusText(item)}
+                                        color={getStatusColor(item)}
+                                        date={getProjectCardDate(item)}
+                                        emphasizeDeadline
+                                        onClick={() => setSelectedProject(item)}
+                                    />
+                                ))}
+                            </AnimatePresence>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div className="mb-2 px-1 text-[11px] font-extrabold uppercase tracking-[0.14em] text-sky-300/90">
+                            Due Tomorrow ({dueBuckets.dueTomorrow.length})
+                        </div>
+                        <div className="space-y-2">
+                            <AnimatePresence mode='popLayout'>
+                                {dueBuckets.dueTomorrow.map((item: any, index: number) => (
+                                    <ProjectCard
+                                        key={item.id}
+                                        index={index}
+                                        name={item.name}
+                                        status={getStatusText(item)}
+                                        color={getStatusColor(item)}
+                                        date={getProjectCardDate(item)}
+                                        emphasizeDeadline
+                                        onClick={() => setSelectedProject(item)}
+                                    />
+                                ))}
+                            </AnimatePresence>
+                        </div>
+                    </div>
+
+                    {dueBuckets.others.length > 0 && (
+                        <div>
+                            <div className="mb-2 px-1 text-[11px] font-extrabold uppercase tracking-[0.14em] text-white/45">
+                                Other Deadlines ({dueBuckets.others.length})
+                            </div>
+                            <div className="space-y-2">
+                                <AnimatePresence mode='popLayout'>
+                                    {dueBuckets.others.map((item: any, index: number) => (
+                                        <ProjectCard
+                                            key={item.id}
+                                            index={index}
+                                            name={item.name}
+                                            status={getStatusText(item)}
+                                            color={getStatusColor(item)}
+                                            date={getProjectCardDate(item)}
+                                            emphasizeDeadline
+                                            onClick={() => setSelectedProject(item)}
+                                        />
+                                    ))}
+                                </AnimatePresence>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -720,7 +883,7 @@ export const EditorProjectSelectionView = ({
                                                                 name={item.name}
                                                                 status={getStatusText(item)}
                                                                 color={getStatusColor(item)}
-                                                                date={new Date(item.created_at).toLocaleDateString()}
+                                                                date={getProjectCardDate(item)}
                                                                 onClick={() => setSelectedProject(item)}
                                                             />
                                                         ))}
@@ -886,6 +1049,17 @@ export const EditorProjectSelectionView = ({
                                                 </button>
                                             </div>
                                         </div>
+                                        <ProjectFeedbackPanel
+                                            boardId={selectedBoardId || boardData?.id || ''}
+                                            itemId={selectedProject.id}
+                                            projectName={selectedProject.name}
+                                            editorNameHint={
+                                                selectedProject.column_values?.find((cv: any) => {
+                                                    const c = boardData.columns?.find((x: any) => x.id === cv.id);
+                                                    return c?.title?.toLowerCase().includes('editor');
+                                                })?.text || ''
+                                            }
+                                        />
                                     </div>
                                 </div>
 

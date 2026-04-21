@@ -1,5 +1,8 @@
 import { supabase } from '../lib/supabaseClient';
 
+// Prevent duplicate deadline notifications during concurrent refreshes in the same session.
+const pendingDeadlineNotificationKeys = new Set<string>();
+
 // ─── Types ──────────────────────────────────────────────────────────────
 export type NotificationType = 'info' | 'success' | 'warning' | 'leave_request' | 'leave_response' | 'assignment' | 'project_complete';
 
@@ -262,6 +265,10 @@ export async function checkDeadlineNotifications(
             if (deadline > now && deadline <= in48h) {
                 // Deduplicate: check if we already sent a deadline notification for this item
                 const dedupId = `deadline_${item.id}`;
+                const dedupKey = `${userEmail}:${dedupId}`;
+
+                // If another in-flight checker is already creating this exact notification, skip.
+                if (pendingDeadlineNotificationKeys.has(dedupKey)) continue;
                 const { data: existing } = await supabase
                     .from('notifications')
                     .select('id')
@@ -272,15 +279,21 @@ export async function checkDeadlineNotifications(
                 if (existing && existing.length > 0) continue; // Already notified
 
                 const hoursLeft = Math.round((deadline.getTime() - now.getTime()) / (1000 * 60 * 60));
-
-                await createNotification({
-                    user_email: userEmail,
-                    type: 'warning',
-                    title: 'Deadline Approaching ⏰',
-                    message: `"${item.name}" is due in ${hoursLeft} hours (${deadline.toLocaleDateString()}).`,
-                    source_type: 'project',
-                    source_id: dedupId
-                });
+                pendingDeadlineNotificationKeys.add(dedupKey);
+                try {
+                    await createNotification({
+                        user_email: userEmail,
+                        type: 'warning',
+                        title: 'Deadline Approaching ⏰',
+                        message: `"${item.name}" is due in ${hoursLeft} hours (${deadline.toLocaleDateString()}).`,
+                        source_type: 'project',
+                        source_id: dedupId
+                    });
+                    // Mark as existing for the rest of this run.
+                    existingIds.add(dedupId);
+                } finally {
+                    pendingDeadlineNotificationKeys.delete(dedupKey);
+                }
             }
         }
     } catch (err) {
