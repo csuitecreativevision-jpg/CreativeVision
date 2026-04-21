@@ -1714,8 +1714,51 @@ export async function getDueTodayItems(forceSync: boolean = false) {
 
         const now = new Date();
         const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
         const dueItems: any[] = [];
+
+        const pickBestDeadlineColumn = (cols: any[], sampleItem?: any) => {
+            const strictCandidates = cols.filter((c: any) => {
+                const t = String(c?.title || '').trim().toLowerCase();
+                return t.includes('ve project board') && t.includes('deadline') || t === 'deadline' || t === 'deadline date';
+            });
+            if (strictCandidates.length > 0) {
+                if (!sampleItem?.column_values?.length) return strictCandidates[0];
+                const byItemValue = [...strictCandidates].sort((a, b) => {
+                    const av = sampleItem.column_values.find((v: any) => v.id === a.id);
+                    const bv = sampleItem.column_values.find((v: any) => v.id === b.id);
+                    const ar = String(av?.text || av?.display_value || '').trim();
+                    const br = String(bv?.text || bv?.display_value || '').trim();
+                    const as = (ar ? 10 : 0) + ((av?.value ? 10 : 0)) + (/(\d{1,2}:\d{2}\s*(am|pm))/i.test(ar) ? 5 : 0);
+                    const bs = (br ? 10 : 0) + ((bv?.value ? 10 : 0)) + (/(\d{1,2}:\d{2}\s*(am|pm))/i.test(br) ? 5 : 0);
+                    return bs - as;
+                });
+                return byItemValue[0];
+            }
+            const scoreCol = (c: any) => {
+                const t = String(c?.title || '').toLowerCase().trim();
+                let score = 0;
+                if (t === 'deadline' || t === 'due date') score += 100;
+                if (t.includes('deadline')) score += 40;
+                if (t.includes('due')) score += 25;
+                if (c?.type === 'date' || c?.type === 'timeline') score += 20;
+                if (t.includes('created') || t.includes('updated') || t.includes('start')) score -= 30;
+                if (sampleItem?.column_values?.length) {
+                    const cv = sampleItem.column_values.find((v: any) => v.id === c.id);
+                    const raw = String(cv?.text || cv?.display_value || '');
+                    if (/(\d{1,2}:\d{2}\s*(am|pm))/i.test(raw)) score += 15;
+                    if (cv?.value) {
+                        try {
+                            const parsed = JSON.parse(cv.value) as { time?: string };
+                            if (parsed?.time) score += 15;
+                        } catch {
+                            /* ignore */
+                        }
+                    }
+                }
+                return score;
+            };
+            return [...(cols || [])].sort((a, b) => scoreCol(b) - scoreCol(a))[0] || null;
+        };
 
         boardsWithItems.forEach((board: any) => {
             const statusCol = board.columns?.find((c: any) => {
@@ -1726,32 +1769,61 @@ export async function getDueTodayItems(forceSync: boolean = false) {
                 const title = String(c.title || '').toLowerCase();
                 return title.includes('editor') || title.includes('owner') || c.type === 'people';
             });
-            const deadlineCol = board.columns?.find((c: any) => {
-                const title = String(c.title || '').toLowerCase();
-                return c.type === 'date' || title.includes('deadline') || title.includes('due');
-            });
+            const deadlineCol = pickBestDeadlineColumn(board.columns || [], board.items?.[0]);
+            const resolveAuxTime = (item: any): { hh: number; mm: number } | null => {
+                const timeCol = (board.columns || []).find((c: any) => {
+                    const t = String(c?.title || '').toLowerCase();
+                    return t.includes('time') && !t.includes('tracking') && !t.includes('timezone');
+                });
+                if (!timeCol?.id) return null;
+                const tv = item?.column_values?.find((v: any) => v.id === timeCol.id);
+                const raw = String(tv?.text || tv?.display_value || '').trim();
+                const m = raw.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+                if (!m) return null;
+                let hh = Number(m[1]);
+                const mm = Number(m[2]);
+                const ap = m[3].toUpperCase();
+                if (ap === 'PM' && hh < 12) hh += 12;
+                if (ap === 'AM' && hh === 12) hh = 0;
+                if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+                return { hh, mm };
+            };
             if (!deadlineCol?.id) return;
 
             board.items?.forEach((item: any) => {
                 const deadlineVal = item.column_values?.find((cv: any) => cv.id === deadlineCol.id);
                 const dueText = String(deadlineVal?.text || deadlineVal?.display_value || '').trim();
-                let hasExplicitTime = /(\d{1,2}:\d{2}\s*(AM|PM))/i.test(dueText) || /T\d{2}:\d{2}/i.test(dueText);
                 let dueDate: Date | null = null;
+                let dueYmd: string | null = null;
+                const timeMatch = dueText.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
 
                 if (deadlineVal?.value) {
                     try {
                         const parsed = JSON.parse(deadlineVal.value) as { date?: string; time?: string; from?: string };
                         const base = parsed.date || parsed.from || '';
                         if (/^\d{4}-\d{2}-\d{2}/.test(base)) {
+                            dueYmd = base.slice(0, 10);
                             const [y, m, d] = base.slice(0, 10).split('-').map(Number);
                             let hh = 12;
                             let mm = 0;
+                            if (timeMatch) {
+                                hh = Number(timeMatch[1]);
+                                mm = Number(timeMatch[2]);
+                                const ap = timeMatch[3].toUpperCase();
+                                if (ap === 'PM' && hh < 12) hh += 12;
+                                if (ap === 'AM' && hh === 12) hh = 0;
+                            } else {
+                                const aux = resolveAuxTime(item);
+                                if (aux) {
+                                    hh = aux.hh;
+                                    mm = aux.mm;
+                                }
+                            }
                             if (parsed.time && /^\d{1,2}:\d{2}/.test(parsed.time)) {
                                 const [h, mi] = parsed.time.split(':').map(Number);
                                 if (!Number.isNaN(h) && !Number.isNaN(mi)) {
                                     hh = h;
                                     mm = mi;
-                                    hasExplicitTime = true;
                                 }
                             }
                             dueDate = new Date(y, m - 1, d, hh, mm, 0, 0);
@@ -1764,6 +1836,7 @@ export async function getDueTodayItems(forceSync: boolean = false) {
                 if (!dueDate && dueText) {
                     const iso = dueText.match(/\d{4}-\d{2}-\d{2}/)?.[0];
                     if (iso) {
+                        dueYmd = iso;
                         const [y, m, d] = iso.split('-').map(Number);
                         dueDate = new Date(y, m - 1, d, 12, 0, 0, 0);
                     } else {
@@ -1775,7 +1848,14 @@ export async function getDueTodayItems(forceSync: boolean = false) {
                     }
                 }
 
-                if (!dueDate || Number.isNaN(dueDate.getTime()) || dueDate < start || dueDate >= end) return;
+                if (!dueYmd && dueDate && !Number.isNaN(dueDate.getTime())) {
+                    const y = dueDate.getFullYear();
+                    const m = String(dueDate.getMonth() + 1).padStart(2, '0');
+                    const d = String(dueDate.getDate()).padStart(2, '0');
+                    dueYmd = `${y}-${m}-${d}`;
+                }
+                const todayYmd = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
+                if (!dueYmd || dueYmd !== todayYmd) return;
 
                 let editorName = 'Unknown';
                 if (editorCol) {
@@ -1801,10 +1881,8 @@ export async function getDueTodayItems(forceSync: boolean = false) {
                     boardName: board.name,
                     editor: editorName,
                     progressStatus,
-                    dueAt: dueDate.toISOString(),
-                    dueText: dueText || dueDate.toLocaleString(undefined, hasExplicitTime
-                        ? { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }
-                        : { month: 'numeric', day: 'numeric', year: 'numeric' }),
+                    dueAt: dueDate ? `${dueYmd} ${String(dueDate.getHours()).padStart(2, '0')}:${String(dueDate.getMinutes()).padStart(2, '0')}` : dueYmd,
+                    dueText: dueText || dueYmd,
                 });
             });
         });
@@ -1827,6 +1905,50 @@ async function getApprovalItemsFresh(forceSync: boolean = false) {
     const boardsWithItems = await getMultipleBoardItems(boardIds, forceSync);
 
     const approvalItems: any[] = [];
+
+    const pickBestDeadlineColumn = (cols: any[], sampleItem?: any) => {
+        const strictCandidates = cols.filter((c: any) => {
+            const t = String(c?.title || '').trim().toLowerCase();
+            return t.includes('ve project board') && t.includes('deadline') || t === 'deadline' || t === 'deadline date';
+        });
+        if (strictCandidates.length > 0) {
+            if (!sampleItem?.column_values?.length) return strictCandidates[0];
+            const byItemValue = [...strictCandidates].sort((a, b) => {
+                const av = sampleItem.column_values.find((v: any) => v.id === a.id);
+                const bv = sampleItem.column_values.find((v: any) => v.id === b.id);
+                const ar = String(av?.text || av?.display_value || '').trim();
+                const br = String(bv?.text || bv?.display_value || '').trim();
+                const as = (ar ? 10 : 0) + ((av?.value ? 10 : 0)) + (/(\d{1,2}:\d{2}\s*(am|pm))/i.test(ar) ? 5 : 0);
+                const bs = (br ? 10 : 0) + ((bv?.value ? 10 : 0)) + (/(\d{1,2}:\d{2}\s*(am|pm))/i.test(br) ? 5 : 0);
+                return bs - as;
+            });
+            return byItemValue[0];
+        }
+        const scoreCol = (c: any) => {
+            const t = String(c?.title || '').toLowerCase().trim();
+            let score = 0;
+            if (t === 'deadline' || t === 'due date') score += 100;
+            if (t.includes('deadline')) score += 40;
+            if (t.includes('due')) score += 25;
+            if (c?.type === 'date' || c?.type === 'timeline') score += 20;
+            if (t.includes('created') || t.includes('updated') || t.includes('start')) score -= 30;
+            if (sampleItem?.column_values?.length) {
+                const cv = sampleItem.column_values.find((v: any) => v.id === c.id);
+                const raw = String(cv?.text || cv?.display_value || '');
+                if (/(\d{1,2}:\d{2}\s*(am|pm))/i.test(raw)) score += 15;
+                if (cv?.value) {
+                    try {
+                        const parsed = JSON.parse(cv.value) as { time?: string };
+                        if (parsed?.time) score += 15;
+                    } catch {
+                        /* ignore */
+                    }
+                }
+            }
+            return score;
+        };
+        return [...(cols || [])].sort((a, b) => scoreCol(b) - scoreCol(a))[0] || null;
+    };
 
     boardsWithItems.forEach((board: any) => {
         // Find ALL relevant status columns to check
@@ -1852,10 +1974,25 @@ async function getApprovalItemsFresh(forceSync: boolean = false) {
             c.title.toLowerCase().includes('owner') ||
             c.type === 'people'
         );
-        const deadlineCol = board.columns?.find((c: any) => {
-            const title = String(c.title || '').toLowerCase();
-            return c.type === 'date' || title.includes('deadline') || title.includes('due');
-        });
+        const deadlineCol = pickBestDeadlineColumn(board.columns || [], board.items?.[0]);
+        const resolveAuxTime = (item: any): { hh: number; mm: number } | null => {
+            const timeCol = (board.columns || []).find((c: any) => {
+                const t = String(c?.title || '').toLowerCase();
+                return t.includes('time') && !t.includes('tracking') && !t.includes('timezone');
+            });
+            if (!timeCol?.id) return null;
+            const tv = item?.column_values?.find((v: any) => v.id === timeCol.id);
+            const raw = String(tv?.text || tv?.display_value || '').trim();
+            const m = raw.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+            if (!m) return null;
+            let hh = Number(m[1]);
+            const mm = Number(m[2]);
+            const ap = m[3].toUpperCase();
+            if (ap === 'PM' && hh < 12) hh += 12;
+            if (ap === 'AM' && hh === 12) hh = 0;
+            if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+            return { hh, mm };
+        };
 
         board.items?.forEach((item: any) => {
             // Check if ANY status column has an "Approval" or "Review" status
@@ -1913,6 +2050,7 @@ async function getApprovalItemsFresh(forceSync: boolean = false) {
                     const deadlineVal = item.column_values.find((cv: any) => cv.id === deadlineCol.id);
                     dueText = String(deadlineVal?.text || deadlineVal?.display_value || '').trim();
                     hasExplicitTime = /(\d{1,2}:\d{2}\s*(AM|PM))/i.test(dueText) || /T\d{2}:\d{2}/i.test(dueText);
+                    const timeMatch = dueText.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
                     if (deadlineVal?.value) {
                         try {
                             const parsed = JSON.parse(deadlineVal.value) as { date?: string; time?: string; from?: string };
@@ -1921,6 +2059,20 @@ async function getApprovalItemsFresh(forceSync: boolean = false) {
                                 const [y, m, d] = base.slice(0, 10).split('-').map(Number);
                                 let hh = 12;
                                 let mm = 0;
+                                if (timeMatch) {
+                                    hh = Number(timeMatch[1]);
+                                    mm = Number(timeMatch[2]);
+                                    const ap = timeMatch[3].toUpperCase();
+                                    if (ap === 'PM' && hh < 12) hh += 12;
+                                    if (ap === 'AM' && hh === 12) hh = 0;
+                                } else {
+                                    const aux = resolveAuxTime(item);
+                                    if (aux) {
+                                        hh = aux.hh;
+                                        mm = aux.mm;
+                                        hasExplicitTime = true;
+                                    }
+                                }
                                 if (parsed.time && /^\d{1,2}:\d{2}/.test(parsed.time)) {
                                     const [h, mi] = parsed.time.split(':').map(Number);
                                     if (!Number.isNaN(h) && !Number.isNaN(mi)) {
