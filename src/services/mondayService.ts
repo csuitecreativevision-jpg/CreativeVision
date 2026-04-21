@@ -623,6 +623,9 @@ export async function getBoardItems(boardId: string, forceSync: boolean = false,
                                 text
                                 value
                                 type
+                                ... on MirrorValue {
+                                    display_value
+                                }
                                 ... on BoardRelationValue {
                                     linked_item_ids
                                 }
@@ -663,6 +666,22 @@ export async function getBoardItems(boardId: string, forceSync: boolean = false,
                             }
                             ... on BoardRelationValue {
                                 linked_item_ids
+                            }
+                        }
+                        subitems {
+                            id
+                            name
+                            column_values {
+                                id
+                                text
+                                value
+                                type
+                                ... on MirrorValue {
+                                    display_value
+                                }
+                                ... on BoardRelationValue {
+                                    linked_item_ids
+                                }
                             }
                         }
                     }
@@ -1466,11 +1485,22 @@ export async function submitProjectAssignment(
     const columns = await getBoardColumns(boardId);
 
     const getColId = (title: string) => columns.find((c: any) => c.title.toLowerCase().includes(title.toLowerCase()))?.id;
+    const findInstructionColumn = () =>
+        columns.find((c: any) => {
+            const t = String(c.title || '').toLowerCase();
+            // Prefer the main assignment notes column; avoid Loom-specific fields.
+            return (t === 'instructions / notes' || t === 'instructions' || t === 'notes') && !t.includes('loom');
+        }) ||
+        columns.find((c: any) => {
+            const t = String(c.title || '').toLowerCase();
+            return (t.includes('instruction') || t.includes('notes')) && !t.includes('loom');
+        });
 
     const statusId = getColId('status') || 'status'; // fallback
     const typeId = getColId('type') || 'type';
     const priceId = getColId('price') || getColId('budget') || 'numbers';
-    const instructionId = getColId('instruction') || getColId('notes') || 'text';
+    const instructionCol = findInstructionColumn();
+    const instructionId = instructionCol?.id || getColId('instruction') || getColId('notes') || 'text';
     const priorityId = getColId('priority');
     const rawVideoId = getColId('raw video') || getColId('video link') || getColId('link');
 
@@ -1480,7 +1510,17 @@ export async function submitProjectAssignment(
     if (data.type) columnValues[typeId] = { label: data.type };
     if (data.price) columnValues[priceId] = data.price;
     if (data.priority && priorityId) columnValues[priorityId] = { label: data.priority };
-    if (data.instructions) columnValues[instructionId] = { text: data.instructions };
+    if (data.instructions && instructionId) {
+        const cleanInstructions = String(data.instructions).trim();
+        if (cleanInstructions) {
+            // Monday expects plain string for `text`, object for long-text style columns.
+            if (instructionCol?.type === 'text') {
+                columnValues[instructionId] = cleanInstructions;
+            } else {
+                columnValues[instructionId] = { text: cleanInstructions };
+            }
+        }
+    }
     if (data.rawVideoLink && rawVideoId) columnValues[rawVideoId] = { url: data.rawVideoLink, text: "Raw Video" };
 
 

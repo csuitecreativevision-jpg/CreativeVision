@@ -1,11 +1,4 @@
-import Swal from 'sweetalert2';
-
-const swalDark = {
-    background: '#131322',
-    color: '#f4f4f5',
-    confirmButtonColor: '#7c3aed',
-    cancelButtonColor: '#52525b'
-};
+import { fireCvSwal } from './swalTheme';
 
 /** Large emoji / icon inside SweetAlert2’s icon ring (replaces default ✓ / i glyph). */
 function swalIconEmoji(emoji: string, sizeRem = 2.5): string {
@@ -53,8 +46,7 @@ export function isWithinDinnerWindow(d: Date): boolean {
 /** Hard block — no override. */
 export async function blockFullTimerClockIn(now: Date): Promise<void> {
     const t = formatTimeLocal(now);
-    await Swal.fire({
-        ...swalDark,
+    await fireCvSwal({
         icon: 'error',
         title: 'Clock in not allowed',
         html: `It's <strong>${t}</strong> right now (real time on this device). Full-time shift is only <strong>4:00 PM – 12:00 AM</strong>.`,
@@ -64,8 +56,7 @@ export async function blockFullTimerClockIn(now: Date): Promise<void> {
 
 export async function blockFullTimerClockOut(now: Date): Promise<void> {
     const t = formatTimeLocal(now);
-    await Swal.fire({
-        ...swalDark,
+    await fireCvSwal({
         icon: 'error',
         title: 'Clock out not allowed',
         html: `It's <strong>${t}</strong>. Full-timers can clock out during <strong>4:00 PM – 12:00 AM</strong>, or before <strong>4:00 AM</strong> after midnight to close out the prior shift.`,
@@ -76,8 +67,7 @@ export async function blockFullTimerClockOut(now: Date): Promise<void> {
 /** During shift: optional confirm when leaving before midnight. */
 export async function confirmFullTimerLeavingDuringShift(now: Date): Promise<boolean> {
     const t = formatTimeLocal(now);
-    const r = await Swal.fire({
-        ...swalDark,
+    const r = await fireCvSwal({
         icon: 'warning',
         title: 'End shift before 12:00 AM?',
         html: `It's <strong>${t}</strong>. Scheduled shift ends at <strong>12:00 AM</strong>. Clock out anyway?`,
@@ -108,8 +98,7 @@ export async function blockFullTimerDinnerOutsideWindow(now: Date): Promise<void
     const t = formatTimeLocal(now);
     const mins = now.getHours() * 60 + now.getMinutes();
     const tooEarly = mins < DINNER_START_MINS;
-    await Swal.fire({
-        ...swalDark,
+    await fireCvSwal({
         icon: 'warning',
         title: tooEarly ? 'Too early for dinner' : 'Dinner window has ended',
         html: tooEarly
@@ -131,8 +120,7 @@ export async function guardFullTimerDinner(now: Date, action: 'out' | 'in'): Pro
 
 /** After starting dinner break — 1-hour meal window begins. */
 export async function swalDinnerOutEatwell(): Promise<void> {
-    await Swal.fire({
-        ...swalDark,
+    await fireCvSwal({
         icon: 'success',
         iconColor: '#fb923c',
         iconHtml: swalIconEmoji('🍳'),
@@ -144,8 +132,7 @@ export async function swalDinnerOutEatwell(): Promise<void> {
 
 /** After dinner in — work timer resumes (shift time continues toward your full block). */
 export async function swalDinnerInResumeShift(): Promise<void> {
-    await Swal.fire({
-        ...swalDark,
+    await fireCvSwal({
         icon: 'info',
         iconColor: '#a78bfa',
         iconHtml: swalIconEmoji('💼'),
@@ -159,8 +146,7 @@ export async function swalDinnerInResumeShift(): Promise<void> {
 export async function swalClockOutGoodbye(displayName: string): Promise<void> {
     const rawFirst = displayName.trim().split(/\s+/)[0] || 'there';
     const first = escapeHtml(rawFirst.slice(0, 48));
-    await Swal.fire({
-        ...swalDark,
+    await fireCvSwal({
         icon: 'success',
         iconColor: '#a78bfa',
         iconHtml: '<span class="cv-swal-bye-hand">👋</span>',
@@ -171,8 +157,7 @@ export async function swalClockOutGoodbye(displayName: string): Promise<void> {
 }
 
 export async function swalActionError(title: string, html: string): Promise<void> {
-    await Swal.fire({
-        ...swalDark,
+    await fireCvSwal({
         icon: 'error',
         title,
         html,

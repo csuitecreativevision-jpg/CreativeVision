@@ -4,6 +4,27 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Thin dark scrollbars (used by AdminPageLayout and overflow panels) */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) rgba(255, 255, 255, 0.04);
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
 /* ===== Concept Design System ===== */
 
 /* ===== Portal Design Tokens (mirrors HomePage aesthetic) ===== */
@@ -605,6 +626,40 @@ select:autofill {
   line-height: 1;
   animation: cv-hand-wave 1.1s ease-in-out infinite;
   transform-origin: 70% 70%;
+}
+
+/* SweetAlert: animated trash icon for destructive confirms */
+@keyframes cv-trash-wiggle {
+
+  0%,
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+
+  20% {
+    transform: rotate(-10deg) scale(1.03);
+  }
+
+  40% {
+    transform: rotate(8deg) scale(1.03);
+  }
+
+  60% {
+    transform: rotate(-6deg);
+  }
+
+  80% {
+    transform: rotate(4deg);
+  }
+}
+
+.cv-swal-trash-can {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.6rem;
+  line-height: 1;
+  animation: cv-trash-wiggle 0.9s ease-in-out infinite;
 }
 
 /* Responsive Design */

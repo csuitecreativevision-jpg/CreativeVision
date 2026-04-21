@@ -5,6 +5,9 @@ import { MessageSquare, X } from 'lucide-react';
 export const AdminChatbot = () => {
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [mounted, setMounted] = useState(false);
+    const [iframeFailed, setIframeFailed] = useState(false);
+    const chatUrl = (import.meta.env.VITE_N8N_CHAT_URL as string | undefined)?.trim();
+    const hasChatUrl = Boolean(chatUrl);
 
     useEffect(() => {
         setMounted(true);
@@ -34,18 +37,42 @@ export const AdminChatbot = () => {
                             <X className="w-5 h-5" />
                         </button>
                     </div>
-                    <iframe
-                        src="https://creativevisionph.app.n8n.cloud/webhook/c6003eb5-9968-4cf2-b5ab-ecb1e16b958a/chat"
-                        className="w-full flex-1 border-none bg-[#1a1b26]"
-                        style={{ colorScheme: 'dark' }}
-                        title="Admin Assistant Chat"
-                    />
+                    {!hasChatUrl ? (
+                        <div className="flex-1 px-5 py-4 text-xs text-white/70 bg-[#1a1b26]">
+                            <p className="font-semibold text-white mb-2">Chatbot not configured</p>
+                            <p>Set <code className="text-violet-300">VITE_N8N_CHAT_URL</code> in your <code className="text-violet-300">.env</code> file and restart the app.</p>
+                        </div>
+                    ) : iframeFailed ? (
+                        <div className="flex-1 px-5 py-4 text-xs text-white/70 bg-[#1a1b26] space-y-2">
+                            <p className="font-semibold text-white">Could not load n8n chat</p>
+                            <p>The URL may be invalid, offline, or blocked from iframe embedding.</p>
+                            <a
+                                href={chatUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex text-violet-300 hover:text-violet-200 underline"
+                            >
+                                Open chatbot in a new tab
+                            </a>
+                        </div>
+                    ) : (
+                        <iframe
+                            src={chatUrl}
+                            className="w-full flex-1 border-none bg-[#1a1b26]"
+                            style={{ colorScheme: 'dark' }}
+                            title="Admin Assistant Chat"
+                            onError={() => setIframeFailed(true)}
+                        />
+                    )}
                 </div>
             )}
 
             {/* Floating Action Button */}
             <button
-                onClick={() => setIsChatOpen(!isChatOpen)}
+                onClick={() => {
+                    setIframeFailed(false);
+                    setIsChatOpen(!isChatOpen);
+                }}
                 className={`h-14 w-14 rounded-full flex items-center justify-center shadow-[0_8px_30px_rgba(139,92,246,0.5)] transition-all duration-300 hover:scale-110 pointer-events-auto
                     ${isChatOpen ? 'bg-white/10 text-white' : 'bg-[#8b5cf6] text-white'}
                 `}

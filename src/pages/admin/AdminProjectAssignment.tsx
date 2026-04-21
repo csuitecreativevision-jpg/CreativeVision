@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { AdminPageLayout } from '../../components/layout/AdminPageLayout';
 import { motion, AnimatePresence } from 'framer-motion';
+import { fireCvSwal } from '../../lib/swalTheme';
 import {
     User,
     Briefcase,
     Check,
-    DollarSign,
     BookOpen,
     Layers,
     Plus,
@@ -19,6 +19,8 @@ import {
     Shield,
     FileText,
     Sparkles,
+    RefreshCw,
+    ExternalLink,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getAllBoards, getBoardColumns, getBoardGroups, submitProjectAssignment } from '../../services/mondayService';
@@ -28,6 +30,51 @@ import { getAllCheckers, Checker } from '../../services/boardsService';
 import { createNotification } from '../../services/notificationService';
 import { supabase } from '../../lib/supabaseClient';
 import { SelectionModal } from '../../components/ui/SelectionModal';
+import {
+    ASSIGN_PROJECT_MONDAY_BOARD_IDS,
+    deadlineToYyyyMmDd,
+    fetchEditorsAvailableForDate,
+} from '../../services/assignProjectMondayIntegration';
+import { DeploymentBoardPanel } from '../../components/admin/DeploymentBoardPanel';
+
+const MONDAY_AVAILABILITY_URL = `https://creative-vision-unit.monday.com/boards/${ASSIGN_PROJECT_MONDAY_BOARD_IDS.availability}/views`;
+
+/** Compact labels for Mon–Sun week strip (matches availability board day columns). */
+const WEEKDAY_PICKER: { label: string; title: string }[] = [
+    { label: 'M', title: 'Monday' },
+    { label: 'T', title: 'Tuesday' },
+    { label: 'W', title: 'Wednesday' },
+    { label: 'TH', title: 'Thursday' },
+    { label: 'F', title: 'Friday' },
+    { label: 'S', title: 'Saturday' },
+    { label: 'Sun', title: 'Sunday' },
+];
+
+function yyyyMmDdLocal(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+function parseLocalYmd(ymd: string): Date {
+    const [y, mo, d] = ymd.split('-').map(Number);
+    return new Date(y, mo - 1, d, 12, 0, 0, 0);
+}
+
+function startOfWeekMondayLocal(d: Date): Date {
+    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0, 0);
+    const dow = x.getDay();
+    const diff = dow === 0 ? -6 : 1 - dow;
+    x.setDate(x.getDate() + diff);
+    return x;
+}
+
+function addDaysLocal(d: Date, n: number): Date {
+    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0, 0);
+    x.setDate(x.getDate() + n);
+    return x;
+}
 
 // ── Field wrapper ────────────────────────────────────────────────────────────
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
@@ -104,6 +151,12 @@ export default function AdminProjectAssignment() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [veProjectBoardId, setVeProjectBoardId] = useState<string | null>(null);
 
+    const [availabilityEditors, setAvailabilityEditors] = useState<string[]>([]);
+    const [availabilityLoading, setAvailabilityLoading] = useState(false);
+    /** Explicit day override (week dots or calendar); empty = use deadline or today. */
+    const [availabilityPickDate, setAvailabilityPickDate] = useState('');
+    const availabilityDateInputRef = useRef<HTMLInputElement>(null);
+
     const initialProjectState = {
         projectName: '', projectStatus: 'Unassigned', projectType: '', client: '',
         price: '', editor: '', checkerName: '', deadline: '', priority: '',
@@ -128,6 +181,43 @@ export default function AdminProjectAssignment() {
             .replace(/[^a-z0-9]+/g, '')
             .trim();
 
+    const normalizeClientName = (value: string) =>
+        value
+            .toLowerCase()
+            .replace(/\(.*?\)/g, '')
+            .replace(/\bclient\b/g, '')
+            .replace(/\bcv\b/g, '')
+            .replace(/[^a-z0-9]+/g, ' ')
+            .trim();
+
+    const resolveClientGroupId = (clientName: string): string | null => {
+        const cleanClient = normalizeClientName(clientName || '');
+        if (!cleanClient) return null;
+
+        // Exact normalized match first.
+        const exact = veBoardGroups.find(g => normalizeClientName(g.title) === cleanClient);
+        if (exact?.id) return exact.id;
+
+        // Then relaxed include match for small title variations.
+        const partial = veBoardGroups.find(g => {
+            const gt = normalizeClientName(g.title);
+            return gt.includes(cleanClient) || cleanClient.includes(gt);
+        });
+        return partial?.id || null;
+    };
+
+    const resolveEditorFromMondayLabel = (label: string) => {
+        const n = normalizePersonName(label);
+        const exact = availableTeam.find(t => normalizePersonName(t.name) === n);
+        if (exact) return exact.name;
+        const partial = availableTeam.find(t => {
+            const tn = normalizePersonName(t.name);
+            return tn.includes(n) || n.includes(tn);
+        });
+        if (partial) return partial.name;
+        return label.trim();
+    };
+
     const activeProject = projects[activeProjectIndex];
 
     const updateCurrentProject = (updates: any) => {
@@ -136,6 +226,15 @@ export default function AdminProjectAssignment() {
             next[activeProjectIndex] = { ...next[activeProjectIndex], ...updates };
             return next;
         });
+    };
+
+    const setEditorFromQuickPick = (label: string) => {
+        const resolved = resolveEditorFromMondayLabel(label);
+        if (isBulkMode && sharedEditor) {
+            setProjects(prev => prev.map(p => ({ ...p, editor: resolved })));
+        } else {
+            updateCurrentProject({ editor: resolved });
+        }
     };
 
     useEffect(() => {
@@ -216,6 +315,74 @@ export default function AdminProjectAssignment() {
         fetchData();
     }, []);
 
+    /** Manual pick wins, then project deadline, then today (always a valid day). */
+    const availabilityQueryDay = useMemo(() => {
+        if (availabilityPickDate && /^\d{4}-\d{2}-\d{2}$/.test(availabilityPickDate)) return availabilityPickDate;
+        const fromDeadline = deadlineToYyyyMmDd(activeProject.deadline);
+        if (fromDeadline) return fromDeadline;
+        return yyyyMmDdLocal(new Date());
+    }, [activeProject.deadline, availabilityPickDate]);
+
+    const availabilityWeekStrip = useMemo(() => {
+        const start = startOfWeekMondayLocal(parseLocalYmd(availabilityQueryDay));
+        return Array.from({ length: 7 }, (_, i) => {
+            const d = addDaysLocal(start, i);
+            return { ymd: yyyyMmDdLocal(d), date: d };
+        });
+    }, [availabilityQueryDay]);
+
+    const todayYmd = yyyyMmDdLocal(new Date());
+
+    const availabilityDayLabel = new Date(`${availabilityQueryDay}T12:00:00`).toLocaleDateString(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+    });
+
+    useEffect(() => {
+        let cancelled = false;
+        const day = availabilityQueryDay;
+        (async () => {
+            setAvailabilityLoading(true);
+            try {
+                const names = await fetchEditorsAvailableForDate(day, false);
+                if (!cancelled) setAvailabilityEditors(names);
+            } catch (e) {
+                console.error('Availability board load failed', e);
+                if (!cancelled) setAvailabilityEditors([]);
+            } finally {
+                if (!cancelled) setAvailabilityLoading(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [availabilityQueryDay]);
+
+    const refreshAvailabilityBoard = async () => {
+        setAvailabilityLoading(true);
+        try {
+            const names = await fetchEditorsAvailableForDate(availabilityQueryDay, true);
+            setAvailabilityEditors(names);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setAvailabilityLoading(false);
+        }
+    };
+
+    const openAvailabilityDatePicker = () => {
+        const el = availabilityDateInputRef.current;
+        if (el && typeof el.showPicker === 'function') {
+            try {
+                el.showPicker();
+                return;
+            } catch {
+                /* Safari / older */
+            }
+        }
+        el?.click();
+    };
+
     const handleSubmit = async () => {
         if (!veProjectBoardId) { alert('Configuration Error: VE Project Board not found.'); return; }
         setIsSubmitting(true);
@@ -223,10 +390,28 @@ export default function AdminProjectAssignment() {
             const validProjects = projects.filter(p => p.projectName.trim() !== '');
             if (validProjects.length === 0) { alert('Please enter at least one project name.'); setIsSubmitting(false); return; }
 
+            const unmappedClients = Array.from(
+                new Set(
+                    validProjects
+                        .map(p => p.client?.trim() || '')
+                        .filter(Boolean)
+                        .filter(c => !resolveClientGroupId(c))
+                )
+            );
+            if (unmappedClients.length > 0) {
+                await fireCvSwal({
+                    icon: 'error',
+                    title: 'Client mapping issue',
+                    html: `Could not match these client group(s) in Monday:<br/><br/><b>${unmappedClients.map(c => c.replace(/</g, '&lt;')).join('<br/>')}</b><br/><br/>Please select the exact client from the list before assigning.`,
+                    confirmButtonText: 'OK',
+                });
+                setIsSubmitting(false);
+                return;
+            }
+
             for (const project of validProjects) {
-                const targetGroup = veBoardGroups.find(g => g.title.toLowerCase() === project.client.toLowerCase());
-                let groupId = targetGroup?.id;
-                if (!groupId) groupId = veBoardGroups.length > 0 ? veBoardGroups[0].id : (() => { throw new Error('No groups found'); })();
+                const groupId = resolveClientGroupId(project.client);
+                if (!groupId) throw new Error(`No Monday group match for client: ${project.client}`);
 
                 await submitProjectAssignment(veProjectBoardId, groupId, {
                     itemName: project.projectName, status: project.projectStatus, type: project.projectType,
@@ -270,7 +455,12 @@ export default function AdminProjectAssignment() {
                 }
             }
 
-            alert(`Successfully assigned ${validProjects.length} project(s)!`);
+            await fireCvSwal({
+                icon: 'success',
+                title: 'Project assigned',
+                text: `Successfully assigned ${validProjects.length} project(s)!`,
+                confirmButtonText: 'OK',
+            });
             navigate('/admin-portal/management');
         } catch (error) {
             console.error(error);
@@ -308,7 +498,9 @@ export default function AdminProjectAssignment() {
             title="Assign Project"
             subtitle="Configure and assign new projects to your team"
         >
-            <div className="max-w-2xl mx-auto">
+            <div className="w-full max-w-[90rem] mx-auto">
+                <div className="flex flex-col lg:flex-row lg:items-start gap-8 lg:gap-10">
+                    <div className="flex-1 min-w-0 w-full max-w-2xl mx-auto lg:mx-0">
 
                 {/* ── Step indicator ── */}
                 <div className="flex items-center justify-center gap-0 mb-10">
@@ -490,6 +682,43 @@ export default function AdminProjectAssignment() {
                                 <SelectPill label="Team Member (Editor)" value={activeProject.editor} placeholder="Select editor…"
                                     color="#3b82f6" icon={<User className="w-4 h-4" />} onClick={() => setActiveModal('team')} />
 
+                                {availabilityEditors.length > 0 && (
+                                    <div className="rounded-2xl border border-white/[0.07] bg-cyan-500/[0.04] p-4 space-y-2">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <p className="text-[10px] font-bold uppercase tracking-wider text-cyan-500/70">Available — {availabilityDayLabel}</p>
+                                            <button
+                                                type="button"
+                                                onClick={refreshAvailabilityBoard}
+                                                disabled={availabilityLoading}
+                                                className="p-1.5 rounded-lg text-cyan-400/50 hover:text-cyan-300 transition-colors disabled:opacity-40"
+                                                title="Refresh availability"
+                                            >
+                                                <RefreshCw className={`w-3 h-3 ${availabilityLoading ? 'animate-spin' : ''}`} />
+                                            </button>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {availabilityEditors.map(name => {
+                                                const resolved = resolveEditorFromMondayLabel(name);
+                                                const active = activeProject.editor === resolved;
+                                                return (
+                                                    <button
+                                                        key={name}
+                                                        type="button"
+                                                        onClick={() => setEditorFromQuickPick(name)}
+                                                        className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${
+                                                            active
+                                                                ? 'border-cyan-400/50 bg-cyan-500/25 text-white'
+                                                                : 'border-cyan-500/20 bg-cyan-500/10 text-cyan-200/90 hover:bg-cyan-500/20'
+                                                        }`}
+                                                    >
+                                                        {resolved}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="flex items-center justify-between">
                                     <SelectPill label="Checker of the Day" value={activeProject.checkerName} placeholder="Select checker…"
                                         color="#f59e0b" icon={<Shield className="w-4 h-4" />} onClick={() => setActiveModal('checker')} />
@@ -578,6 +807,115 @@ export default function AdminProjectAssignment() {
                             )}
                         </button>
                     </div>
+                </div>
+                    </div>
+
+                    <aside
+                        aria-label="Deployment board and Monday.com editor availability"
+                        className="w-full lg:w-[min(100%,26rem)] xl:w-[28rem] flex-shrink-0 space-y-4 lg:sticky lg:top-6 lg:self-start pb-8 lg:pb-0"
+                    >
+                        <DeploymentBoardPanel variant="sidebar" />
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-white/25 px-0.5 hidden lg:block">Live from Monday</p>
+                        <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4 space-y-3">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <div className="w-8 h-8 rounded-lg bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center flex-shrink-0">
+                                        <Calendar className="w-4 h-4 text-cyan-400" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h4 className="text-[12px] font-bold text-white/85">Editor availability</h4>
+                                        <p className="text-[10px] text-white/35 leading-snug">
+                                            Defaults to today; uses project deadline when set. Tap a day this week or the calendar for other dates.{' '}
+                                            <a href={MONDAY_AVAILABILITY_URL} target="_blank" rel="noreferrer" className="text-cyan-400/90 hover:underline inline-flex items-center gap-0.5">
+                                                Open board <ExternalLink className="w-2.5 h-2.5 inline opacity-70" />
+                                            </a>
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={refreshAvailabilityBoard}
+                                    disabled={availabilityLoading}
+                                    className="flex-shrink-0 p-2 rounded-lg border border-white/[0.08] text-white/40 hover:text-white hover:border-white/20 transition-colors disabled:opacity-40"
+                                    title="Refresh from Monday"
+                                >
+                                    <RefreshCw className={`w-3.5 h-3.5 ${availabilityLoading ? 'animate-spin' : ''}`} />
+                                </button>
+                            </div>
+
+                            <input
+                                ref={availabilityDateInputRef}
+                                type="date"
+                                className="sr-only"
+                                tabIndex={-1}
+                                aria-hidden
+                                value={availabilityPickDate || availabilityQueryDay}
+                                onChange={e => setAvailabilityPickDate(e.target.value)}
+                            />
+
+                            <div className="flex flex-wrap items-center gap-1">
+                                {availabilityWeekStrip.map(({ ymd }, i) => {
+                                    const meta = WEEKDAY_PICKER[i];
+                                    const selected = ymd === availabilityQueryDay;
+                                    const isToday = ymd === todayYmd;
+                                    const labelSize =
+                                        meta.label.length >= 3 ? 'text-[7px]' : meta.label.length === 2 ? 'text-[8px]' : 'text-[10px]';
+                                    return (
+                                        <button
+                                            key={ymd}
+                                            type="button"
+                                            title={`${meta.title} — ${ymd}`}
+                                            onClick={() => setAvailabilityPickDate(ymd)}
+                                            className={`h-8 min-w-[2rem] px-1 rounded-full border font-bold transition-colors flex items-center justify-center ${labelSize} ${
+                                                selected
+                                                    ? 'border-cyan-400/60 bg-cyan-500/25 text-white shadow-[0_0_0_1px_rgba(34,211,238,0.35)]'
+                                                    : isToday
+                                                      ? 'border-white/25 bg-white/[0.06] text-white/90'
+                                                      : 'border-white/[0.1] bg-white/[0.03] text-white/55 hover:bg-white/[0.07] hover:text-white/80'
+                                            }`}
+                                        >
+                                            {meta.label}
+                                        </button>
+                                    );
+                                })}
+                                <button
+                                    type="button"
+                                    onClick={openAvailabilityDatePicker}
+                                    className="h-8 w-8 rounded-full border border-white/[0.12] bg-white/[0.04] text-cyan-400/90 hover:bg-cyan-500/15 hover:border-cyan-500/35 flex items-center justify-center flex-shrink-0 transition-colors"
+                                    title="Choose any date"
+                                    aria-label="Open calendar to choose a date"
+                                >
+                                    <Calendar className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+
+                            {availabilityLoading && availabilityEditors.length === 0 ? (
+                                <div className="flex items-center gap-2 text-[11px] text-white/35 py-2">
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading {availabilityDayLabel}…
+                                </div>
+                            ) : availabilityEditors.length === 0 ? (
+                                <p className="text-[11px] text-white/30 py-1">
+                                    No editors listed for <span className="text-white/50">{availabilityDayLabel}</span>. Check the board and refresh.
+                                </p>
+                            ) : (
+                                <div className="space-y-2">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-cyan-500/60">Available — {availabilityDayLabel}</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {availabilityEditors.map(name => (
+                                            <button
+                                                key={name}
+                                                type="button"
+                                                onClick={() => setEditorFromQuickPick(name)}
+                                                className="px-3 py-1.5 rounded-lg text-[11px] font-semibold border border-cyan-500/25 bg-cyan-500/10 text-cyan-200/90 hover:bg-cyan-500/20 transition-colors"
+                                            >
+                                                {resolveEditorFromMondayLabel(name)}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </aside>
                 </div>
             </div>
 
