@@ -14,6 +14,8 @@ import {
     Loader2,
     Link,
     Calendar,
+    ChevronLeft,
+    ChevronDown,
     ChevronRight,
     Users,
     Shield,
@@ -74,6 +76,40 @@ function addDaysLocal(d: Date, n: number): Date {
     const x = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0, 0);
     x.setDate(x.getDate() + n);
     return x;
+}
+
+function to12HourParts(hours24: number): { hour12: string; ampm: 'AM' | 'PM' } {
+    const ampm: 'AM' | 'PM' = hours24 >= 12 ? 'PM' : 'AM';
+    let hour12 = hours24 % 12;
+    if (hour12 === 0) hour12 = 12;
+    return { hour12: String(hour12).padStart(2, '0'), ampm };
+}
+
+function to24Hour(hour12: string, ampm: 'AM' | 'PM'): number {
+    let h = Number(hour12);
+    if (Number.isNaN(h) || h < 1 || h > 12) h = 12;
+    if (ampm === 'AM') return h === 12 ? 0 : h;
+    return h === 12 ? 12 : h + 12;
+}
+
+function parseDeadlineLocal(deadline: string): { ymd: string; hour12: string; minute: string; ampm: 'AM' | 'PM' } {
+    if (deadline && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(deadline)) {
+        const ymd = deadline.slice(0, 10);
+        const hh = Number(deadline.slice(11, 13));
+        const mm = deadline.slice(14, 16);
+        const parts = to12HourParts(hh);
+        return { ymd, hour12: parts.hour12, minute: mm, ampm: parts.ampm };
+    }
+    const now = new Date();
+    const ymd = yyyyMmDdLocal(now);
+    const parts = to12HourParts(now.getHours());
+    return { ymd, hour12: parts.hour12, minute: String(now.getMinutes()).padStart(2, '0'), ampm: parts.ampm };
+}
+
+function buildDeadlineLocal(ymd: string, hour12: string, minute: string, ampm: 'AM' | 'PM'): string {
+    const hh24 = String(to24Hour(hour12, ampm)).padStart(2, '0');
+    const mm = String(Math.max(0, Math.min(59, Number(minute) || 0))).padStart(2, '0');
+    return `${ymd}T${hh24}:${mm}`;
 }
 
 // ── Field wrapper ────────────────────────────────────────────────────────────
@@ -155,7 +191,22 @@ export default function AdminProjectAssignment() {
     const [availabilityLoading, setAvailabilityLoading] = useState(false);
     /** Explicit day override (week dots or calendar); empty = use deadline or today. */
     const [availabilityPickDate, setAvailabilityPickDate] = useState('');
-    const availabilityDateInputRef = useRef<HTMLInputElement>(null);
+    const [isAvailabilityCalendarOpen, setIsAvailabilityCalendarOpen] = useState(false);
+    const [availabilityCalendarMonth, setAvailabilityCalendarMonth] = useState<Date>(() => {
+        const t = new Date();
+        return new Date(t.getFullYear(), t.getMonth(), 1, 12, 0, 0, 0);
+    });
+    const availabilityCalendarRef = useRef<HTMLDivElement>(null);
+    const [isDeadlinePickerOpen, setIsDeadlinePickerOpen] = useState(false);
+    const [deadlinePickerMonth, setDeadlinePickerMonth] = useState<Date>(() => {
+        const t = new Date();
+        return new Date(t.getFullYear(), t.getMonth(), 1, 12, 0, 0, 0);
+    });
+    const [deadlinePickerYmd, setDeadlinePickerYmd] = useState(yyyyMmDdLocal(new Date()));
+    const [deadlinePickerHour, setDeadlinePickerHour] = useState('12');
+    const [deadlinePickerMinute, setDeadlinePickerMinute] = useState('00');
+    const [deadlinePickerAmPm, setDeadlinePickerAmPm] = useState<'AM' | 'PM'>('PM');
+    const deadlinePickerRef = useRef<HTMLDivElement>(null);
 
     const initialProjectState = {
         projectName: '', projectStatus: 'Unassigned', projectType: '', client: '',
@@ -371,17 +422,51 @@ export default function AdminProjectAssignment() {
     };
 
     const openAvailabilityDatePicker = () => {
-        const el = availabilityDateInputRef.current;
-        if (el && typeof el.showPicker === 'function') {
-            try {
-                el.showPicker();
-                return;
-            } catch {
-                /* Safari / older */
-            }
-        }
-        el?.click();
+        const anchor = parseLocalYmd(availabilityPickDate || availabilityQueryDay);
+        setAvailabilityCalendarMonth(new Date(anchor.getFullYear(), anchor.getMonth(), 1, 12, 0, 0, 0));
+        setIsAvailabilityCalendarOpen(prev => !prev);
     };
+
+    const openDeadlinePicker = () => {
+        const parsed = parseDeadlineLocal(activeProject.deadline || '');
+        setDeadlinePickerYmd(parsed.ymd);
+        setDeadlinePickerHour(parsed.hour12);
+        setDeadlinePickerMinute(parsed.minute);
+        setDeadlinePickerAmPm(parsed.ampm);
+        const d = parseLocalYmd(parsed.ymd);
+        setDeadlinePickerMonth(new Date(d.getFullYear(), d.getMonth(), 1, 12, 0, 0, 0));
+        setIsDeadlinePickerOpen(prev => !prev);
+    };
+
+    const applyDeadlinePicker = () => {
+        const value = buildDeadlineLocal(deadlinePickerYmd, deadlinePickerHour, deadlinePickerMinute, deadlinePickerAmPm);
+        updateCurrentProject({ deadline: value });
+        setIsDeadlinePickerOpen(false);
+    };
+
+    useEffect(() => {
+        if (!isAvailabilityCalendarOpen) return;
+        const onClickOutside = (e: MouseEvent) => {
+            const target = e.target as Node;
+            if (!availabilityCalendarRef.current?.contains(target)) {
+                setIsAvailabilityCalendarOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', onClickOutside);
+        return () => document.removeEventListener('mousedown', onClickOutside);
+    }, [isAvailabilityCalendarOpen]);
+
+    useEffect(() => {
+        if (!isDeadlinePickerOpen) return;
+        const onClickOutside = (e: MouseEvent) => {
+            const target = e.target as Node;
+            if (!deadlinePickerRef.current?.contains(target)) {
+                setIsDeadlinePickerOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', onClickOutside);
+        return () => document.removeEventListener('mousedown', onClickOutside);
+    }, [isDeadlinePickerOpen]);
 
     const handleSubmit = async () => {
         if (!veProjectBoardId) { alert('Configuration Error: VE Project Board not found.'); return; }
@@ -578,7 +663,7 @@ export default function AdminProjectAssignment() {
                 )}
 
                 {/* ── Step content ── */}
-                <div className="bg-white/[0.018] border border-white/[0.06] rounded-2xl overflow-hidden">
+                <div className="bg-white/[0.018] border border-white/[0.06] rounded-2xl overflow-visible">
                     <AnimatePresence mode="wait">
 
                         {/* Step 1 — Project Details */}
@@ -599,9 +684,174 @@ export default function AdminProjectAssignment() {
                                     <Input label="Project Name" type="text" value={activeProject.projectName}
                                         onChange={e => updateCurrentProject({ projectName: e.target.value })}
                                         placeholder="e.g. Nike Q1 Commercial" />
-                                    <Input label="Deadline" type="datetime-local" value={activeProject.deadline}
-                                        onChange={e => updateCurrentProject({ deadline: e.target.value })}
-                                        className="[&::-webkit-calendar-picker-indicator]:invert" />
+                                    <div className="space-y-2 relative" ref={deadlinePickerRef}>
+                                        <label className="text-[11px] font-bold uppercase tracking-widest text-white/30">Deadline</label>
+                                        <button
+                                            type="button"
+                                            onClick={openDeadlinePicker}
+                                            className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl px-4 py-3 text-sm text-left text-white hover:border-violet-500/50 transition-colors flex items-center justify-between"
+                                        >
+                                            <span className={activeProject.deadline ? 'text-white' : 'text-white/25'}>
+                                                {activeProject.deadline
+                                                    ? new Date(activeProject.deadline).toLocaleString(undefined, { month: '2-digit', day: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+                                                    : 'mm/dd/yyyy --:-- --'}
+                                            </span>
+                                            <Calendar className="w-4 h-4 text-white/55" />
+                                        </button>
+
+                                        {isDeadlinePickerOpen && (
+                                            <div className="absolute z-[90] mt-2 w-[20rem] max-w-[calc(100vw-2rem)] rounded-xl border border-white/[0.12] bg-[#121425] p-2.5 space-y-2 shadow-2xl">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const t = new Date();
+                                                            const ymd = yyyyMmDdLocal(t);
+                                                            setDeadlinePickerYmd(ymd);
+                                                            const p = to12HourParts(t.getHours());
+                                                            setDeadlinePickerHour(p.hour12);
+                                                            setDeadlinePickerMinute(String(t.getMinutes()).padStart(2, '0'));
+                                                            setDeadlinePickerAmPm(p.ampm);
+                                                            setDeadlinePickerMonth(new Date(t.getFullYear(), t.getMonth(), 1, 12, 0, 0, 0));
+                                                        }}
+                                                        className="px-2 py-1 rounded-md border border-white/[0.14] bg-white/[0.03] text-[10px] font-bold text-white/75 hover:text-white hover:bg-white/[0.07] transition-colors"
+                                                    >
+                                                        Today
+                                                    </button>
+                                                    <div className="text-[10px] text-white/40 font-semibold">
+                                                        {deadlinePickerYmd}
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-1.5">
+                                                    <div className="flex items-center gap-1 min-w-0">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setDeadlinePickerMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1, 12, 0, 0, 0))}
+                                                            className="h-6 w-6 rounded-md border border-white/[0.12] bg-white/[0.02] text-white/70 hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-colors"
+                                                        >
+                                                            <ChevronLeft className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setDeadlinePickerMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1, 12, 0, 0, 0))}
+                                                            className="h-6 w-6 rounded-md border border-white/[0.12] bg-white/[0.02] text-white/70 hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-colors"
+                                                        >
+                                                            <ChevronRight className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <div className="text-[11px] font-bold text-white/85 tracking-wide ml-1.5 leading-tight">
+                                                            {deadlinePickerMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+                                                        </div>
+                                                    </div>
+                                                    <div className="h-7 rounded-md border border-white/[0.12] bg-white/[0.03] px-1.5 flex items-center gap-1">
+                                                        <input
+                                                            type="text"
+                                                            inputMode="numeric"
+                                                            maxLength={2}
+                                                            value={deadlinePickerHour}
+                                                            onChange={(e) => {
+                                                                const next = e.target.value.replace(/\D/g, '').slice(0, 2);
+                                                                if (next === '') {
+                                                                    setDeadlinePickerHour('');
+                                                                    return;
+                                                                }
+                                                                const n = Number(next);
+                                                                if (Number.isNaN(n)) return;
+                                                                setDeadlinePickerHour(String(Math.max(1, Math.min(12, n))).padStart(2, '0'));
+                                                            }}
+                                                            onBlur={() => {
+                                                                const n = Number(deadlinePickerHour) || 12;
+                                                                setDeadlinePickerHour(String(Math.max(1, Math.min(12, n))).padStart(2, '0'));
+                                                            }}
+                                                            className="w-8 bg-transparent text-center text-[11px] font-semibold text-white outline-none"
+                                                            aria-label="Hour"
+                                                        />
+                                                    </div>
+                                                    <div className="h-7 rounded-md border border-white/[0.12] bg-white/[0.03] px-1.5 flex items-center gap-1">
+                                                        <input
+                                                            type="text"
+                                                            inputMode="numeric"
+                                                            maxLength={2}
+                                                            value={deadlinePickerMinute}
+                                                            onChange={(e) => {
+                                                                const next = e.target.value.replace(/\D/g, '').slice(0, 2);
+                                                                if (next === '') {
+                                                                    setDeadlinePickerMinute('');
+                                                                    return;
+                                                                }
+                                                                const n = Number(next);
+                                                                if (Number.isNaN(n)) return;
+                                                                setDeadlinePickerMinute(String(Math.max(0, Math.min(59, n))).padStart(2, '0'));
+                                                            }}
+                                                            onBlur={() => {
+                                                                const n = Number(deadlinePickerMinute) || 0;
+                                                                setDeadlinePickerMinute(String(Math.max(0, Math.min(59, n))).padStart(2, '0'));
+                                                            }}
+                                                            className="w-8 bg-transparent text-center text-[11px] font-semibold text-white outline-none"
+                                                            aria-label="Minute"
+                                                        />
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setDeadlinePickerAmPm(prev => (prev === 'AM' ? 'PM' : 'AM'))}
+                                                        className="h-7 min-w-[2.75rem] rounded-md border border-white/[0.12] bg-white/[0.03] text-white text-[11px] font-semibold hover:bg-white/[0.08] transition-colors"
+                                                    >
+                                                        {deadlinePickerAmPm}
+                                                    </button>
+                                                </div>
+
+                                                <div className="grid grid-cols-7 gap-1">
+                                                    {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
+                                                        <div key={d} className="h-5 flex items-center justify-center text-[10px] font-bold text-white/35">{d}</div>
+                                                    ))}
+                                                    {(() => {
+                                                        const first = new Date(deadlinePickerMonth.getFullYear(), deadlinePickerMonth.getMonth(), 1, 12, 0, 0, 0);
+                                                        const startIdx = first.getDay();
+                                                        const gridStart = addDaysLocal(first, -startIdx);
+                                                        return Array.from({ length: 42 }, (_, idx) => {
+                                                            const d = addDaysLocal(gridStart, idx);
+                                                            const ymd = yyyyMmDdLocal(d);
+                                                            const inMonth = d.getMonth() === deadlinePickerMonth.getMonth();
+                                                            const isSelected = ymd === deadlinePickerYmd;
+                                                            return (
+                                                                <button
+                                                                    key={ymd}
+                                                                    type="button"
+                                                                    onClick={() => setDeadlinePickerYmd(ymd)}
+                                                                    className={`h-7 rounded-md text-[11px] font-semibold border transition-colors ${
+                                                                        isSelected
+                                                                            ? 'border-violet-400/70 bg-violet-500/25 text-white'
+                                                                            : inMonth
+                                                                                ? 'border-white/[0.08] bg-white/[0.02] text-white/65 hover:bg-white/[0.08] hover:text-white'
+                                                                                : 'border-transparent text-white/20 hover:text-white/40'
+                                                                    }`}
+                                                                >
+                                                                    {d.getDate()}
+                                                                </button>
+                                                            );
+                                                        });
+                                                    })()}
+                                                </div>
+
+                                                <div className="flex justify-end gap-1.5 pt-0.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIsDeadlinePickerOpen(false)}
+                                                        className="px-2.5 py-1.5 rounded-md text-[11px] border border-white/[0.12] text-white/70 hover:text-white hover:bg-white/[0.06]"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={applyDeadlinePicker}
+                                                        className="px-2.5 py-1.5 rounded-md text-[11px] font-semibold bg-violet-600 hover:bg-violet-500 text-white"
+                                                    >
+                                                        Apply
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <Field label="Raw Video Link">
@@ -843,16 +1093,6 @@ export default function AdminProjectAssignment() {
                                 </button>
                             </div>
 
-                            <input
-                                ref={availabilityDateInputRef}
-                                type="date"
-                                className="sr-only"
-                                tabIndex={-1}
-                                aria-hidden
-                                value={availabilityPickDate || availabilityQueryDay}
-                                onChange={e => setAvailabilityPickDate(e.target.value)}
-                            />
-
                             <div className="flex flex-wrap items-center gap-1">
                                 {availabilityWeekStrip.map(({ ymd }, i) => {
                                     const meta = WEEKDAY_PICKER[i];
@@ -888,6 +1128,98 @@ export default function AdminProjectAssignment() {
                                     <Calendar className="w-3.5 h-3.5" />
                                 </button>
                             </div>
+
+                            {isAvailabilityCalendarOpen && (
+                                <div ref={availabilityCalendarRef} className="rounded-2xl border border-white/[0.12] bg-[#121425] p-3 space-y-3 shadow-2xl">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setAvailabilityPickDate(todayYmd)}
+                                            className="px-2.5 py-1 rounded-lg border border-white/[0.14] bg-white/[0.03] text-[10px] font-bold text-white/75 hover:text-white hover:bg-white/[0.07] transition-colors"
+                                        >
+                                            Today
+                                        </button>
+                                        <div className="text-[10px] text-white/40 font-semibold">{availabilityDayLabel}</div>
+                                    </div>
+
+                                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => setAvailabilityCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1, 12, 0, 0, 0))}
+                                                className="h-7 w-7 rounded-lg border border-white/[0.12] bg-white/[0.02] text-white/70 hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-colors"
+                                                aria-label="Previous month"
+                                            >
+                                                <ChevronLeft className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setAvailabilityCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1, 12, 0, 0, 0))}
+                                                className="h-7 w-7 rounded-lg border border-white/[0.12] bg-white/[0.02] text-white/70 hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-colors"
+                                                aria-label="Next month"
+                                            >
+                                                <ChevronRight className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                        <div className="justify-self-center text-xs font-bold text-white/85 tracking-wide">
+                                            {availabilityCalendarMonth.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}
+                                        </div>
+                                        <div className="justify-self-end">
+                                            <span className="inline-flex items-center gap-1 text-[10px] text-white/40">
+                                                Pick day <ChevronDown className="w-3 h-3" />
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-7 gap-1">
+                                        {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(d => (
+                                            <div key={d} className="h-6 flex items-center justify-center text-[10px] font-bold text-white/35">{d}</div>
+                                        ))}
+                                        {(() => {
+                                            const monthStart = new Date(
+                                                availabilityCalendarMonth.getFullYear(),
+                                                availabilityCalendarMonth.getMonth(),
+                                                1,
+                                                12,
+                                                0,
+                                                0,
+                                                0
+                                            );
+                                            const dow = monthStart.getDay();
+                                            const mondayIndex = dow === 0 ? 6 : dow - 1;
+                                            const gridStart = addDaysLocal(monthStart, -mondayIndex);
+                                            return Array.from({ length: 42 }, (_, idx) => {
+                                                const d = addDaysLocal(gridStart, idx);
+                                                const ymd = yyyyMmDdLocal(d);
+                                                const inMonth = d.getMonth() === availabilityCalendarMonth.getMonth();
+                                                const isSelected = ymd === availabilityQueryDay;
+                                                const isToday = ymd === todayYmd;
+                                                return (
+                                                    <button
+                                                        key={ymd}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setAvailabilityPickDate(ymd);
+                                                            setIsAvailabilityCalendarOpen(false);
+                                                        }}
+                                                        className={`h-8 rounded-lg text-[11px] font-semibold border transition-colors ${
+                                                            isSelected
+                                                                ? 'border-cyan-400/70 bg-cyan-500/25 text-white'
+                                                                : isToday
+                                                                  ? 'border-white/30 bg-white/[0.08] text-white/90'
+                                                                  : inMonth
+                                                                    ? 'border-white/[0.08] bg-white/[0.02] text-white/65 hover:bg-white/[0.08] hover:text-white'
+                                                                    : 'border-transparent text-white/20 hover:text-white/40'
+                                                        }`}
+                                                    >
+                                                        {d.getDate()}
+                                                    </button>
+                                                );
+                                            });
+                                        })()}
+                                    </div>
+                                </div>
+                            )}
 
                             {availabilityLoading && availabilityEditors.length === 0 ? (
                                 <div className="flex items-center gap-2 text-[11px] text-white/35 py-2">
