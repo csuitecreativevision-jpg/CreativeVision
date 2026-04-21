@@ -1735,6 +1735,7 @@ export async function getDueTodayItems(forceSync: boolean = false) {
             board.items?.forEach((item: any) => {
                 const deadlineVal = item.column_values?.find((cv: any) => cv.id === deadlineCol.id);
                 const dueText = String(deadlineVal?.text || deadlineVal?.display_value || '').trim();
+                let hasExplicitTime = /(\d{1,2}:\d{2}\s*(AM|PM))/i.test(dueText) || /T\d{2}:\d{2}/i.test(dueText);
                 let dueDate: Date | null = null;
 
                 if (deadlineVal?.value) {
@@ -1750,6 +1751,7 @@ export async function getDueTodayItems(forceSync: boolean = false) {
                                 if (!Number.isNaN(h) && !Number.isNaN(mi)) {
                                     hh = h;
                                     mm = mi;
+                                    hasExplicitTime = true;
                                 }
                             }
                             dueDate = new Date(y, m - 1, d, hh, mm, 0, 0);
@@ -1800,7 +1802,9 @@ export async function getDueTodayItems(forceSync: boolean = false) {
                     editor: editorName,
                     progressStatus,
                     dueAt: dueDate.toISOString(),
-                    dueText: dueText || dueDate.toLocaleString(),
+                    dueText: dueText || dueDate.toLocaleString(undefined, hasExplicitTime
+                        ? { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }
+                        : { month: 'numeric', day: 'numeric', year: 'numeric' }),
                 });
             });
         });
@@ -1904,9 +1908,11 @@ async function getApprovalItemsFresh(forceSync: boolean = false) {
 
                 let dueAt: string | null = null;
                 let dueText: string = '';
+                let hasExplicitTime = false;
                 if (deadlineCol?.id) {
                     const deadlineVal = item.column_values.find((cv: any) => cv.id === deadlineCol.id);
                     dueText = String(deadlineVal?.text || deadlineVal?.display_value || '').trim();
+                    hasExplicitTime = /(\d{1,2}:\d{2}\s*(AM|PM))/i.test(dueText) || /T\d{2}:\d{2}/i.test(dueText);
                     if (deadlineVal?.value) {
                         try {
                             const parsed = JSON.parse(deadlineVal.value) as { date?: string; time?: string; from?: string };
@@ -1920,6 +1926,7 @@ async function getApprovalItemsFresh(forceSync: boolean = false) {
                                     if (!Number.isNaN(h) && !Number.isNaN(mi)) {
                                         hh = h;
                                         mm = mi;
+                                        hasExplicitTime = true;
                                     }
                                 }
                                 dueAt = new Date(y, m - 1, d, hh, mm, 0, 0).toISOString();
@@ -1951,7 +1958,9 @@ async function getApprovalItemsFresh(forceSync: boolean = false) {
                     createdAt: item.created_at,
                     group: item.group,
                     dueAt,
-                    dueText,
+                    dueText: dueText || (dueAt ? new Date(dueAt).toLocaleString(undefined, hasExplicitTime
+                        ? { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }
+                        : { month: 'numeric', day: 'numeric', year: 'numeric' }) : ''),
                 });
             }
         });
