@@ -1703,6 +1703,113 @@ export async function getApprovalItems(forceSync: boolean = false) {
     }, true, forceSync);
 }
 
+export async function getDueTodayItems(forceSync: boolean = false) {
+    return getCachedOrFetch('due_today_items', async () => {
+        const allWorkspaceBoards = await getWorkspaceBoards(forceSync);
+        const workspaceBoards = allWorkspaceBoards.filter((b: any) =>
+            b.name.toLowerCase().includes('- workspace')
+        );
+        const boardIds = workspaceBoards.map((b: any) => b.id);
+        const boardsWithItems = await getMultipleBoardItems(boardIds, forceSync);
+
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+        const dueItems: any[] = [];
+
+        boardsWithItems.forEach((board: any) => {
+            const statusCol = board.columns?.find((c: any) => {
+                const title = String(c.title || '').toLowerCase();
+                return title.includes('status') || title.includes('phase') || title.includes('stage') || c.type === 'status' || c.type === 'color';
+            });
+            const editorCol = board.columns?.find((c: any) => {
+                const title = String(c.title || '').toLowerCase();
+                return title.includes('editor') || title.includes('owner') || c.type === 'people';
+            });
+            const deadlineCol = board.columns?.find((c: any) => {
+                const title = String(c.title || '').toLowerCase();
+                return c.type === 'date' || title.includes('deadline') || title.includes('due');
+            });
+            if (!deadlineCol?.id) return;
+
+            board.items?.forEach((item: any) => {
+                const deadlineVal = item.column_values?.find((cv: any) => cv.id === deadlineCol.id);
+                const dueText = String(deadlineVal?.text || deadlineVal?.display_value || '').trim();
+                let dueDate: Date | null = null;
+
+                if (deadlineVal?.value) {
+                    try {
+                        const parsed = JSON.parse(deadlineVal.value) as { date?: string; time?: string; from?: string };
+                        const base = parsed.date || parsed.from || '';
+                        if (/^\d{4}-\d{2}-\d{2}/.test(base)) {
+                            const [y, m, d] = base.slice(0, 10).split('-').map(Number);
+                            let hh = 12;
+                            let mm = 0;
+                            if (parsed.time && /^\d{1,2}:\d{2}/.test(parsed.time)) {
+                                const [h, mi] = parsed.time.split(':').map(Number);
+                                if (!Number.isNaN(h) && !Number.isNaN(mi)) {
+                                    hh = h;
+                                    mm = mi;
+                                }
+                            }
+                            dueDate = new Date(y, m - 1, d, hh, mm, 0, 0);
+                        }
+                    } catch {
+                        /* ignore */
+                    }
+                }
+
+                if (!dueDate && dueText) {
+                    const iso = dueText.match(/\d{4}-\d{2}-\d{2}/)?.[0];
+                    if (iso) {
+                        const [y, m, d] = iso.split('-').map(Number);
+                        dueDate = new Date(y, m - 1, d, 12, 0, 0, 0);
+                    } else {
+                        const withYear = /\b[A-Za-z]{3,9}\s+\d{1,2}\b/.test(dueText)
+                            ? `${dueText}, ${now.getFullYear()}`
+                            : dueText;
+                        const parsedTs = Date.parse(withYear);
+                        if (!Number.isNaN(parsedTs)) dueDate = new Date(parsedTs);
+                    }
+                }
+
+                if (!dueDate || Number.isNaN(dueDate.getTime()) || dueDate < start || dueDate >= end) return;
+
+                let editorName = 'Unknown';
+                if (editorCol) {
+                    const editorVal = item.column_values?.find((cv: any) => cv.id === editorCol.id);
+                    const rawEditor = editorVal?.display_value || editorVal?.text;
+                    if (rawEditor) editorName = String(rawEditor).split(',')[0].trim();
+                }
+                if (editorName === 'Unknown') {
+                    editorName = board.name
+                        .replace(/- Workspace/gi, '')
+                        .replace(/\(c-w-[\w-]+\)/gi, '')
+                        .replace(/\((Active|On Hold|Inactive|Done)\)/gi, '')
+                        .trim();
+                }
+
+                const statusVal = statusCol ? item.column_values?.find((cv: any) => cv.id === statusCol.id) : null;
+                const progressStatus = String(statusVal?.text || statusVal?.display_value || 'No status').trim();
+
+                dueItems.push({
+                    id: item.id,
+                    name: item.name,
+                    boardId: board.id,
+                    boardName: board.name,
+                    editor: editorName,
+                    progressStatus,
+                    dueAt: dueDate.toISOString(),
+                    dueText: dueText || dueDate.toLocaleString(),
+                });
+            });
+        });
+
+        dueItems.sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime());
+        return dueItems;
+    }, true, forceSync);
+}
+
 async function getApprovalItemsFresh(forceSync: boolean = false) {
     // 1. Get all Workspace Boards
     const allWorkspaceBoards = await getWorkspaceBoards(forceSync);
@@ -1741,6 +1848,10 @@ async function getApprovalItemsFresh(forceSync: boolean = false) {
             c.title.toLowerCase().includes('owner') ||
             c.type === 'people'
         );
+        const deadlineCol = board.columns?.find((c: any) => {
+            const title = String(c.title || '').toLowerCase();
+            return c.type === 'date' || title.includes('deadline') || title.includes('due');
+        });
 
         board.items?.forEach((item: any) => {
             // Check if ANY status column has an "Approval" or "Review" status
@@ -1791,6 +1902,44 @@ async function getApprovalItemsFresh(forceSync: boolean = false) {
                         .trim();
                 }
 
+                let dueAt: string | null = null;
+                let dueText: string = '';
+                if (deadlineCol?.id) {
+                    const deadlineVal = item.column_values.find((cv: any) => cv.id === deadlineCol.id);
+                    dueText = String(deadlineVal?.text || deadlineVal?.display_value || '').trim();
+                    if (deadlineVal?.value) {
+                        try {
+                            const parsed = JSON.parse(deadlineVal.value) as { date?: string; time?: string; from?: string };
+                            const base = parsed.date || parsed.from || '';
+                            if (/^\d{4}-\d{2}-\d{2}/.test(base)) {
+                                const [y, m, d] = base.slice(0, 10).split('-').map(Number);
+                                let hh = 12;
+                                let mm = 0;
+                                if (parsed.time && /^\d{1,2}:\d{2}/.test(parsed.time)) {
+                                    const [h, mi] = parsed.time.split(':').map(Number);
+                                    if (!Number.isNaN(h) && !Number.isNaN(mi)) {
+                                        hh = h;
+                                        mm = mi;
+                                    }
+                                }
+                                dueAt = new Date(y, m - 1, d, hh, mm, 0, 0).toISOString();
+                            }
+                        } catch {
+                            /* ignore */
+                        }
+                    }
+                    if (!dueAt && dueText) {
+                        const iso = dueText.match(/\d{4}-\d{2}-\d{2}/)?.[0];
+                        if (iso) {
+                            const [y, m, d] = iso.split('-').map(Number);
+                            dueAt = new Date(y, m - 1, d, 12, 0, 0, 0).toISOString();
+                        } else {
+                            const parsed = Date.parse(dueText);
+                            if (!Number.isNaN(parsed)) dueAt = new Date(parsed).toISOString();
+                        }
+                    }
+                }
+
                 approvalItems.push({
                     id: item.id,
                     name: item.name,
@@ -1800,7 +1949,9 @@ async function getApprovalItemsFresh(forceSync: boolean = false) {
                     editor: editorName,
                     videoLink: videoLink,
                     createdAt: item.created_at,
-                    group: item.group
+                    group: item.group,
+                    dueAt,
+                    dueText,
                 });
             }
         });

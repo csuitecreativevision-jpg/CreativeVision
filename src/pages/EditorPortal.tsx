@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Briefcase,
@@ -24,9 +24,10 @@ import { TimeTracker } from '../components/shared/TimeTracker';
 import { NotificationBell } from '../components/shared/NotificationBell';
 import AdminSettings from './admin/AdminSettings';
 import { usePortalTheme } from '../contexts/PortalThemeContext';
-import { getUserNotifications, type Notification } from '../services/notificationService';
+import { getUserNotifications, subscribeToNotifications, type Notification } from '../services/notificationService';
 import { parseFeedbackSourceId } from '../services/projectFeedbackService';
 import { fireCvSwal } from '../lib/swalTheme';
+import { fetchLatestFollowUpMessage, fetchRecentFollowUpMessages, parseFollowUpSourceId, sendFollowUpReply, subscribeToFollowUpMessages, type FollowUpRealtimeMessage } from '../services/projectFollowUpService';
 
 function EditorPortalMainChrome({
     onOpenMobileMenu,
@@ -139,6 +140,8 @@ function EditorPortalContent() {
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
     const [discordThreadId, setDiscordThreadId] = useState<string | null>(null);
     const feedbackPromptShownRef = useRef(false);
+    const followUpSeenIdsRef = useRef<Set<string>>(new Set());
+    const followUpSessionStartRef = useRef<string>(new Date().toISOString());
 
     // User info (synced when profile is edited in Settings)
     const [sidebarUserName, setSidebarUserName] = useState(() => localStorage.getItem('portal_user_name') || 'Editor');
@@ -308,26 +311,45 @@ function EditorPortalContent() {
     };
 
     const openItemFromNotification = async (notification: Notification) => {
-        if (notification.source_type !== 'project_feedback') return;
-        const parsed = parseFeedbackSourceId(notification.source_id);
-        if (!parsed) return;
-        setIsProcessingNavigation(true);
-        try {
-            const sortedBoards = [...boards].sort((a: any, b: any) =>
-                a.id === parsed.boardId ? -1 : b.id === parsed.boardId ? 1 : 0
-            );
-            for (const board of sortedBoards) {
-                const fullBoardData = await getBoardItems(board.id, true);
-                const hasItem = (fullBoardData?.items || []).some((item: any) => item.id === parsed.itemId);
-                if (!hasItem) continue;
-                setInitialItemId(parsed.itemId);
-                setSelectedBoard(fullBoardData);
-                return;
+        if (notification.source_type === 'project_feedback') {
+            const parsed = parseFeedbackSourceId(notification.source_id);
+            if (!parsed) return;
+            setIsProcessingNavigation(true);
+            try {
+                const sortedBoards = [...boards].sort((a: any, b: any) =>
+                    a.id === parsed.boardId ? -1 : b.id === parsed.boardId ? 1 : 0
+                );
+                for (const board of sortedBoards) {
+                    const fullBoardData = await getBoardItems(board.id, true);
+                    const hasItem = (fullBoardData?.items || []).some((item: any) => item.id === parsed.itemId);
+                    if (!hasItem) continue;
+                    setInitialItemId(parsed.itemId);
+                    setSelectedBoard(fullBoardData);
+                    return;
+                }
+            } catch (error) {
+                console.error('Failed to open feedback item from notification:', error);
+            } finally {
+                setIsProcessingNavigation(false);
             }
-        } catch (error) {
-            console.error('Failed to open feedback item from notification:', error);
-        } finally {
-            setIsProcessingNavigation(false);
+            return;
+        }
+        if (notification.source_type === 'follow_up_request') {
+            const parsed = parseFollowUpSourceId(notification.source_id);
+            const email = localStorage.getItem('portal_user_email') || '';
+            if (!parsed || !email) return;
+            try {
+                const latest = await fetchLatestFollowUpMessage({
+                    recipientEmail: email,
+                    boardId: parsed.boardId,
+                    itemId: parsed.itemId,
+                    senderRole: 'admin',
+                });
+                if (!latest) return;
+                await handleEditorFollowUp(latest);
+            } catch (error) {
+                console.error('Failed to open follow-up request from notification:', error);
+            }
         }
     };
 
@@ -360,6 +382,114 @@ function EditorPortalContent() {
         }, 5000);
         return () => clearTimeout(t);
     }, [boards]);
+
+    const handleEditorFollowUp = useCallback(async (msg: FollowUpRealtimeMessage) => {
+        if (msg.sender_role !== 'admin') return;
+        if (followUpSeenIdsRef.current.has(msg.id)) return;
+        followUpSeenIdsRef.current.add(msg.id);
+        const editorName = localStorage.getItem('portal_user_name') || 'Editor';
+        const openPrompt = async () => {
+                const r = await fireCvSwal({
+                    icon: 'info',
+                    title: 'Admin follow-up request',
+                    html: `
+                        <div class="text-left">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="cv-swal-bye-hand">👋</span>
+                                <p class="text-sm font-semibold text-white">Quick progress check-in</p>
+                            </div>
+                            <p class="text-white/75 text-sm leading-relaxed">${msg.message}</p>
+                            <p class="text-white/55 text-xs mt-2">Please share your current progress below.</p>
+                            <div class="mt-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                                <div class="flex items-center justify-between text-[11px] text-white/65 mb-1">
+                                    <span>Progress</span>
+                                    <span id="cv-followup-progress-value" class="font-bold text-violet-300">0%</span>
+                                </div>
+                                <input id="cv-followup-progress-range" type="range" min="0" max="100" step="1" value="0" style="width:100%" />
+                            </div>
+                        </div>
+                    `,
+                    input: 'textarea',
+                    inputPlaceholder: 'Type your progress update...',
+                    showCancelButton: true,
+                    confirmButtonText: 'Confirm',
+                    cancelButtonText: 'Later',
+                    didOpen: () => {
+                        const slider = document.getElementById('cv-followup-progress-range') as HTMLInputElement | null;
+                        const valueEl = document.getElementById('cv-followup-progress-value');
+                        if (!slider || !valueEl) return;
+                        const sync = () => { valueEl.textContent = `${slider.value}%`; };
+                        slider.addEventListener('input', sync);
+                        sync();
+                    },
+                    inputValidator: (value) => (!String(value || '').trim() ? 'Please enter your progress update.' : null),
+                    preConfirm: (value) => {
+                        const slider = document.getElementById('cv-followup-progress-range') as HTMLInputElement | null;
+                        const pct = slider ? Number(slider.value) : 0;
+                        return { note: String(value || '').trim(), percent: Number.isNaN(pct) ? 0 : pct };
+                    },
+                });
+                if (!r.isConfirmed || !r.value || !String((r.value as any).note || '').trim()) return;
+                try {
+                    const projectName = String(msg.project_name || '').trim() || 'Project';
+                    const payload = r.value as { note: string; percent: number };
+                    await sendFollowUpReply({
+                        boardId: msg.board_id,
+                        itemId: msg.item_id,
+                        projectName,
+                        editorName,
+                        replyMessage: `${Math.max(0, Math.min(100, Number(payload.percent) || 0))}% complete — ${payload.note}`,
+                    });
+                    await fireCvSwal({
+                        icon: 'success',
+                        title: 'Progress sent',
+                        timer: 1200,
+                        showConfirmButton: false,
+                    });
+                } catch (e) {
+                    await fireCvSwal({
+                        icon: 'error',
+                        title: 'Failed to send progress',
+                        text: e instanceof Error ? e.message : 'Could not send progress update.',
+                    });
+                }
+        };
+        void openPrompt();
+    }, []);
+
+    useEffect(() => {
+        const email = localStorage.getItem('portal_user_email') || '';
+        if (!email) return;
+        const unsubscribe = subscribeToFollowUpMessages(email, (msg) => {
+            void handleEditorFollowUp(msg);
+        });
+
+        let active = true;
+        const poll = async () => {
+            if (!active) return;
+            try {
+                const rows = await fetchRecentFollowUpMessages(email, followUpSessionStartRef.current);
+                for (const row of rows) {
+                    await handleEditorFollowUp(row);
+                }
+            } catch {
+                /* ignore polling errors */
+            }
+        };
+        void poll();
+        const interval = window.setInterval(() => { void poll(); }, 5000);
+        const onFocus = () => { void poll(); };
+        window.addEventListener('focus', onFocus);
+        document.addEventListener('visibilitychange', onFocus);
+
+        return () => {
+            active = false;
+            clearInterval(interval);
+            window.removeEventListener('focus', onFocus);
+            document.removeEventListener('visibilitychange', onFocus);
+            unsubscribe();
+        };
+    }, [handleEditorFollowUp]);
 
     useEffect(() => {
         if (!selectedBoard || selectedBoard === 'calendar' || selectedBoard === 'settings' || !selectedBoard.id) return;

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { PortalLayout } from '../components/shared/PortalLayout';
 import { SidebarItem } from '../components/shared/SidebarItem';
 import { SidebarDropdown } from '../components/shared/SidebarDropdown';
@@ -24,9 +24,10 @@ import { AdminChatbot } from '../components/admin/AdminChatbot';
 import { NotificationBell } from '../components/shared/NotificationBell';
 import { PORTAL_CACHED_PASSWORD_KEY } from '../lib/portalPasswordCache';
 import { usePortalTheme } from '../contexts/PortalThemeContext';
-import { getUserNotifications, type Notification } from '../services/notificationService';
+import { getUserNotifications, subscribeToNotifications, type Notification } from '../services/notificationService';
 import { parseFeedbackSourceId } from '../services/projectFeedbackService';
 import { fireCvSwal } from '../lib/swalTheme';
+import { fetchLatestFollowUpMessage, fetchRecentFollowUpMessages, parseFollowUpSourceId, subscribeToFollowUpMessages, type FollowUpRealtimeMessage } from '../services/projectFollowUpService';
 
 function AdminSidebarFooter({
     currentUserName,
@@ -113,6 +114,8 @@ function AdminPortalContent() {
     const [sidebarUserName, setSidebarUserName] = useState(() => localStorage.getItem('portal_user_name') || '');
     const { triggerRefresh } = useRefresh();
     const feedbackPromptShownRef = useRef(false);
+    const followUpSeenIdsRef = useRef<Set<string>>(new Set());
+    const followUpSessionStartRef = useRef<string>(new Date().toISOString());
 
     useEffect(() => {
         const sync = () => setSidebarUserName(localStorage.getItem('portal_user_name') || '');
@@ -182,10 +185,29 @@ function AdminPortalContent() {
     const activeTab = getActiveTab();
 
     const openFeedbackFromNotification = async (notification: Notification) => {
-        if (notification.source_type !== 'project_feedback') return;
-        const parsed = parseFeedbackSourceId(notification.source_id);
-        if (!parsed) return;
-        navigate('/admin-portal/team', { state: { boardId: parsed.boardId, itemId: parsed.itemId } });
+        if (notification.source_type === 'project_feedback') {
+            const parsed = parseFeedbackSourceId(notification.source_id);
+            if (!parsed) return;
+            navigate('/admin-portal/team', { state: { boardId: parsed.boardId, itemId: parsed.itemId } });
+            return;
+        }
+        if (notification.source_type === 'follow_up_reply') {
+            const parsed = parseFollowUpSourceId(notification.source_id);
+            const email = localStorage.getItem('portal_user_email') || '';
+            if (!parsed || !email) return;
+            try {
+                const latest = await fetchLatestFollowUpMessage({
+                    recipientEmail: email,
+                    boardId: parsed.boardId,
+                    itemId: parsed.itemId,
+                    senderRole: 'editor',
+                });
+                if (!latest) return;
+                await handleAdminFollowUpReply(latest);
+            } catch (error) {
+                console.error('Failed to open follow-up reply from notification:', error);
+            }
+        }
     };
 
     useEffect(() => {
@@ -215,6 +237,61 @@ function AdminPortalContent() {
         }, 5000);
         return () => clearTimeout(t);
     }, [navigate, location.pathname]);
+
+    const handleAdminFollowUpReply = useCallback(async (msg: FollowUpRealtimeMessage) => {
+        if (msg.sender_role !== 'editor') return;
+        if (followUpSeenIdsRef.current.has(msg.id)) return;
+        followUpSeenIdsRef.current.add(msg.id);
+        const run = async () => {
+                const r = await fireCvSwal({
+                    icon: 'info',
+                    title: 'Editor progress update',
+                    text: msg.message,
+                    showCancelButton: true,
+                    confirmButtonText: 'Open Approvals',
+                    cancelButtonText: 'Later',
+                });
+                if (r.isConfirmed) {
+                    navigate('/admin-portal/approvals');
+                }
+        };
+        void run();
+    }, [navigate]);
+
+    useEffect(() => {
+        const role = localStorage.getItem('portal_user_role');
+        const email = localStorage.getItem('portal_user_email') || '';
+        if (role !== 'admin' || !email) return;
+        const unsubscribe = subscribeToFollowUpMessages(email, (msg) => {
+            void handleAdminFollowUpReply(msg);
+        });
+
+        let active = true;
+        const poll = async () => {
+            if (!active) return;
+            try {
+                const rows = await fetchRecentFollowUpMessages(email, followUpSessionStartRef.current);
+                for (const row of rows) {
+                    await handleAdminFollowUpReply(row);
+                }
+            } catch {
+                /* ignore polling errors */
+            }
+        };
+        void poll();
+        const interval = window.setInterval(() => { void poll(); }, 5000);
+        const onFocus = () => { void poll(); };
+        window.addEventListener('focus', onFocus);
+        document.addEventListener('visibilitychange', onFocus);
+
+        return () => {
+            active = false;
+            clearInterval(interval);
+            window.removeEventListener('focus', onFocus);
+            document.removeEventListener('visibilitychange', onFocus);
+            unsubscribe();
+        };
+    }, [handleAdminFollowUpReply]);
 
     // Mapping tabs to existing components or placeholders
     // Only Overview, Boards, Users are implemented separate pages currently.
