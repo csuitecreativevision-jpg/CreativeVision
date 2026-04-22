@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { MessageSquare, X, Send } from 'lucide-react';
+import { DEFAULT_N8N_CHAT_WEBHOOK } from '../../config/n8nWebhooks';
 
 type Message = {
     id: string;
@@ -19,9 +20,7 @@ export const AdminChatbot = () => {
     const [sessionId] = useState(() => Math.random().toString(36).substring(7));
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    const chatUrl =
-        (import.meta.env.VITE_N8N_CHAT_URL as string | undefined)?.trim() ||
-        'https://creativevisionph.app.n8n.cloud/webhook/1652778a-9023-4d23-8fe7-5e2392f03fed/chat';
+    const chatUrl = DEFAULT_N8N_CHAT_WEBHOOK;
 
     useEffect(() => {
         setMounted(true);

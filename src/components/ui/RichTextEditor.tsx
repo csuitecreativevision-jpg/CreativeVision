@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bold, Italic, List, ListOrdered, Underline } from 'lucide-react';
+import { linkifyBareUrlsInHtml, linkifyPlainTextPasteToHtml } from '../../lib/instructionLinkify';
 
 interface RichTextEditorProps {
     value: string;
@@ -31,6 +32,16 @@ export function RichTextEditor({ value, onChange, placeholder, className = '' }:
         if (editorRef.current) {
             const html = editorRef.current.innerHTML;
             onChange(html === '<br>' ? '' : html);
+        }
+    };
+
+    const applyLinkifyToEditor = () => {
+        if (!editorRef.current) return;
+        const before = editorRef.current.innerHTML;
+        const next = linkifyBareUrlsInHtml(before);
+        if (next !== before) {
+            editorRef.current.innerHTML = next;
+            handleInput();
         }
     };
 
@@ -83,11 +94,26 @@ export function RichTextEditor({ value, onChange, placeholder, className = '' }:
                 )}
                 <div
                     ref={editorRef}
-                    className="p-4 min-h-[150px] text-white focus:outline-none prose prose-invert max-w-none text-sm relative z-0"
+                    className="p-4 min-h-[150px] text-white focus:outline-none prose prose-invert max-w-none text-sm relative z-0 [&_a]:text-violet-400 [&_a]:underline [&_a]:hover:text-violet-300 [&_a]:break-all"
                     contentEditable
                     onInput={handleInput}
                     onFocus={() => setIsFocused(true)}
-                    onBlur={() => setIsFocused(false)}
+                    onBlur={() => {
+                        setIsFocused(false);
+                        applyLinkifyToEditor();
+                    }}
+                    onPaste={(e) => {
+                        const clip = e.clipboardData;
+                        if (!clip) return;
+                        const html = clip.getData('text/html');
+                        const plain = clip.getData('text/plain') || '';
+                        if (!html && plain && /https?:\/\//i.test(plain)) {
+                            e.preventDefault();
+                            const fragment = linkifyPlainTextPasteToHtml(plain);
+                            document.execCommand('insertHTML', false, fragment);
+                            handleInput();
+                        }
+                    }}
                 />
             </div>
         </div>

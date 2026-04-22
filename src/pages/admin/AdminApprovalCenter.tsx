@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { getApprovalItems, getBoardItems, getDueTodayItems } from '../../services/mondayService';
+import { getApprovalItems, getBoardItems, getDueTodayItems, getDueYesterdayItems } from '../../services/mondayService';
 import { Video, RefreshCw, CheckCircle2, Layers, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AdminApprovalModal } from '../../components/views/AdminApprovalModal';
@@ -7,12 +7,12 @@ import { FilePreviewModal } from '../../components/ui/FilePreviewModal';
 import { AdminPageLayout } from '../../components/layout/AdminPageLayout';
 import { fireCvSwal } from '../../lib/swalTheme';
 import { sendFollowUpRequest } from '../../services/projectFollowUpService';
-import { sendN8nDiscordFollowUp } from '../../services/n8nFollowUpService';
 
 export default function AdminApprovalCenter() {
     const [items, setItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [dueTodayItems, setDueTodayItems] = useState<any[]>([]);
+    const [dueYesterdayItems, setDueYesterdayItems] = useState<any[]>([]);
 
     const [selectedApprovalItem, setSelectedApprovalItem] = useState<any | null>(null);
     const [approvalBoardData, setApprovalBoardData] = useState<any | null>(null);
@@ -26,12 +26,14 @@ export default function AdminApprovalCenter() {
     const loadData = async (forceRefresh: boolean = false) => {
         setLoading(true);
         try {
-            const [data, dueToday] = await Promise.all([
+            const [data, dueToday, dueYesterday] = await Promise.all([
                 getApprovalItems(forceRefresh),
                 getDueTodayItems(forceRefresh),
+                getDueYesterdayItems(forceRefresh),
             ]);
             setItems(data);
             setDueTodayItems(dueToday);
+            setDueYesterdayItems(dueYesterday);
         } catch (error) {
             console.error('Failed to load approvals', error);
         } finally {
@@ -60,11 +62,12 @@ export default function AdminApprovalCenter() {
     };
 
     const dueTodayCountLabel = useMemo(() => dueTodayItems.length, [dueTodayItems]);
+    const dueYesterdayCountLabel = useMemo(() => dueYesterdayItems.length, [dueYesterdayItems]);
 
     const handleFollowUp = async (item: any) => {
         const adminName = localStorage.getItem('portal_user_name') || 'Admin';
         const dueText = String(item.dueText || item.dueAt || 'today').trim();
-        const autoPrompt = `Hi ${item.editor || 'Editor'}, quick follow-up on "${item.name}" due ${dueText}. Please send your current progress update.`;
+        const autoPrompt = `Hi ${item.editor || 'Editor'}, quick follow-up on "${item.name}" (due ${dueText}). Please share the current project status and report progress at https://creativevision.dev .`;
         const first = await fireCvSwal({
             icon: 'question',
             title: 'Send Follow-up Request?',
@@ -118,25 +121,10 @@ export default function AdminApprovalCenter() {
                 promptMessage: autoPrompt,
             });
 
-            try {
-                await sendN8nDiscordFollowUp({
-                    boardId: item.boardId,
-                    itemId: item.id,
-                    projectName: item.name,
-                    deadlineText: dueText,
-                    deadlineIso: item.dueAt,
-                    editorName: item.editor || 'Editor',
-                    adminName,
-                    followUpMessage: autoPrompt,
-                });
-            } catch (n8nErr) {
-                console.error('[n8n follow-up] Discord automation failed:', n8nErr);
-            }
-
             await fireCvSwal({
                 icon: 'success',
                 title: 'Follow-up sent',
-                text: `${item.editor || 'Editor'} will receive a popup to reply with progress. Discord follow-up automation was also triggered.`,
+                text: `${item.editor || 'Editor'} will receive a popup to reply with progress.`,
                 timer: 1300,
                 showConfirmButton: false,
             });
@@ -179,7 +167,9 @@ export default function AdminApprovalCenter() {
                     <div className="flex items-center justify-between gap-3 mb-3">
                         <div>
                             <p className="text-[11px] font-bold uppercase tracking-widest text-violet-300/90">Due Today</p>
-                            <p className="text-xs text-white/45 mt-1">Projects due today that need editor progress follow-up</p>
+                            <p className="text-xs text-white/45 mt-1">
+                                Projects due today that need editor progress follow-up.
+                            </p>
                         </div>
                         <div className="px-2.5 py-1 rounded-lg bg-violet-500/10 border border-violet-500/30 text-violet-300 text-[11px] font-bold">
                             {dueTodayCountLabel}
@@ -211,7 +201,45 @@ export default function AdminApprovalCenter() {
                     )}
                 </div>
 
-            <div className="space-y-2">
+                <div className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.06] p-4">
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                        <div>
+                            <p className="text-[11px] font-bold uppercase tracking-widest text-amber-200/90">Due Yesterday</p>
+                            <p className="text-xs text-white/45 mt-1">
+                                Deadline was yesterday on the calendar — quick follow-up with the editor.
+                            </p>
+                        </div>
+                        <div className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[11px] font-bold">
+                            {dueYesterdayCountLabel}
+                        </div>
+                    </div>
+                    {dueYesterdayCountLabel === 0 ? (
+                        <p className="text-xs text-white/35">Nothing due yesterday.</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {dueYesterdayItems.map((item: any) => (
+                                <div key={`yest-${item.boardId}-${item.id}`} className="flex items-center gap-3 px-3 py-2 rounded-xl border border-white/10 bg-black/20">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-white truncate">{item.name}</p>
+                                        <p className="text-[11px] text-white/45 truncate">{item.editor} · {item.dueText || 'Due yesterday'}</p>
+                                        <p className="text-[11px] text-amber-200/85 truncate">Progress: {item.progressStatus || 'No status'}</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleFollowUp(item)}
+                                        disabled={followUpLoadingId === item.id}
+                                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-[11px] font-bold uppercase tracking-wider"
+                                    >
+                                        {followUpLoadingId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                                        Follow Up
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="space-y-2">
                 {items.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-24 border border-white/[0.05] rounded-2xl text-white/20">
                         <CheckCircle2 className="w-8 h-8 mb-3 opacity-40" />
@@ -274,7 +302,7 @@ export default function AdminApprovalCenter() {
                         </motion.div>
                     ))
                 )}
-            </div>
+                </div>
             </div>
 
             <AnimatePresence>

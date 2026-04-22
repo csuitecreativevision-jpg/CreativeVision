@@ -14,6 +14,7 @@ import {
     extractGoogleDriveFileId,
     fetchGoogleDriveFileTitle,
 } from '../../services/googleDriveLinkService';
+import { LinkifiedInstructionBody, stripHtmlToPlainText } from '../../lib/instructionLinkify';
 import {
     Plus,
     Trash2,
@@ -52,7 +53,7 @@ function InstructionsBlock({ text, sidebar }: { text: string; sidebar: boolean }
 
     const copy = async () => {
         try {
-            await navigator.clipboard.writeText(text);
+            await navigator.clipboard.writeText(stripHtmlToPlainText(text));
             setCopyHint('success');
         } catch {
             setCopyHint('error');
@@ -153,13 +154,12 @@ function InstructionsBlock({ text, sidebar }: { text: string; sidebar: boolean }
                                     <X className="w-4 h-4" />
                                 </button>
                             </div>
-                            <div
+                            <LinkifiedInstructionBody
+                                text={text}
                                 className={`flex-1 min-h-0 overflow-y-auto custom-scrollbar px-4 py-3 text-white/85 whitespace-pre-wrap break-words [overflow-wrap:anywhere] select-text ${
                                     sidebar ? 'text-[11px] leading-relaxed' : 'text-sm leading-relaxed'
                                 }`}
-                            >
-                                {text}
-                            </div>
+                            />
                             <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-white/[0.08] flex-shrink-0">
                                 <button
                                     type="button"
