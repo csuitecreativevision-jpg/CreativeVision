@@ -29,10 +29,19 @@ import {
     Rocket,
     Copy,
     X,
+    Archive,
 } from 'lucide-react';
 
 const MAIN_STATUSES: DeploymentMainStatus[] = ['Working on it', 'Deployed'];
 const VIDEO_STATUSES: DeploymentVideoStatus[] = ['Ready for Deployment', 'Deployed'];
+
+function displayMainStatus(status: DeploymentMainStatus): string {
+    return status === 'Deployed' ? 'Done' : status;
+}
+
+function displayVideoStatus(status: DeploymentVideoStatus): string {
+    return status === 'Deployed' ? 'Done' : status;
+}
 
 function InstructionsBlock({ text, sidebar }: { text: string; sidebar: boolean }) {
     const [modalOpen, setModalOpen] = useState(false);
@@ -156,7 +165,7 @@ function InstructionsBlock({ text, sidebar }: { text: string; sidebar: boolean }
                             </div>
                             <LinkifiedInstructionBody
                                 text={text}
-                                className={`flex-1 min-h-0 overflow-y-auto custom-scrollbar px-4 py-3 text-white/85 whitespace-pre-wrap break-words [overflow-wrap:anywhere] select-text ${
+                                className={`flex-1 min-h-0 overflow-y-auto custom-scrollbar px-4 py-3 text-white/85 whitespace-pre-wrap [overflow-wrap:anywhere] select-text ${
                                     sidebar ? 'text-[11px] leading-relaxed' : 'text-sm leading-relaxed'
                                 }`}
                             />
@@ -221,10 +230,12 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
+    const [archiveModalOpen, setArchiveModalOpen] = useState(false);
 
     /** Per batch: expanded video queues (default collapsed when the section has rows). */
     const [readyVideosFoldOpen, setReadyVideosFoldOpen] = useState<Record<string, boolean>>({});
     const [deployedVideosFoldOpen, setDeployedVideosFoldOpen] = useState<Record<string, boolean>>({});
+    const [mainStatusMenuOpen, setMainStatusMenuOpen] = useState<Record<string, boolean>>({});
 
     const [mainModal, setMainModal] = useState<DeploymentBoardMain | 'new' | null>(null);
     const [mainForm, setMainForm] = useState({
@@ -277,6 +288,11 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
         setLoading(true);
         setLoadError(null);
         try {
+            try {
+                await deploymentBoardService.purgeArchivedMainsOlderThanDays(20);
+            } catch (purgeErr) {
+                console.warn('[Deployment] archive purge skipped:', purgeErr);
+            }
             const list = await deploymentBoardService.listMains();
             setMains(list);
             const v: Record<string, DeploymentBoardVideo[]> = {};
@@ -312,6 +328,29 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
     useEffect(() => {
         videosByMainRef.current = videosByMain;
     }, [videosByMain]);
+
+    const visibleMains = mains.filter(m => !m.archived_at);
+    const doneMains = visibleMains.filter(m => m.status === 'Deployed');
+    const archivedMains = mains
+        .filter(m => !!m.archived_at)
+        .sort((a, b) => {
+            const ta = new Date(a.archived_at || a.created_at).getTime();
+            const tb = new Date(b.archived_at || b.created_at).getTime();
+            return tb - ta;
+        });
+
+    const recoverArchivedBatch = async (mainId: string) => {
+        setSaving(true);
+        try {
+            await deploymentBoardService.updateMain(mainId, { archived_at: null } as Partial<DeploymentBoardMain>);
+            await loadAll();
+        } catch (e) {
+            console.error(e);
+            await fireErrorSwal('Recover failed', 'Could not recover this archived batch. Please try again.');
+        } finally {
+            setSaving(false);
+        }
+    };
 
     const openNewMain = () => {
         setMainForm({
@@ -374,6 +413,36 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
         } catch (e) {
             console.error(e);
             await fireErrorSwal('Delete failed', 'Could not delete this batch. Please try again.');
+        }
+    };
+
+    const updateMainStatusInline = async (mainId: string, next: DeploymentMainStatus) => {
+        const prevList = mains;
+        const archiveNow = next === 'Deployed';
+        const archivedAt = archiveNow ? new Date().toISOString() : null;
+        setMains(list =>
+            list.map(m =>
+                m.id === mainId
+                    ? {
+                          ...m,
+                          status: next,
+                          archived_at: archiveNow ? archivedAt : m.archived_at ?? null,
+                      }
+                    : m
+            )
+        );
+        try {
+            await deploymentBoardService.updateMain(
+                mainId,
+                {
+                    status: next,
+                    ...(archiveNow ? { archived_at: archivedAt } : {}),
+                } as Partial<DeploymentBoardMain>
+            );
+        } catch (e) {
+            console.error(e);
+            setMains(prevList);
+            await fireErrorSwal('Status update failed', 'Could not update batch status. Please try again.');
         }
     };
 
@@ -663,7 +732,7 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                             >
                                 {VIDEO_STATUSES.map(s => (
                                     <option key={s} value={s} className="bg-zinc-900 text-white">
-                                        {s}
+                                        {displayVideoStatus(s)}
                                     </option>
                                 ))}
                             </select>
@@ -763,11 +832,61 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-1.5 gap-y-1">
                                     <h3 className={`font-bold text-white/90 ${sidebar ? 'text-[12px] leading-snug' : 'text-base'}`}>{m.title}</h3>
-                                    <span
-                                        className={`${sidebar ? 'text-[9px] px-1.5 py-0.5' : 'text-[10px] px-2 py-0.5'} font-bold uppercase tracking-wider rounded-lg border ${statusPillClass(isDark, 'main', m.status)}`}
-                                    >
-                                        {m.status}
-                                    </span>
+                                    <div className="relative">
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setMainStatusMenuOpen(prev => ({
+                                                    ...prev,
+                                                    [m.id]: !prev[m.id],
+                                                }))
+                                            }
+                                            className={`${sidebar ? 'text-[9px] px-1.5 py-0.5' : 'text-[10px] px-2 py-0.5'} inline-flex items-center gap-1 font-bold uppercase tracking-wider rounded-lg border cursor-pointer focus:outline-none ${statusPillClass(isDark, 'main', m.status)}`}
+                                            title="Change batch status"
+                                        >
+                                            {displayMainStatus(m.status)}
+                                            <ChevronDown className="w-3.5 h-3.5 opacity-80" />
+                                        </button>
+                                        <AnimatePresence>
+                                            {mainStatusMenuOpen[m.id] && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: 6 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, y: 6 }}
+                                                    className="absolute top-full mt-1 right-0 z-20 min-w-[9rem] rounded-xl border border-white/[0.12] bg-[#121425] p-1.5 shadow-2xl"
+                                                >
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            void updateMainStatusInline(m.id, 'Working on it');
+                                                            setMainStatusMenuOpen(prev => ({ ...prev, [m.id]: false }));
+                                                        }}
+                                                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                                                            m.status === 'Working on it'
+                                                                ? 'bg-amber-500/20 text-amber-200'
+                                                                : 'text-white/75 hover:bg-white/[0.08] hover:text-white'
+                                                        }`}
+                                                    >
+                                                        Working on it
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            void updateMainStatusInline(m.id, 'Deployed');
+                                                            setMainStatusMenuOpen(prev => ({ ...prev, [m.id]: false }));
+                                                        }}
+                                                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                                                            m.status === 'Deployed'
+                                                                ? 'bg-emerald-500/20 text-emerald-200'
+                                                                : 'text-white/75 hover:bg-white/[0.08] hover:text-white'
+                                                        }`}
+                                                    >
+                                                        Done
+                                                    </button>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
                                     <span className={`${sidebar ? 'text-[10px]' : 'text-[11px]'} text-white/35`}>
                                         {vids.length} video{vids.length !== 1 ? 's' : ''}
                                     </span>
@@ -971,7 +1090,14 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
     const body = (
         <>
             {!sidebar && (
-                <div className="flex justify-end mb-4">
+                <div className="flex items-center justify-end gap-2 mb-4">
+                    <button
+                        type="button"
+                        onClick={() => setArchiveModalOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/[0.08] bg-white/[0.03] text-white/80 text-sm font-semibold hover:bg-white/[0.07] transition-colors"
+                    >
+                        <Archive className="w-4 h-4" /> Archive batch projects
+                    </button>
                     <button
                         type="button"
                         onClick={openNewMain}
@@ -1008,7 +1134,7 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                     <div className={`flex items-center gap-2 text-white/40 text-sm justify-center ${sidebar ? 'py-6' : 'py-12'}`}>
                         <Loader2 className="w-5 h-5 animate-spin" /> Loading…
                     </div>
-                ) : mains.length === 0 ? (
+                ) : visibleMains.length === 0 ? (
                     <div
                         className={`rounded-2xl border border-white/[0.08] bg-white/[0.02] text-center text-white/40 text-sm ${
                             sidebar ? 'p-5' : 'p-10'
@@ -1026,7 +1152,7 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                         )}
                     </div>
                 ) : (
-                    <div className={sidebar ? 'space-y-2' : 'space-y-4'}>{mains.map(m => renderMainBatchCard(m))}</div>
+                    <div className={sidebar ? 'space-y-2' : 'space-y-4'}>{visibleMains.map(m => renderMainBatchCard(m))}</div>
                 )}
             </div>
         </>
@@ -1049,6 +1175,14 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                             </div>
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => setArchiveModalOpen(true)}
+                                className="flex items-center gap-1 px-2.5 py-2 rounded-lg border border-white/[0.08] bg-white/[0.03] text-white/65 text-[10px] font-bold hover:bg-white/[0.08] transition-colors"
+                                title="Archive done batch projects"
+                            >
+                                <Archive className="w-3.5 h-3.5" /> Archive
+                            </button>
                             <button
                                 type="button"
                                 onClick={() => loadAll()}
@@ -1075,6 +1209,112 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
             )}
 
             <AnimatePresence>
+                {archiveModalOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[101] flex items-center justify-center p-4 bg-black/70"
+                        onClick={() => !saving && setArchiveModalOpen(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.96, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.96, opacity: 0 }}
+                            onClick={e => e.stopPropagation()}
+                            className="w-full max-w-2xl rounded-2xl border border-white/[0.1] bg-[#0c0c10] p-6 space-y-4 shadow-2xl"
+                        >
+                            <div className="flex items-center justify-between gap-3">
+                                <h4 className="text-lg font-bold text-white">Archive batch projects</h4>
+                                <span className="text-xs text-white/45">
+                                    {archivedMains.length} archived
+                                </span>
+                            </div>
+                            <div className="max-h-[55vh] overflow-y-auto custom-scrollbar space-y-4 pr-1">
+                                <div className="space-y-2">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-violet-200/80">
+                                        Archived batches
+                                    </p>
+                                    {archivedMains.length === 0 ? (
+                                        <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                                            <p className="text-sm text-white/45">No archived batches yet.</p>
+                                        </div>
+                                    ) : (
+                                        archivedMains.map(m => {
+                                            const doneVideos = (videosByMain[m.id] || []).filter(v => v.status === 'Deployed');
+                                            return (
+                                                <div key={m.id} className="rounded-xl border border-violet-500/20 bg-violet-500/[0.05] p-3 space-y-2">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <p className="text-sm font-semibold text-white/90">{m.title}</p>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-violet-200/90 border border-violet-500/30 bg-violet-500/10 rounded-md px-2 py-0.5">
+                                                                Archived
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => void recoverArchivedBatch(m.id)}
+                                                                disabled={saving}
+                                                                className="text-[10px] font-bold uppercase tracking-wider rounded-md px-2 py-0.5 border border-emerald-500/35 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20 transition-colors disabled:opacity-40"
+                                                            >
+                                                                Recover
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <p className="text-[10px] text-white/40">
+                                                        {m.archived_at ? `Archived ${new Date(m.archived_at).toLocaleString()}` : 'Archived'}
+                                                    </p>
+                                                    {m.drive_folder_link ? (
+                                                        <a
+                                                            href={m.drive_folder_link}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="inline-flex items-center gap-1 text-[11px] text-sky-300/90 hover:underline"
+                                                        >
+                                                            <FolderOpen className="w-3.5 h-3.5" />
+                                                            Open Drive folder
+                                                            <ExternalLink className="w-3 h-3 opacity-70" />
+                                                        </a>
+                                                    ) : null}
+                                                    {doneVideos.length > 0 ? (
+                                                        <ul className="space-y-1">
+                                                            {doneVideos.map(v => (
+                                                                <li key={v.id} className="text-xs text-white/65">
+                                                                    {v.video_link ? (
+                                                                        <a
+                                                                            href={v.video_link}
+                                                                            target="_blank"
+                                                                            rel="noreferrer"
+                                                                            className="inline-flex max-w-full items-center gap-1 hover:text-white hover:underline truncate"
+                                                                        >
+                                                                            • {v.name?.trim() || 'Untitled video'}
+                                                                            <ExternalLink className="w-3 h-3 opacity-70 flex-shrink-0" />
+                                                                        </a>
+                                                                    ) : (
+                                                                        <span className="truncate">• {v.name?.trim() || 'Untitled video'}</span>
+                                                                    )}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    ) : null}
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setArchiveModalOpen(false)}
+                                    disabled={saving}
+                                    className="px-4 py-2 text-sm text-white/55 hover:text-white"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
                 {mainModal && (
                     <motion.div
                         initial={{ opacity: 0 }}
@@ -1127,14 +1367,16 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                                     <span className="text-[10px] font-bold uppercase tracking-widest text-white/35">Status</span>
                                     <select
                                         value={mainForm.status}
-                                        onChange={e => setMainForm(f => ({ ...f, status: e.target.value as DeploymentMainStatus }))}
+                                        onChange={e =>
+                                            setMainForm(f => ({
+                                                ...f,
+                                                status: (e.target.value === 'Done' ? 'Deployed' : e.target.value) as DeploymentMainStatus,
+                                            }))
+                                        }
                                         className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-3 py-2 text-sm text-white"
                                     >
-                                        {MAIN_STATUSES.map(s => (
-                                            <option key={s} value={s} className="bg-zinc-900">
-                                                {s}
-                                            </option>
-                                        ))}
+                                        <option value="Working on it" className="bg-zinc-900">Working on it</option>
+                                        <option value="Done" className="bg-zinc-900">Done</option>
                                     </select>
                                 </label>
                             </div>

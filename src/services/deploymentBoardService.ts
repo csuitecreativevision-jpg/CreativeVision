@@ -27,6 +27,7 @@ export interface DeploymentBoardMain {
     instructions: string;
     drive_folder_link: string;
     status: DeploymentMainStatus;
+    archived_at?: string | null;
 }
 
 export interface DeploymentBoardVideo {
@@ -42,6 +43,17 @@ export interface DeploymentBoardVideo {
 }
 
 export const deploymentBoardService = {
+    async purgeArchivedMainsOlderThanDays(days: number = 20): Promise<number> {
+        const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+        const { data, error } = await supabase
+            .from(MAINS)
+            .delete()
+            .lt('archived_at', cutoff)
+            .select('id');
+        if (error) throw new Error(error.message);
+        return (data || []).length;
+    },
+
     async listMains(): Promise<DeploymentBoardMain[]> {
         const { data, error } = await supabase
             .from(MAINS)

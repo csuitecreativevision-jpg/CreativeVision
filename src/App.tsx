@@ -27,6 +27,7 @@ const AdminClients = lazy(() => import('./pages/admin/AdminClients'));
 const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics'));
 const AdminApprovalCenter = lazy(() => import('./pages/admin/AdminApprovalCenter'));
 const AdminDeploymentCenter = lazy(() => import('./pages/admin/AdminDeploymentCenter'));
+const AdminDeployedProjects = lazy(() => import('./pages/admin/AdminDeployedProjects'));
 const EditorPortal = lazy(() => import('./pages/EditorPortal'));
 const ClientPortal = lazy(() => import('./pages/ClientPortal'));
 const AdminUserManagement = lazy(() => import('./pages/admin/AdminUserManagement'));
@@ -164,6 +165,7 @@ export default function App() {
               <Route path="users" element={<AdminUserManagement />} />
               <Route path="analytics" element={<AdminAnalytics />} />
               <Route path="approvals" element={<AdminApprovalCenter />} />
+              <Route path="deployed-projects" element={<AdminDeployedProjects />} />
               <Route path="deployments" element={<AdminDeploymentCenter />} />
               <Route path="time-logs" element={<AdminTimeLogs />} />
               <Route path="leave-approvals" element={<AdminLeaveApprovals />} />

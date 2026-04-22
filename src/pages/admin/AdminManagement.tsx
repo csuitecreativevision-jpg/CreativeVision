@@ -8,7 +8,8 @@ import {
     TrendingUp,
     ArrowRight,
     ArrowLeft,
-    CheckSquare
+    CheckSquare,
+    MonitorCheck
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import AdminAnalytics from './AdminAnalytics';
@@ -36,6 +37,16 @@ export default function AdminManagement() {
             action: () => setView('approvals'),
             gradient: 'from-blue-500/20 to-indigo-500/20',
             border: 'group-hover:border-blue-500/50',
+            disabled: false
+        },
+        {
+            id: 'deployed-projects',
+            title: 'Deployed Projects',
+            description: 'View deployed items and update status, editor, price, links, and instructions from Monday.',
+            icon: <MonitorCheck className="w-8 h-8 text-emerald-300" />,
+            action: () => navigate('/admin-portal/deployed-projects'),
+            gradient: 'from-emerald-500/20 to-lime-500/20',
+            border: 'group-hover:border-emerald-500/50',
             disabled: false
         },
         {

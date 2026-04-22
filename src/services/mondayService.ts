@@ -904,6 +904,26 @@ export async function updateSourceColumn(sourceBoardId: string | number, sourceI
     return data;
 }
 
+export async function updateMondayItemColumns(
+    boardId: string | number,
+    itemId: string | number,
+    columnValues: Record<string, unknown>
+) {
+    const query = `mutation ($boardId: ID!, $itemId: ID!, $columnValues: JSON!) {
+        change_multiple_column_values(board_id: $boardId, item_id: $itemId, column_values: $columnValues) {
+            id
+        }
+    }`;
+
+    const variables = {
+        boardId: Number(boardId),
+        itemId: Number(itemId),
+        columnValues: JSON.stringify(columnValues),
+    };
+
+    return mondayRequest(query, variables);
+}
+
 
 
 // Refactored to use getBoardItems which provides Caching & Pagination

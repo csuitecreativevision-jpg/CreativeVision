@@ -5,6 +5,7 @@
 CREATE TABLE IF NOT EXISTS public.deployment_board_mains (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
+    archived_at TIMESTAMPTZ NULL,
     title TEXT NOT NULL DEFAULT 'Untitled batch',
     instructions TEXT DEFAULT '',
     drive_folder_link TEXT DEFAULT '',

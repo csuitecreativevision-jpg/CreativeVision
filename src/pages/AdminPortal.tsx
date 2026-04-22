@@ -15,7 +15,8 @@ import {
     TrendingUp,
     Rocket,
     Clock,
-    Calendar
+    Calendar,
+    MonitorCheck
 } from 'lucide-react';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { RefreshProvider, useRefresh } from '../contexts/RefreshContext';
@@ -170,6 +171,7 @@ function AdminPortalContent() {
         if (path.includes('assign-project')) return 'Assign Project';
         if (path.includes('leave-approvals')) return 'Leave Approvals';
         if (path.includes('approvals')) return 'Approvals';
+        if (path.includes('deployed-projects')) return 'Deployed Projects';
         if (path.includes('calendar')) return 'Team Calendar';
         if (path.includes('users')) return 'Users';
         if (path.includes('time-logs')) return 'Time Tracking';
@@ -314,6 +316,7 @@ function AdminPortalContent() {
                                 active={
                                     activeTab === 'Assign Project' ||
                                     activeTab === 'Approvals' ||
+                                    activeTab === 'Deployed Projects' ||
                                     activeTab === 'Leave Approvals' ||
                                     activeTab === 'Team Calendar' ||
                                     activeTab === 'Analytics' ||
@@ -333,6 +336,12 @@ function AdminPortalContent() {
                                     label="Project Approvals"
                                     active={activeTab === 'Approvals'}
                                     onClick={() => navigate('/admin-portal/approvals')}
+                                />
+                                <SidebarItem
+                                    icon={<MonitorCheck className="w-4 h-4" />}
+                                    label="Deployed Projects"
+                                    active={activeTab === 'Deployed Projects'}
+                                    onClick={() => navigate('/admin-portal/deployed-projects')}
                                 />
                                 <SidebarItem
                                     icon={<Calendar className="w-4 h-4" />}
