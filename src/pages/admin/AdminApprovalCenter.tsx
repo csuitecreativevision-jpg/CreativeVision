@@ -5,12 +5,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { AdminApprovalModal } from '../../components/views/AdminApprovalModal';
 import { FilePreviewModal } from '../../components/ui/FilePreviewModal';
 import { AdminPageLayout } from '../../components/layout/AdminPageLayout';
+import { ThreeLogoLoader } from '../../components/ui/ThreeLogoLoader';
 import { fireCvSwal } from '../../lib/swalTheme';
 import { sendFollowUpRequest } from '../../services/projectFollowUpService';
 
 export default function AdminApprovalCenter() {
     const [items, setItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [dueTodayItems, setDueTodayItems] = useState<any[]>([]);
     const [dueYesterdayItems, setDueYesterdayItems] = useState<any[]>([]);
 
@@ -24,7 +26,11 @@ export default function AdminApprovalCenter() {
     useEffect(() => { loadData(); }, []);
 
     const loadData = async (forceRefresh: boolean = false) => {
-        setLoading(true);
+        if (forceRefresh) {
+            setRefreshing(true);
+        } else {
+            setLoading(true);
+        }
         try {
             const [data, dueToday, dueYesterday] = await Promise.all([
                 getApprovalItems(forceRefresh),
@@ -38,6 +44,7 @@ export default function AdminApprovalCenter() {
             console.error('Failed to load approvals', error);
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
     };
 
@@ -146,6 +153,9 @@ export default function AdminApprovalCenter() {
             </div>
         );
     }
+    if (refreshing) {
+        return <ThreeLogoLoader />;
+    }
 
     return (
         <AdminPageLayout
@@ -155,10 +165,11 @@ export default function AdminApprovalCenter() {
             action={
                 <button
                     onClick={() => loadData(true)}
-                    className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.04] border border-white/[0.07] hover:bg-white/[0.07] text-white/60 hover:text-white text-xs font-semibold transition-all duration-150"
+                    disabled={refreshing}
+                    className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.04] border border-white/[0.07] hover:bg-white/[0.07] disabled:opacity-60 disabled:cursor-not-allowed text-white/60 hover:text-white text-xs font-semibold transition-all duration-150"
                 >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    Refresh
+                    <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+                    {refreshing ? 'Refreshing...' : 'Refresh'}
                 </button>
             }
         >
@@ -184,6 +195,9 @@ export default function AdminApprovalCenter() {
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-semibold text-white truncate">{item.name}</p>
                                         <p className="text-[11px] text-white/45 truncate">{item.editor} · {item.dueText || 'Due today'}</p>
+                                        {item.clientName ? (
+                                            <p className="text-[11px] text-white/40 truncate">Client: {item.clientName}</p>
+                                        ) : null}
                                         <p className="text-[11px] text-violet-300/85 truncate">Progress: {item.progressStatus || 'No status'}</p>
                                     </div>
                                     <button
@@ -222,6 +236,9 @@ export default function AdminApprovalCenter() {
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-semibold text-white truncate">{item.name}</p>
                                         <p className="text-[11px] text-white/45 truncate">{item.editor} · {item.dueText || 'Due yesterday'}</p>
+                                        {item.clientName ? (
+                                            <p className="text-[11px] text-white/40 truncate">Client: {item.clientName}</p>
+                                        ) : null}
                                         <p className="text-[11px] text-amber-200/85 truncate">Progress: {item.progressStatus || 'No status'}</p>
                                     </div>
                                     <button
@@ -275,6 +292,12 @@ export default function AdminApprovalCenter() {
                                         </span>
                                         <span className="text-white/10">·</span>
                                         <span className="text-[11px] text-white/30 font-medium">{item.editor}</span>
+                                        {item.clientName ? (
+                                            <>
+                                                <span className="text-white/10">·</span>
+                                                <span className="text-[11px] text-white/30 font-medium truncate">Client: {item.clientName}</span>
+                                            </>
+                                        ) : null}
                                     </div>
                                 </div>
 

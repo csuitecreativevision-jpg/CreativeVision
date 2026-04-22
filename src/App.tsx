@@ -1,7 +1,9 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import { BackgroundLayout } from './components/layout/BackgroundLayout';
 import { CinematicOverlay } from './components/ui/CinematicOverlay';
+import { ThreeLogoLoader } from './components/ui/ThreeLogoLoader';
 import { MainChatbot } from './components/MainChatbot';
 
 // Lazy Load Pages
@@ -36,6 +38,9 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const REQUIRED_SECRET_CLICKS = 2;
+  const [routeLoading, setRouteLoading] = useState(false);
+  const prevPathRef = useRef(location.pathname);
+  const routeLoaderTimerRef = useRef<number | null>(null);
 
   // Secret portal logic
   const [clickCount, setClickCount] = useState(0);
@@ -60,12 +65,49 @@ export default function App() {
     // Lenis removed for native scroll feel
   }, []);
 
+  useLayoutEffect(() => {
+    if (prevPathRef.current === location.pathname) return;
+    prevPathRef.current = location.pathname;
+    setRouteLoading(true);
+    if (routeLoaderTimerRef.current) {
+      window.clearTimeout(routeLoaderTimerRef.current);
+    }
+    routeLoaderTimerRef.current = window.setTimeout(() => {
+      setRouteLoading(false);
+    }, 900);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    return () => {
+      if (routeLoaderTimerRef.current) {
+        window.clearTimeout(routeLoaderTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleBack = () => {
     navigate(-1);
   };
+  const isPortalPath =
+    location.pathname.startsWith('/admin-portal') ||
+    location.pathname.startsWith('/editor-portal') ||
+    location.pathname.startsWith('/client-portal');
 
   return (
     <BackgroundLayout>
+      <AnimatePresence>
+        {routeLoading ? (
+          <motion.div
+            className={`fixed inset-0 z-[120] ${isPortalPath ? 'lg:left-[240px]' : ''}`}
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+          >
+            <ThreeLogoLoader />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
       {/* Preloader removed */}
       <CinematicOverlay />
 
@@ -91,42 +133,47 @@ export default function App() {
         )}
 
       {/* Main Routing */}
-      <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-black text-white" />}>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/hire" element={<HireUsPage onBack={handleBack} />} />
-          <Route path="/join" element={<JoinPage onBack={() => {
-            navigate('/', { state: { target: 'services' } });
-          }} />} />
-          <Route path="/start" element={<StartProjectPage onBack={() => {
-            navigate('/', { state: { target: 'services' } });
-          }} />} />
-          <Route path="/thank-you" element={<ThankYouPage onBack={handleBack} />} />
-          <Route path="/portfolio" element={<PortfolioPage />} />
-          <Route path="/pricing/:type" element={<PricingPage />} />
-          <Route path="/portal" element={<PortalPage />} />
-          <Route path="/admin-dashboard" element={<PortalRouter />} />
-          <Route path="/admin-portal" element={<AdminPortal />}>
-            <Route index element={<Navigate to="overview" replace />} />
-            <Route path="overview" element={<AdminOverview />} />
-            <Route path="management" element={<AdminManagement />} />
-            <Route path="assign-project" element={<AdminProjectAssignment />} />
-            <Route path="boards" element={<AdminBoards />} />
-            <Route path="settings" element={<AdminSettings />} />
-            <Route path="team" element={<AdminTeam />} />
-            <Route path="clients" element={<AdminClients />} />
-            <Route path="users" element={<AdminUserManagement />} />
-            <Route path="analytics" element={<AdminAnalytics />} />
-            <Route path="approvals" element={<AdminApprovalCenter />} />
-            <Route path="deployments" element={<AdminDeploymentCenter />} />
-            <Route path="time-logs" element={<AdminTimeLogs />} />
-            <Route path="leave-approvals" element={<AdminLeaveApprovals />} />
-            <Route path="calendar" element={<AdminCalendar />} />
-          </Route>
-          <Route path="/editor-portal" element={<EditorPortal />} />
-          <Route path="/client-portal" element={<ClientPortal />} />
-        </Routes>
-      </Suspense>
+      <motion.div
+        animate={{ opacity: routeLoading && !isPortalPath ? 0 : 1 }}
+        transition={{ duration: 0.35, ease: 'easeInOut' }}
+      >
+        <Suspense fallback={<ThreeLogoLoader />}>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/hire" element={<HireUsPage onBack={handleBack} />} />
+            <Route path="/join" element={<JoinPage onBack={() => {
+              navigate('/', { state: { target: 'services' } });
+            }} />} />
+            <Route path="/start" element={<StartProjectPage onBack={() => {
+              navigate('/', { state: { target: 'services' } });
+            }} />} />
+            <Route path="/thank-you" element={<ThankYouPage onBack={handleBack} />} />
+            <Route path="/portfolio" element={<PortfolioPage />} />
+            <Route path="/pricing/:type" element={<PricingPage />} />
+            <Route path="/portal" element={<PortalPage />} />
+            <Route path="/admin-dashboard" element={<PortalRouter />} />
+            <Route path="/admin-portal" element={<AdminPortal />}>
+              <Route index element={<Navigate to="overview" replace />} />
+              <Route path="overview" element={<AdminOverview />} />
+              <Route path="management" element={<AdminManagement />} />
+              <Route path="assign-project" element={<AdminProjectAssignment />} />
+              <Route path="boards" element={<AdminBoards />} />
+              <Route path="settings" element={<AdminSettings />} />
+              <Route path="team" element={<AdminTeam />} />
+              <Route path="clients" element={<AdminClients />} />
+              <Route path="users" element={<AdminUserManagement />} />
+              <Route path="analytics" element={<AdminAnalytics />} />
+              <Route path="approvals" element={<AdminApprovalCenter />} />
+              <Route path="deployments" element={<AdminDeploymentCenter />} />
+              <Route path="time-logs" element={<AdminTimeLogs />} />
+              <Route path="leave-approvals" element={<AdminLeaveApprovals />} />
+              <Route path="calendar" element={<AdminCalendar />} />
+            </Route>
+            <Route path="/editor-portal" element={<EditorPortal />} />
+            <Route path="/client-portal" element={<ClientPortal />} />
+          </Routes>
+        </Suspense>
+      </motion.div>
     </BackgroundLayout>
   );
 }

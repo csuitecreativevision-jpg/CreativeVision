@@ -1892,6 +1892,12 @@ function resolveWorkspaceEditorName(board: any, item: any, editorCol: any): stri
     return editorName;
 }
 
+function resolveWorkspaceClientName(item: any, clientCol: any): string {
+    if (!clientCol?.id) return '';
+    const clientVal = item?.column_values?.find((cv: any) => cv.id === clientCol.id);
+    return String(clientVal?.display_value || clientVal?.text || '').trim();
+}
+
 function isDeadlineDateTimePassed(dueDate: Date | null, now: Date): boolean {
     return !!(dueDate && !Number.isNaN(dueDate.getTime()) && dueDate.getTime() < now.getTime());
 }
@@ -1984,6 +1990,10 @@ export async function getDueTodayItems(forceSync: boolean = false) {
                 const title = String(c.title || '').toLowerCase();
                 return title.includes('editor') || title.includes('owner') || c.type === 'people';
             });
+            const clientCol = board.columns?.find((c: any) => {
+                const title = String(c.title || '').toLowerCase();
+                return title.includes('client') || title.includes('customer') || title.includes('brand') || title.includes('company');
+            });
             const deadlineCol = pickBestDeadlineColumn(board.columns || [], board.items?.[0]);
             if (!deadlineCol?.id) return;
 
@@ -1993,6 +2003,7 @@ export async function getDueTodayItems(forceSync: boolean = false) {
                 if (!showDueToday) return;
 
                 const editorName = resolveWorkspaceEditorName(board, item, editorCol);
+                const clientName = resolveWorkspaceClientName(item, clientCol);
 
                 const statusVal = statusCol ? item.column_values?.find((cv: any) => cv.id === statusCol.id) : null;
                 const progressStatus = String(statusVal?.text || statusVal?.display_value || 'No status').trim();
@@ -2003,6 +2014,7 @@ export async function getDueTodayItems(forceSync: boolean = false) {
                     boardId: board.id,
                     boardName: board.name,
                     editor: editorName,
+                    clientName,
                     progressStatus,
                     dueAt: dueDate ? `${dueYmd} ${String(dueDate.getHours()).padStart(2, '0')}:${String(dueDate.getMinutes()).padStart(2, '0')}` : dueYmd,
                     dueText: dueText || dueYmd,
@@ -2092,6 +2104,10 @@ export async function getDueYesterdayItems(forceSync: boolean = false) {
                 const title = String(c.title || '').toLowerCase();
                 return title.includes('editor') || title.includes('owner') || c.type === 'people';
             });
+            const clientCol = board.columns?.find((c: any) => {
+                const title = String(c.title || '').toLowerCase();
+                return title.includes('client') || title.includes('customer') || title.includes('brand') || title.includes('company');
+            });
             const deadlineCol = pickBestDeadlineColumn(board.columns || [], board.items?.[0]);
             if (!deadlineCol?.id) return;
 
@@ -2100,6 +2116,7 @@ export async function getDueYesterdayItems(forceSync: boolean = false) {
                 if (!dueYmd || dueYmd !== yesterdayYmd) return;
 
                 const editorName = resolveWorkspaceEditorName(board, item, editorCol);
+                const clientName = resolveWorkspaceClientName(item, clientCol);
 
                 const statusVal = statusCol ? item.column_values?.find((cv: any) => cv.id === statusCol.id) : null;
                 const progressStatus = String(statusVal?.text || statusVal?.display_value || 'No status').trim();
@@ -2111,6 +2128,7 @@ export async function getDueYesterdayItems(forceSync: boolean = false) {
                     boardId: board.id,
                     boardName: board.name,
                     editor: editorName,
+                    clientName,
                     progressStatus,
                     dueAt: dueDate ? `${dueYmd} ${String(dueDate.getHours()).padStart(2, '0')}:${String(dueDate.getMinutes()).padStart(2, '0')}` : dueYmd,
                     dueText: dueText || dueYmd,
@@ -2205,6 +2223,10 @@ async function getApprovalItemsFresh(forceSync: boolean = false) {
             c.title.toLowerCase().includes('owner') ||
             c.type === 'people'
         );
+        const clientCol = board.columns?.find((c: any) => {
+            const title = String(c?.title || '').toLowerCase();
+            return title.includes('client') || title.includes('customer') || title.includes('brand') || title.includes('company');
+        });
         const deadlineCol = pickBestDeadlineColumn(board.columns || [], board.items?.[0]);
         const resolveAuxTime = (item: any): { hh: number; mm: number } | null => {
             const timeCol = (board.columns || []).find((c: any) => {
@@ -2273,6 +2295,7 @@ async function getApprovalItemsFresh(forceSync: boolean = false) {
                         .replace(/\((Active|On Hold|Inactive|Done)\)/gi, '')
                         .trim();
                 }
+                const clientName = resolveWorkspaceClientName(item, clientCol);
 
                 let dueAt: string | null = null;
                 let dueText: string = '';
@@ -2337,6 +2360,7 @@ async function getApprovalItemsFresh(forceSync: boolean = false) {
                     boardName: board.name,
                     status: matchingStatusText,
                     editor: editorName,
+                    clientName,
                     videoLink: videoLink,
                     createdAt: item.created_at,
                     group: item.group,
