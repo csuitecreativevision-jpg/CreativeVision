@@ -15,6 +15,7 @@ import {
     fetchGoogleDriveFileTitle,
 } from '../../services/googleDriveLinkService';
 import { LinkifiedInstructionBody, stripHtmlToPlainText } from '../../lib/instructionLinkify';
+import { RichTextEditor } from '../ui/RichTextEditor';
 import {
     Plus,
     Trash2,
@@ -1355,12 +1356,11 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                                 </label>
                                 <label className="block space-y-1">
                                     <span className="text-[10px] font-bold uppercase tracking-widest text-white/35">Instructions</span>
-                                    <textarea
+                                    <RichTextEditor
                                         value={mainForm.instructions}
-                                        onChange={e => setMainForm(f => ({ ...f, instructions: e.target.value }))}
-                                        rows={5}
-                                        className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-3 py-2 text-sm text-white resize-y"
+                                        onChange={val => setMainForm(f => ({ ...f, instructions: val }))}
                                         placeholder="Deployment notes, Loom links, client context…"
+                                        className="min-h-[140px] text-sm text-white border-white/10"
                                     />
                                 </label>
                                 <label className="block space-y-1">

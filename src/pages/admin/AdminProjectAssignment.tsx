@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
 import { AdminPageLayout } from '../../components/layout/AdminPageLayout';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fireCvSwal } from '../../lib/swalTheme';
@@ -38,6 +38,20 @@ import {
     fetchEditorsAvailableForDate,
 } from '../../services/assignProjectMondayIntegration';
 import { DeploymentBoardPanel } from '../../components/admin/DeploymentBoardPanel';
+import {
+    deriveTitleFromVideoUrl,
+    extractGoogleDriveFileId,
+    fetchGoogleDriveFileTitle,
+} from '../../services/googleDriveLinkService';
+import {
+    buildManilaDeadline,
+    formatDeadlineInManila,
+    manilaPickerPartsFromDate,
+    parseManilaDeadlineForPicker,
+    parseYmdToNoonManila,
+    todaysYmdManila,
+    ymdInManila,
+} from '../../lib/philippinesTime';
 
 const MONDAY_AVAILABILITY_URL = `https://creative-vision-unit.monday.com/boards/${ASSIGN_PROJECT_MONDAY_BOARD_IDS.availability}/views`;
 
@@ -51,18 +65,6 @@ const WEEKDAY_PICKER: { label: string; title: string }[] = [
     { label: 'S', title: 'Saturday' },
     { label: 'Sun', title: 'Sunday' },
 ];
-
-function yyyyMmDdLocal(d: Date): string {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-}
-
-function parseLocalYmd(ymd: string): Date {
-    const [y, mo, d] = ymd.split('-').map(Number);
-    return new Date(y, mo - 1, d, 12, 0, 0, 0);
-}
 
 function startOfWeekMondayLocal(d: Date): Date {
     const x = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0, 0);
@@ -78,39 +80,10 @@ function addDaysLocal(d: Date, n: number): Date {
     return x;
 }
 
-function to12HourParts(hours24: number): { hour12: string; ampm: 'AM' | 'PM' } {
-    const ampm: 'AM' | 'PM' = hours24 >= 12 ? 'PM' : 'AM';
-    let hour12 = hours24 % 12;
-    if (hour12 === 0) hour12 = 12;
-    return { hour12: String(hour12).padStart(2, '0'), ampm };
-}
-
-function to24Hour(hour12: string, ampm: 'AM' | 'PM'): number {
-    let h = Number(hour12);
-    if (Number.isNaN(h) || h < 1 || h > 12) h = 12;
-    if (ampm === 'AM') return h === 12 ? 0 : h;
-    return h === 12 ? 12 : h + 12;
-}
-
-function parseDeadlineLocal(deadline: string): { ymd: string; hour12: string; minute: string; ampm: 'AM' | 'PM' } {
-    if (deadline && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(deadline)) {
-        const ymd = deadline.slice(0, 10);
-        const hh = Number(deadline.slice(11, 13));
-        const mm = deadline.slice(14, 16);
-        const parts = to12HourParts(hh);
-        return { ymd, hour12: parts.hour12, minute: mm, ampm: parts.ampm };
-    }
-    const now = new Date();
-    const ymd = yyyyMmDdLocal(now);
-    const parts = to12HourParts(now.getHours());
-    return { ymd, hour12: parts.hour12, minute: String(now.getMinutes()).padStart(2, '0'), ampm: parts.ampm };
-}
-
-function buildDeadlineLocal(ymd: string, hour12: string, minute: string, ampm: 'AM' | 'PM'): string {
-    const hh24 = String(to24Hour(hour12, ampm)).padStart(2, '0');
-    const mm = String(Math.max(0, Math.min(59, Number(minute) || 0))).padStart(2, '0');
-    return `${ymd}T${hh24}:${mm}`;
-}
+/** 01–12 for 12h deadline pickers. */
+const DEADLINE_PICKER_HOUR_VALUES = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
+/** 00–59. */
+const DEADLINE_PICKER_MINUTE_VALUES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
 
 // ── Field wrapper ────────────────────────────────────────────────────────────
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
@@ -193,19 +166,23 @@ export default function AdminProjectAssignment() {
     const [availabilityPickDate, setAvailabilityPickDate] = useState('');
     const [isAvailabilityCalendarOpen, setIsAvailabilityCalendarOpen] = useState(false);
     const [availabilityCalendarMonth, setAvailabilityCalendarMonth] = useState<Date>(() => {
-        const t = new Date();
-        return new Date(t.getFullYear(), t.getMonth(), 1, 12, 0, 0, 0);
+        const a = parseYmdToNoonManila(todaysYmdManila());
+        return new Date(a.getFullYear(), a.getMonth(), 1, 12, 0, 0, 0);
     });
     const availabilityCalendarRef = useRef<HTMLDivElement>(null);
     const [isDeadlinePickerOpen, setIsDeadlinePickerOpen] = useState(false);
     const [deadlinePickerMonth, setDeadlinePickerMonth] = useState<Date>(() => {
-        const t = new Date();
-        return new Date(t.getFullYear(), t.getMonth(), 1, 12, 0, 0, 0);
+        const a = parseYmdToNoonManila(todaysYmdManila());
+        return new Date(a.getFullYear(), a.getMonth(), 1, 12, 0, 0, 0);
     });
-    const [deadlinePickerYmd, setDeadlinePickerYmd] = useState(yyyyMmDdLocal(new Date()));
+    const [deadlinePickerYmd, setDeadlinePickerYmd] = useState(todaysYmdManila());
     const [deadlinePickerHour, setDeadlinePickerHour] = useState('12');
     const [deadlinePickerMinute, setDeadlinePickerMinute] = useState('00');
     const [deadlinePickerAmPm, setDeadlinePickerAmPm] = useState<'AM' | 'PM'>('PM');
+    /** Scroll list for hour/minute; replaces fragile numeric text inputs on touch / mixed IME. */
+    const [timeListOpen, setTimeListOpen] = useState<null | 'hour' | 'minute'>(null);
+    const timeHourListRef = useRef<HTMLDivElement>(null);
+    const timeMinuteListRef = useRef<HTMLDivElement>(null);
     const deadlinePickerRef = useRef<HTMLDivElement>(null);
 
     const initialProjectState = {
@@ -278,6 +255,54 @@ export default function AdminProjectAssignment() {
             return next;
         });
     };
+
+    /** Match deployment board: autofill name from Google Drive (API key) or best-effort URL. Only when project name is still empty. */
+    const tryAutofillProjectNameFromDrive = useCallback(async (projectIndex: number, url: string) => {
+        const cleanUrl = url.trim();
+        if (!cleanUrl) return;
+        let title: string | null = null;
+        const fileId = extractGoogleDriveFileId(cleanUrl);
+        if (fileId) {
+            title = await fetchGoogleDriveFileTitle(fileId);
+        }
+        if (!title) {
+            title = deriveTitleFromVideoUrl(cleanUrl);
+        }
+        const clean = title?.trim();
+        if (!clean) return;
+        setProjects(prev => {
+            const p = prev[projectIndex];
+            if (!p) return prev;
+            if (p.projectName?.trim() !== '') return prev;
+            if (p.rawVideoLink?.trim() !== cleanUrl) return prev;
+            return prev.map((row, j) => (j === projectIndex ? { ...row, projectName: clean } : row));
+        });
+    }, []);
+
+    const rawVideoNameTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const scheduleProjectNameFromDrive = useCallback(
+        (rawUrl: string) => {
+            if (rawVideoNameTimerRef.current) {
+                clearTimeout(rawVideoNameTimerRef.current);
+                rawVideoNameTimerRef.current = null;
+            }
+            const projectIndex = activeProjectIndex;
+            const urlSnapshot = rawUrl.trim();
+            if (!urlSnapshot) return;
+            rawVideoNameTimerRef.current = setTimeout(() => {
+                rawVideoNameTimerRef.current = null;
+                void tryAutofillProjectNameFromDrive(projectIndex, urlSnapshot);
+            }, 850);
+        },
+        [activeProjectIndex, tryAutofillProjectNameFromDrive]
+    );
+
+    useEffect(() => {
+        return () => {
+            if (rawVideoNameTimerRef.current) clearTimeout(rawVideoNameTimerRef.current);
+        };
+    }, []);
 
     const setEditorFromQuickPick = (label: string) => {
         const resolved = resolveEditorFromMondayLabel(label);
@@ -371,24 +396,25 @@ export default function AdminProjectAssignment() {
         if (availabilityPickDate && /^\d{4}-\d{2}-\d{2}$/.test(availabilityPickDate)) return availabilityPickDate;
         const fromDeadline = deadlineToYyyyMmDd(activeProject.deadline);
         if (fromDeadline) return fromDeadline;
-        return yyyyMmDdLocal(new Date());
+        return todaysYmdManila();
     }, [activeProject.deadline, availabilityPickDate]);
 
     const availabilityWeekStrip = useMemo(() => {
-        const start = startOfWeekMondayLocal(parseLocalYmd(availabilityQueryDay));
+        const start = startOfWeekMondayLocal(parseYmdToNoonManila(availabilityQueryDay));
         return Array.from({ length: 7 }, (_, i) => {
             const d = addDaysLocal(start, i);
-            return { ymd: yyyyMmDdLocal(d), date: d };
+            return { ymd: ymdInManila(d), date: d };
         });
     }, [availabilityQueryDay]);
 
-    const todayYmd = yyyyMmDdLocal(new Date());
+    const todayYmd = todaysYmdManila();
 
-    const availabilityDayLabel = new Date(`${availabilityQueryDay}T12:00:00`).toLocaleDateString(undefined, {
+    const availabilityDayLabel = new Date(`${availabilityQueryDay}T12:00:00+08:00`).toLocaleDateString('en-PH', {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
         year: 'numeric',
+        timeZone: 'Asia/Manila',
     });
 
     useEffect(() => {
@@ -422,27 +448,47 @@ export default function AdminProjectAssignment() {
     };
 
     const openAvailabilityDatePicker = () => {
-        const anchor = parseLocalYmd(availabilityPickDate || availabilityQueryDay);
+        const anchor = parseYmdToNoonManila(availabilityPickDate || availabilityQueryDay);
         setAvailabilityCalendarMonth(new Date(anchor.getFullYear(), anchor.getMonth(), 1, 12, 0, 0, 0));
         setIsAvailabilityCalendarOpen(prev => !prev);
     };
 
     const openDeadlinePicker = () => {
-        const parsed = parseDeadlineLocal(activeProject.deadline || '');
+        const parsed = parseManilaDeadlineForPicker(activeProject.deadline || '');
         setDeadlinePickerYmd(parsed.ymd);
         setDeadlinePickerHour(parsed.hour12);
         setDeadlinePickerMinute(parsed.minute);
         setDeadlinePickerAmPm(parsed.ampm);
-        const d = parseLocalYmd(parsed.ymd);
+        const d = parseYmdToNoonManila(parsed.ymd);
         setDeadlinePickerMonth(new Date(d.getFullYear(), d.getMonth(), 1, 12, 0, 0, 0));
+        setTimeListOpen(null);
         setIsDeadlinePickerOpen(prev => !prev);
     };
 
     const applyDeadlinePicker = () => {
-        const value = buildDeadlineLocal(deadlinePickerYmd, deadlinePickerHour, deadlinePickerMinute, deadlinePickerAmPm);
+        const value = buildManilaDeadline(deadlinePickerYmd, deadlinePickerHour, deadlinePickerMinute, deadlinePickerAmPm);
         updateCurrentProject({ deadline: value });
+        setTimeListOpen(null);
         setIsDeadlinePickerOpen(false);
     };
+
+    useEffect(() => {
+        if (!isDeadlinePickerOpen) setTimeListOpen(null);
+    }, [isDeadlinePickerOpen]);
+
+    useLayoutEffect(() => {
+        if (timeListOpen === 'hour' && timeHourListRef.current) {
+            const el = timeHourListRef.current.querySelector('[data-active="true"]') as HTMLElement | null;
+            el?.scrollIntoView({ block: 'center' });
+        }
+    }, [timeListOpen, deadlinePickerHour, isDeadlinePickerOpen]);
+
+    useLayoutEffect(() => {
+        if (timeListOpen === 'minute' && timeMinuteListRef.current) {
+            const el = timeMinuteListRef.current.querySelector('[data-active="true"]') as HTMLElement | null;
+            el?.scrollIntoView({ block: 'center' });
+        }
+    }, [timeListOpen, deadlinePickerMinute, isDeadlinePickerOpen]);
 
     useEffect(() => {
         if (!isAvailabilityCalendarOpen) return;
@@ -508,7 +554,7 @@ export default function AdminProjectAssignment() {
                     announceAssignment({
                         projectName: project.projectName, clientName: project.client || 'N/A',
                         editorName: project.editor, checkerName: project.checkerName, price: project.price,
-                        deadline: project.deadline ? new Date(project.deadline).toLocaleString() : undefined,
+                        deadline: project.deadline ? formatDeadlineInManila(project.deadline) : undefined,
                         instructions: project.instructions
                     }).catch(err => console.error('Discord failed', err));
 
@@ -524,7 +570,7 @@ export default function AdminProjectAssignment() {
                                     return allowedBoardMatch || nameMatch;
                                 });
                                 if (matchedUser?.email) {
-                                    const deadlineStr = project.deadline ? ` | Deadline: ${new Date(project.deadline).toLocaleDateString()}` : '';
+                                    const deadlineStr = project.deadline ? ` | Deadline: ${formatDeadlineInManila(project.deadline, false)}` : '';
                                     const checkerStr = project.checkerName ? ` | Checker: ${project.checkerName}` : '';
                                     const typeStr = project.projectType ? ` | Type: ${project.projectType}` : '';
                                     await createNotification({
@@ -693,26 +739,29 @@ export default function AdminProjectAssignment() {
                                         >
                                             <span className={activeProject.deadline ? 'text-white' : 'text-white/25'}>
                                                 {activeProject.deadline
-                                                    ? new Date(activeProject.deadline).toLocaleString(undefined, { month: '2-digit', day: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit' })
-                                                    : 'mm/dd/yyyy --:-- --'}
+                                                    ? formatDeadlineInManila(activeProject.deadline, true)
+                                                    : 'mm/dd/yyyy --:-- -- (PH)'}
                                             </span>
                                             <Calendar className="w-4 h-4 text-white/55" />
                                         </button>
 
                                         {isDeadlinePickerOpen && (
                                             <div className="absolute z-[90] mt-2 w-[20rem] max-w-[calc(100vw-2rem)] rounded-xl border border-white/[0.12] bg-[#121425] p-2.5 space-y-2 shadow-2xl">
-                                                <div className="flex items-center justify-between gap-2">
+                                                <div
+                                                    className="flex items-center justify-between gap-2"
+                                                    onMouseDown={() => setTimeListOpen(null)}
+                                                >
                                                     <button
                                                         type="button"
                                                         onClick={() => {
-                                                            const t = new Date();
-                                                            const ymd = yyyyMmDdLocal(t);
-                                                            setDeadlinePickerYmd(ymd);
-                                                            const p = to12HourParts(t.getHours());
+                                                            const p = manilaPickerPartsFromDate(new Date());
+                                                            setDeadlinePickerYmd(p.ymd);
                                                             setDeadlinePickerHour(p.hour12);
-                                                            setDeadlinePickerMinute(String(t.getMinutes()).padStart(2, '0'));
+                                                            setDeadlinePickerMinute(p.minute);
                                                             setDeadlinePickerAmPm(p.ampm);
-                                                            setDeadlinePickerMonth(new Date(t.getFullYear(), t.getMonth(), 1, 12, 0, 0, 0));
+                                                            const a = parseYmdToNoonManila(p.ymd);
+                                                            setDeadlinePickerMonth(new Date(a.getFullYear(), a.getMonth(), 1, 12, 0, 0, 0));
+                                                            setTimeListOpen(null);
                                                         }}
                                                         className="px-2 py-1 rounded-md border border-white/[0.14] bg-white/[0.03] text-[10px] font-bold text-white/75 hover:text-white hover:bg-white/[0.07] transition-colors"
                                                     >
@@ -724,7 +773,10 @@ export default function AdminProjectAssignment() {
                                                 </div>
 
                                                 <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-1.5">
-                                                    <div className="flex items-center gap-1 min-w-0">
+                                                    <div
+                                                        className="flex items-center gap-1 min-w-0"
+                                                        onMouseDown={() => setTimeListOpen(null)}
+                                                    >
                                                         <button
                                                             type="button"
                                                             onClick={() => setDeadlinePickerMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1, 12, 0, 0, 0))}
@@ -740,67 +792,105 @@ export default function AdminProjectAssignment() {
                                                             <ChevronRight className="w-3.5 h-3.5" />
                                                         </button>
                                                         <div className="text-[11px] font-bold text-white/85 tracking-wide ml-1.5 leading-tight">
-                                                            {deadlinePickerMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+                                                            {deadlinePickerMonth.toLocaleDateString('en-PH', {
+                                                                month: 'long',
+                                                                year: 'numeric',
+                                                                timeZone: 'Asia/Manila',
+                                                            })}
                                                         </div>
                                                     </div>
-                                                    <div className="h-7 rounded-md border border-white/[0.12] bg-white/[0.03] px-1.5 flex items-center gap-1">
-                                                        <input
-                                                            type="text"
-                                                            inputMode="numeric"
-                                                            maxLength={2}
-                                                            value={deadlinePickerHour}
-                                                            onChange={(e) => {
-                                                                const next = e.target.value.replace(/\D/g, '').slice(0, 2);
-                                                                if (next === '') {
-                                                                    setDeadlinePickerHour('');
-                                                                    return;
-                                                                }
-                                                                const n = Number(next);
-                                                                if (Number.isNaN(n)) return;
-                                                                setDeadlinePickerHour(String(Math.max(1, Math.min(12, n))).padStart(2, '0'));
-                                                            }}
-                                                            onBlur={() => {
-                                                                const n = Number(deadlinePickerHour) || 12;
-                                                                setDeadlinePickerHour(String(Math.max(1, Math.min(12, n))).padStart(2, '0'));
-                                                            }}
-                                                            className="w-8 bg-transparent text-center text-[11px] font-semibold text-white outline-none"
+                                                    <div className="relative h-7 rounded-md border border-white/[0.12] bg-white/[0.03]">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setTimeListOpen(t => (t === 'hour' ? null : 'hour'))}
+                                                            className="h-7 w-full min-w-[3rem] pl-1.5 pr-1 flex items-center justify-center gap-0.5 text-[11px] font-semibold text-white outline-none rounded-md hover:bg-white/[0.05] focus-visible:ring-1 focus-visible:ring-violet-500/60"
+                                                            aria-haspopup="listbox"
+                                                            aria-expanded={timeListOpen === 'hour'}
                                                             aria-label="Hour"
-                                                        />
+                                                        >
+                                                            <span className="tabular-nums">{deadlinePickerHour}</span>
+                                                            <ChevronDown className="w-3 h-3 text-white/45 shrink-0 pointer-events-none" />
+                                                        </button>
+                                                        {timeListOpen === 'hour' && (
+                                                            <div
+                                                                ref={timeHourListRef}
+                                                                role="listbox"
+                                                                className="absolute left-0 top-full z-[100] mt-0.5 w-full min-w-[3.25rem] max-h-36 overflow-y-auto overscroll-y-contain rounded-md border border-violet-500/30 bg-[#0d1020] py-0.5 shadow-lg"
+                                                            >
+                                                                {DEADLINE_PICKER_HOUR_VALUES.map(h => (
+                                                                    <button
+                                                                        key={h}
+                                                                        type="button"
+                                                                        role="option"
+                                                                        data-active={deadlinePickerHour === h ? 'true' : undefined}
+                                                                        aria-selected={deadlinePickerHour === h}
+                                                                        onClick={() => { setDeadlinePickerHour(h); setTimeListOpen(null); }}
+                                                                        className={`w-full py-1 text-center text-[11px] font-semibold tabular-nums transition-colors ${
+                                                                            deadlinePickerHour === h
+                                                                                ? 'bg-violet-500/30 text-white'
+                                                                                : 'text-white/75 hover:bg-white/[0.08] hover:text-white'
+                                                                        }`}
+                                                                    >
+                                                                        {h}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                    <div className="h-7 rounded-md border border-white/[0.12] bg-white/[0.03] px-1.5 flex items-center gap-1">
-                                                        <input
-                                                            type="text"
-                                                            inputMode="numeric"
-                                                            maxLength={2}
-                                                            value={deadlinePickerMinute}
-                                                            onChange={(e) => {
-                                                                const next = e.target.value.replace(/\D/g, '').slice(0, 2);
-                                                                if (next === '') {
-                                                                    setDeadlinePickerMinute('');
-                                                                    return;
-                                                                }
-                                                                const n = Number(next);
-                                                                if (Number.isNaN(n)) return;
-                                                                setDeadlinePickerMinute(String(Math.max(0, Math.min(59, n))).padStart(2, '0'));
-                                                            }}
-                                                            onBlur={() => {
-                                                                const n = Number(deadlinePickerMinute) || 0;
-                                                                setDeadlinePickerMinute(String(Math.max(0, Math.min(59, n))).padStart(2, '0'));
-                                                            }}
-                                                            className="w-8 bg-transparent text-center text-[11px] font-semibold text-white outline-none"
+                                                    <div className="relative h-7 rounded-md border border-white/[0.12] bg-white/[0.03]">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setTimeListOpen(t => (t === 'minute' ? null : 'minute'))}
+                                                            className="h-7 w-full min-w-[3rem] pl-1.5 pr-1 flex items-center justify-center gap-0.5 text-[11px] font-semibold text-white outline-none rounded-md hover:bg-white/[0.05] focus-visible:ring-1 focus-visible:ring-violet-500/60"
+                                                            aria-haspopup="listbox"
+                                                            aria-expanded={timeListOpen === 'minute'}
                                                             aria-label="Minute"
-                                                        />
+                                                        >
+                                                            <span className="tabular-nums">{deadlinePickerMinute}</span>
+                                                            <ChevronDown className="w-3 h-3 text-white/45 shrink-0 pointer-events-none" />
+                                                        </button>
+                                                        {timeListOpen === 'minute' && (
+                                                            <div
+                                                                ref={timeMinuteListRef}
+                                                                role="listbox"
+                                                                className="absolute left-0 right-0 top-full z-[100] mt-0.5 w-full min-w-[3.25rem] max-h-36 overflow-y-auto overscroll-y-contain rounded-md border border-violet-500/30 bg-[#0d1020] py-0.5 shadow-lg"
+                                                            >
+                                                                {DEADLINE_PICKER_MINUTE_VALUES.map(m => (
+                                                                    <button
+                                                                        key={m}
+                                                                        type="button"
+                                                                        role="option"
+                                                                        data-active={deadlinePickerMinute === m ? 'true' : undefined}
+                                                                        aria-selected={deadlinePickerMinute === m}
+                                                                        onClick={() => { setDeadlinePickerMinute(m); setTimeListOpen(null); }}
+                                                                        className={`w-full py-1 text-center text-[11px] font-semibold tabular-nums transition-colors ${
+                                                                            deadlinePickerMinute === m
+                                                                                ? 'bg-violet-500/30 text-white'
+                                                                                : 'text-white/75 hover:bg-white/[0.08] hover:text-white'
+                                                                        }`}
+                                                                    >
+                                                                        {m}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                     <button
                                                         type="button"
-                                                        onClick={() => setDeadlinePickerAmPm(prev => (prev === 'AM' ? 'PM' : 'AM'))}
+                                                        onClick={() => {
+                                                            setTimeListOpen(null);
+                                                            setDeadlinePickerAmPm(prev => (prev === 'AM' ? 'PM' : 'AM'));
+                                                        }}
                                                         className="h-7 min-w-[2.75rem] rounded-md border border-white/[0.12] bg-white/[0.03] text-white text-[11px] font-semibold hover:bg-white/[0.08] transition-colors"
                                                     >
                                                         {deadlinePickerAmPm}
                                                     </button>
                                                 </div>
 
-                                                <div className="grid grid-cols-7 gap-1">
+                                                <div
+                                                    className="grid grid-cols-7 gap-1"
+                                                    onMouseDown={() => setTimeListOpen(null)}
+                                                >
                                                     {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
                                                         <div key={d} className="h-5 flex items-center justify-center text-[10px] font-bold text-white/35">{d}</div>
                                                     ))}
@@ -810,7 +900,7 @@ export default function AdminProjectAssignment() {
                                                         const gridStart = addDaysLocal(first, -startIdx);
                                                         return Array.from({ length: 42 }, (_, idx) => {
                                                             const d = addDaysLocal(gridStart, idx);
-                                                            const ymd = yyyyMmDdLocal(d);
+                                                            const ymd = ymdInManila(d);
                                                             const inMonth = d.getMonth() === deadlinePickerMonth.getMonth();
                                                             const isSelected = ymd === deadlinePickerYmd;
                                                             return (
@@ -857,10 +947,24 @@ export default function AdminProjectAssignment() {
                                 <Field label="Raw Video Link">
                                     <div className="relative">
                                         <Link className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 pointer-events-none" />
-                                        <input type="url" value={activeProject.rawVideoLink}
-                                            onChange={e => updateCurrentProject({ rawVideoLink: e.target.value })}
+                                        <input
+                                            type="url"
+                                            value={activeProject.rawVideoLink}
+                                            onChange={e => {
+                                                const v = e.target.value;
+                                                updateCurrentProject({ rawVideoLink: v });
+                                                scheduleProjectNameFromDrive(v);
+                                            }}
+                                            onBlur={e => {
+                                                if (rawVideoNameTimerRef.current) {
+                                                    clearTimeout(rawVideoNameTimerRef.current);
+                                                    rawVideoNameTimerRef.current = null;
+                                                }
+                                                void tryAutofillProjectNameFromDrive(activeProjectIndex, e.target.value);
+                                            }}
                                             placeholder="https://drive.google.com/..."
-                                            className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-violet-500/50 transition-colors" />
+                                            className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-violet-500/50 transition-colors"
+                                        />
                                     </div>
                                 </Field>
 
@@ -1190,7 +1294,7 @@ export default function AdminProjectAssignment() {
                                             const gridStart = addDaysLocal(monthStart, -mondayIndex);
                                             return Array.from({ length: 42 }, (_, idx) => {
                                                 const d = addDaysLocal(gridStart, idx);
-                                                const ymd = yyyyMmDdLocal(d);
+                                                const ymd = ymdInManila(d);
                                                 const inMonth = d.getMonth() === availabilityCalendarMonth.getMonth();
                                                 const isSelected = ymd === availabilityQueryDay;
                                                 const isToday = ymd === todayYmd;

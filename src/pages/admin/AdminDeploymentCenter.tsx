@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { deploymentService, DeploymentNote, DeploymentFolder } from '../../services/deploymentService';
 import { Plus, Edit2, Trash2, ExternalLink, Calendar as CalendarIcon, Loader2, X, DollarSign, RefreshCw, Layers, Folder } from 'lucide-react';
+import { RichTextEditor } from '../../components/ui/RichTextEditor';
+import { stripHtmlToPlainText } from '../../lib/instructionLinkify';
 
 export default function AdminDeploymentCenter() {
     const role = localStorage.getItem('portal_user_role');
@@ -357,8 +359,15 @@ export default function AdminDeploymentCenter() {
                                                 </span>
                                             </td>
                                             <td className="p-4 align-top max-w-[300px]">
-                                                <p className="text-sm text-gray-400 line-clamp-2 leading-relaxed" title={note.instructions}>
-                                                    {note.instructions || <span className="text-gray-600 italic">No instructions provided.</span>}
+                                                <p
+                                                    className="text-sm text-gray-400 line-clamp-2 leading-relaxed"
+                                                    title={note.instructions ? stripHtmlToPlainText(note.instructions) : undefined}
+                                                >
+                                                    {note.instructions ? (
+                                                        stripHtmlToPlainText(note.instructions)
+                                                    ) : (
+                                                        <span className="text-gray-600 italic">No instructions provided.</span>
+                                                    )}
                                                 </p>
                                             </td>
                                             <td className="p-4 align-top">
@@ -525,11 +534,11 @@ export default function AdminDeploymentCenter() {
 
                                     <div className="space-y-2 mt-6">
                                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Deployment Instructions</label>
-                                        <textarea
-                                            value={formData.instructions}
-                                            onChange={(e) => setFormData({ ...formData, instructions: e.target.value })}
-                                            className="w-full bg-[#07070f] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all placeholder:text-gray-600 font-medium custom-scrollbar resize-y min-h-[120px]"
+                                        <RichTextEditor
+                                            value={formData.instructions || ''}
+                                            onChange={val => setFormData(f => ({ ...f, instructions: val }))}
                                             placeholder="Add specific posting instructions, captions, hooks, tags..."
+                                            className="min-h-[140px] text-sm text-white border border-white/10"
                                         />
                                     </div>
 

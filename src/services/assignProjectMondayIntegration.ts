@@ -2,6 +2,7 @@
  * Monday.com: editor availability for Admin → Assign Project (optional sidebar).
  * Availability board: https://creative-vision-unit.monday.com/boards/7616044423/views
  */
+import { ymdInManila } from '../lib/philippinesTime';
 import { getBoardItems, getUsers } from './mondayService';
 
 export const ASSIGN_PROJECT_MONDAY_BOARD_IDS = {
@@ -403,8 +404,5 @@ export function deadlineToYyyyMmDd(deadlineInput: string): string | null {
     if (!deadlineInput || !deadlineInput.trim()) return null;
     const d = new Date(deadlineInput);
     if (Number.isNaN(d.getTime())) return null;
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+    return ymdInManila(d);
 }

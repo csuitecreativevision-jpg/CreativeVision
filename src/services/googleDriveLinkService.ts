@@ -8,6 +8,20 @@
 let warnedMissingKey = false;
 let warnedDriveApiFailure = false;
 
+/** Trailing video container extensions — removed from autofill titles (Drive file name is often `Project.mp4`). */
+const VIDEO_FILE_EXT_RE = /\.(mp4|mov|webm|m4v|avi|mkv|wmv|flv|ogv|mpg|mpeg|mts|m2ts|3gp)$/i;
+
+/**
+ * Strips a trailing video file extension for display as project / row title.
+ * If nothing would remain, returns the original string trimmed.
+ */
+export function stripVideoFileExtensionFromTitle(name: string): string {
+    const t = name.trim();
+    if (!t) return t;
+    const without = t.replace(VIDEO_FILE_EXT_RE, '').trim();
+    return without || t;
+}
+
 /** Extract a Drive file id from common share URL shapes. Returns null for folders or unrecognized URLs. */
 export function extractGoogleDriveFileId(raw: string): string | null {
     const s = raw.trim();
@@ -56,7 +70,9 @@ export function deriveTitleFromVideoUrl(raw: string): string | null {
         const decoded = decodeURIComponent(candidate).replace(/\+/g, ' ');
         if (!decoded) return null;
         const trimmed = decoded.length > 200 ? `${decoded.slice(0, 197)}…` : decoded;
-        if (trimmed.includes('.') || trimmed.length >= 4) return trimmed;
+        if (trimmed.includes('.') || trimmed.length >= 4) {
+            return stripVideoFileExtensionFromTitle(trimmed);
+        }
         return null;
     } catch {
         return null;
@@ -97,7 +113,8 @@ export async function fetchGoogleDriveFileTitle(fileId: string): Promise<string 
             }
             return null;
         }
-        return typeof data.name === 'string' && data.name.trim() ? data.name.trim() : null;
+        if (typeof data.name !== 'string' || !data.name.trim()) return null;
+        return stripVideoFileExtensionFromTitle(data.name.trim());
     } catch {
         return null;
     }

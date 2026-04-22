@@ -166,6 +166,20 @@ export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dro
     if (colValueObj && colValueObj.value) {
         try {
             const val = JSON.parse(colValueObj.value);
+            // long_text: Monday stores content in `value` JSON as { text: "…" }; top-level .text is often empty.
+            if (column.type === 'long_text' && val && typeof val === 'object' && typeof val.text === 'string' && val.text) {
+                displayValue = val.text;
+            }
+            if (
+                column.type === 'text' &&
+                !displayValue &&
+                val &&
+                typeof val === 'object' &&
+                typeof val.text === 'string' &&
+                val.text
+            ) {
+                displayValue = val.text;
+            }
             // Link
             if (column.type === 'link') {
                 linkUrl = val.url;
@@ -883,7 +897,9 @@ export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dro
     return (
         <div
             onClick={() => setIsEditing(true)}
-            className="select-text cursor-text hover:bg-white/5 px-2 py-1 rounded-md transition-colors text-gray-200 text-sm min-h-[28px] w-full border border-transparent hover:border-white/5 flex items-center"
+            className={`select-text cursor-text hover:bg-white/5 px-2 py-1 rounded-md transition-colors text-gray-200 text-sm min-h-[28px] w-full border border-transparent hover:border-white/5 flex ${
+                column.type === 'long_text' ? 'items-start whitespace-pre-wrap break-words' : 'items-center'
+            }`}
         >
             {displayValue || <span className="text-gray-600 text-xs italic">Empty</span>}
         </div>
