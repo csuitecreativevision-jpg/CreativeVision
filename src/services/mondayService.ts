@@ -1549,6 +1549,71 @@ export async function setItemDescriptionFromMarkdown(
     }
 }
 
+/**
+ * Creates a Monday Workdoc inside a **doc-type column cell** for a specific item,
+ * then writes the instruction text into it as a `normal_text` doc block.
+ *
+ * Flow: `create_doc` (location = board item + column) → `create_doc_block` (normal_text).
+ * Requires API version 2026-04+.
+ */
+export async function createDocInColumn(
+    itemId: string,
+    columnId: string,
+    textContent: string
+): Promise<{ success: boolean; docId?: string; error?: string }> {
+    if (!MONDAY_API_TOKEN || MONDAY_API_TOKEN === "YOUR_MONDAY_API_TOKEN") {
+        return { success: false, error: "no_token" };
+    }
+    const body = textContent.trim();
+    if (!body) return { success: true };
+
+    try {
+        // Step 1 — Create a Workdoc inside the doc column cell
+        //   CreateDocBoardInput only accepts: column_id (String!) and item_id (ID!)
+        const createDocQuery = `mutation CreateDocInColumn($itemId: ID!, $columnId: String!) {
+  create_doc(
+    location: { board: { item_id: $itemId, column_id: $columnId } }
+  ) {
+    id
+  }
+}`;
+        const docResult: any = await mondayRequest(
+            createDocQuery,
+            { itemId: Number(itemId), columnId },
+            3,
+            1000,
+            MONDAY_API_VERSION_DOC_BLOCKS
+        );
+        const docId = docResult?.create_doc?.id;
+        if (!docId) {
+            return { success: false, error: "create_doc returned no id" };
+        }
+
+        // Step 2 — Add a normal_text block with the instructions content
+        //   Monday expects Delta format: {"deltaFormat":[{"insert":"text\n"}]}
+        const delta = JSON.stringify({
+            deltaFormat: [{ insert: body + "\n" }]
+        });
+        const addBlockQuery = `mutation AddDocBlock($docId: ID!, $content: JSON!) {
+  create_doc_block(doc_id: $docId, type: normal_text, content: $content) {
+    id
+  }
+}`;
+        await mondayRequest(
+            addBlockQuery,
+            { docId: Number(docId), content: delta },
+            2,
+            1000,
+            MONDAY_API_VERSION_DOC_BLOCKS
+        );
+
+        console.log(`[Monday] Created doc (ID ${docId}) in column "${columnId}" for item ${itemId}`);
+        return { success: true, docId: String(docId) };
+    } catch (e: any) {
+        return { success: false, error: e?.message || String(e) };
+    }
+}
+
 export async function submitProjectAssignment(
     boardId: string,
     groupId: string,
@@ -1575,14 +1640,14 @@ export async function submitProjectAssignment(
             if (isLoom(t)) return false;
             return t === 'instructions / notes' || t === 'instructions' || t === 'notes';
         });
-        // Prefer a real text / long_text column (API value shape depends on type).
+        // Prefer a real text / long_text / doc column (API value shape depends on type).
         const fromKeyword = columns.filter((c: any) => {
             const t = String(c.title || '').toLowerCase();
             if (isLoom(t)) return false;
             return t.includes('instruction') || t.includes('notes');
         });
         return (
-            fromKeyword.find((c: any) => c.type === 'long_text' || c.type === 'text') ||
+            fromKeyword.find((c: any) => c.type === 'doc' || c.type === 'long_text' || c.type === 'text') ||
             exact ||
             fromKeyword[0] ||
             columns.find((c: any) => {
@@ -1612,7 +1677,9 @@ export async function submitProjectAssignment(
     const instructionPlain = instructionSource
         ? stripHtmlToPlainText(instructionSource).trim()
         : "";
-    if (instructionPlain && instructionId) {
+    const isInstructionDocColumn = instructionColResolved?.type === "doc";
+    // Only set column value for text/long_text columns; doc columns are handled after item creation
+    if (instructionPlain && instructionId && !isInstructionDocColumn) {
         if (instructionColResolved?.type === "text") {
             columnValues[instructionId] = instructionPlain;
         } else {
@@ -1737,14 +1804,31 @@ export async function submitProjectAssignment(
     }
 
     if (instructionPlain) {
-        const r = await setItemDescriptionFromMarkdown(String(newItemId), instructionPlain);
-        if (!r.success) {
-            console.warn(
-                "[Monday] Could not sync instructions to the item Workdoc (description). " +
-                "The Instructions column is still set. " +
-                "Error:",
-                r.error
-            );
+        let docSynced = false;
+
+        // If the Instructions column is a doc column, create a Workdoc inside it
+        if (isInstructionDocColumn && instructionId) {
+            const docResult = await createDocInColumn(String(newItemId), instructionId, instructionPlain);
+            if (docResult.success) {
+                docSynced = true;
+            } else {
+                console.warn(
+                    "[Monday] Could not create doc in Instructions column. Error:",
+                    docResult.error
+                );
+            }
+        }
+
+        // Fallback: sync to item description only when doc column was not used / failed
+        if (!docSynced) {
+            const r = await setItemDescriptionFromMarkdown(String(newItemId), instructionPlain);
+            if (!r.success) {
+                console.warn(
+                    "[Monday] Could not sync instructions to the item Workdoc (description). " +
+                    "Error:",
+                    r.error
+                );
+            }
         }
     }
 
