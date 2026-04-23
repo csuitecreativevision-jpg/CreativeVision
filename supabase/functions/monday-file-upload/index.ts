@@ -2,7 +2,6 @@
  * Proxies Monday.com file uploads (add_file_to_column) from the browser.
  * Direct browser → api.monday.com/v2/file is blocked by CORS; this runs server-side.
  */
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
 const MONDAY_FILE_URL = 'https://api.monday.com/v2/file';
 const MONDAY_API_TOKEN = Deno.env.get('MONDAY_API_TOKEN') || '';
@@ -13,7 +12,7 @@ const corsHeaders: Record<string, string> = {
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders });
     }
@@ -123,3 +122,4 @@ serve(async (req) => {
         });
     }
 });
+
