@@ -791,63 +791,29 @@ export async function updateItemValue(boardId: string, itemId: string, columnId:
 
 /**
  * Upload a file into a Monday.com **file** column (e.g. Submission Preview).
- * Browser → `api.monday.com/v2/file` is blocked by CORS, so we POST via Supabase Edge when configured.
+ *
+ * **Architecture (v2 — streaming proxy):**
+ * The browser builds the full Monday-compatible multipart body (GraphQL
+ * `query` + `variables[file]`), then sends it to the `monday-file-upload`
+ * Edge Function.  The Edge Function **never calls `req.formData()`** — it
+ * pipes `req.body` as a `ReadableStream` straight to `api.monday.com/v2/file`,
+ * keeping memory usage near-zero regardless of file size.
+ *
+ * This bypasses the 150 MB Supabase Edge Function memory limit.
+ * Monday.com's own file limit is 500 MB.
  */
 export async function uploadFileToItemColumn(itemId: string, columnId: string, file: File): Promise<void> {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
     const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
-    if (supabaseUrl && supabaseAnonKey) {
-        const formData = new FormData();
-        formData.append('file', file, file.name);
-        formData.append('itemId', itemId);
-        formData.append('columnId', columnId);
-
-        const networkHint =
-            'Could not reach the upload service. Save `.env`, restart the dev server (needed after `vite.config` changes), deploy `monday-file-upload` with `verify_jwt = false`, and set Edge secret `MONDAY_API_TOKEN` (Dashboard → Edge Functions → Secrets). `VITE_MONDAY_API_TOKEN` in `.env` does not configure the function.';
-
-        // In dev, post via Vite proxy (same origin) to avoid CORS blocking cross-origin calls to *.supabase.co.
-        const uploadUrl = import.meta.env.DEV
-            ? '/functions/v1/monday-file-upload'
-            : `${supabaseUrl.replace(/\/$/, '')}/functions/v1/monday-file-upload`;
-
-        let response: Response;
-        try {
-            response = await fetch(uploadUrl, {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${supabaseAnonKey}`,
-                    apikey: supabaseAnonKey,
-                },
-                body: formData,
-            });
-        } catch {
-            throw new Error(networkHint);
-        }
-
-        const text = await response.text();
-        let json: { error?: string; success?: boolean };
-        try {
-            json = JSON.parse(text) as { error?: string; success?: boolean };
-        } catch {
-            throw new Error(
-                `Upload proxy failed (${response.status}): ${text.slice(0, 200) || 'Invalid response'}`
-            );
-        }
-
-        if (!response.ok || json.error) {
-            throw new Error(json.error || `Upload failed (${response.status})`);
-        }
-        return;
-    }
-
-    // Fallback: direct Monday (works only in non-browser or if CORS allows — usually fails in the app)
-    if (!MONDAY_API_TOKEN || MONDAY_API_TOKEN === 'YOUR_MONDAY_API_TOKEN') {
+    if (!supabaseUrl || !supabaseAnonKey) {
         throw new Error(
-            'Configure VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY and deploy the monday-file-upload edge function (browser uploads require the proxy).'
+            'Configure VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY in .env and deploy the monday-file-upload Edge Function.'
         );
     }
 
+    // Build the Monday-compatible multipart form on the client side.
+    // The Edge Function will stream this body to Monday without buffering.
     const mutation = `mutation ($file: File!) {
         add_file_to_column (
             file: $file,
@@ -862,24 +828,39 @@ export async function uploadFileToItemColumn(itemId: string, columnId: string, f
     formData.append('query', mutation);
     formData.append('variables[file]', file, file.name);
 
-    const response = await limiter.add(() =>
-        fetch(MONDAY_FILE_API_URL, {
+    const uploadUrl = import.meta.env.DEV
+        ? '/functions/v1/monday-file-upload'
+        : `${supabaseUrl.replace(/\/$/, '')}/functions/v1/monday-file-upload`;
+
+    const networkHint =
+        'Could not reach the upload service. Deploy `monday-file-upload` with `verify_jwt = false` and set Edge secret `MONDAY_API_TOKEN`.';
+
+    let response: Response;
+    try {
+        response = await fetch(uploadUrl, {
             method: 'POST',
             headers: {
-                Authorization: MONDAY_API_TOKEN,
+                Authorization: `Bearer ${supabaseAnonKey}`,
+                apikey: supabaseAnonKey,
             },
             body: formData,
-        })
-    );
-
-    if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`Monday file upload failed (${response.status}): ${text.slice(0, 200)}`);
+        });
+    } catch {
+        throw new Error(networkHint);
     }
 
-    const json = await response.json();
-    if (json.errors?.length) {
-        throw new Error(json.errors.map((e: { message?: string }) => e.message || 'Unknown error').join('; '));
+    const text = await response.text();
+    let json: { error?: string; success?: boolean };
+    try {
+        json = JSON.parse(text) as { error?: string; success?: boolean };
+    } catch {
+        throw new Error(
+            `Upload proxy failed (${response.status}): ${text.slice(0, 300) || 'Invalid response'}`
+        );
+    }
+
+    if (!response.ok || json.error) {
+        throw new Error(json.error || `Upload failed (${response.status})`);
     }
 }
 

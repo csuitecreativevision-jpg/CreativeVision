@@ -1,6 +1,20 @@
 /**
- * Proxies Monday.com file uploads (add_file_to_column) from the browser.
- * Direct browser → api.monday.com/v2/file is blocked by CORS; this runs server-side.
+ * Streaming proxy for Monday.com file uploads (add_file_to_column).
+ *
+ * ── WHY STREAMING? ──────────────────────────────────────────────────
+ * Supabase Edge Functions have a 150 MB memory limit.  The previous
+ * version called `req.formData()` which buffers the *entire* file in
+ * RAM.  This version never parses the body — it pipes `req.body`
+ * (a ReadableStream) directly to Monday.com, keeping memory usage
+ * near-zero regardless of file size (Monday's own limit is 500 MB).
+ *
+ * The browser is responsible for building the Monday-compatible
+ * multipart/form-data body (with the `query` mutation field and
+ * `variables[file]` field).  This function only adds the secure
+ * `Authorization` header and forwards the stream.
+ *
+ * Deploy: `npx supabase functions deploy monday-file-upload --no-verify-jwt`
+ * Secret: Set `MONDAY_API_TOKEN` in Dashboard → Edge Functions → Secrets.
  */
 
 const MONDAY_FILE_URL = 'https://api.monday.com/v2/file';
@@ -32,45 +46,19 @@ Deno.serve(async (req) => {
     }
 
     try {
-        const incoming = await req.formData();
-        const file = incoming.get('file');
-        const itemId = String(incoming.get('itemId') ?? '');
-        const columnId = String(incoming.get('columnId') ?? '');
-
-        if (!file || !(file instanceof Blob)) {
-            return new Response(JSON.stringify({ error: 'Missing file' }), {
-                status: 400,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            });
-        }
-        const uploadName = file instanceof File ? file.name : 'upload';
-        if (!itemId || !columnId) {
-            return new Response(JSON.stringify({ error: 'Missing itemId or columnId' }), {
-                status: 400,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            });
-        }
-
-        const mutation = `mutation ($file: File!) {
-            add_file_to_column (
-                file: $file,
-                item_id: ${Number(itemId)},
-                column_id: ${JSON.stringify(columnId)}
-            ) {
-                id
-            }
-        }`;
-
-        const mondayForm = new FormData();
-        mondayForm.append('query', mutation);
-        mondayForm.append('variables[file]', file, uploadName);
+        // ── STREAM the request body to Monday WITHOUT buffering ──
+        // The browser already built the correct multipart/form-data
+        // (query + variables[file]).  We just pipe it through and
+        // attach the API token.
+        const contentType = req.headers.get('Content-Type') || '';
 
         const mondayRes = await fetch(MONDAY_FILE_URL, {
             method: 'POST',
             headers: {
                 Authorization: MONDAY_API_TOKEN,
+                'Content-Type': contentType,
             },
-            body: mondayForm,
+            body: req.body, // ReadableStream — never buffered in RAM
         });
 
         const text = await mondayRes.text();
@@ -122,4 +110,3 @@ Deno.serve(async (req) => {
         });
     }
 });
-
