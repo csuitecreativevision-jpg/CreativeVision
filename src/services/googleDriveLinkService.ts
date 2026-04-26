@@ -16,10 +16,25 @@ const VIDEO_FILE_EXT_RE = /\.(mp4|mov|webm|m4v|avi|mkv|wmv|flv|ogv|mpg|mpeg|mts|
  * If nothing would remain, returns the original string trimmed.
  */
 export function stripVideoFileExtensionFromTitle(name: string): string {
-    const t = name.trim();
+    let t = name.trim();
     if (!t) return t;
-    const without = t.replace(VIDEO_FILE_EXT_RE, '').trim();
-    return without || t;
+    let prev = '';
+    while (prev !== t) {
+        prev = t;
+        t = t.replace(VIDEO_FILE_EXT_RE, '').trim();
+    }
+    return t || name.trim();
+}
+
+function isDriveFileHostname(host: string): boolean {
+    const h = host.toLowerCase();
+    return (
+        h === 'drive.google.com' ||
+        h.endsWith('.drive.google.com') ||
+        h === 'docs.google.com' ||
+        h.endsWith('.docs.google.com') ||
+        h === 'drive.usercontent.google.com'
+    );
 }
 
 /** Extract a Drive file id from common share URL shapes. Returns null for folders or unrecognized URLs. */
@@ -28,13 +43,35 @@ export function extractGoogleDriveFileId(raw: string): string | null {
     if (!s) return null;
     if (s.includes('/folders/')) return null;
 
-    const fileD = s.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-    if (fileD?.[1]) return fileD[1];
+    try {
+        const u = new URL(s);
+        const host = u.hostname.toLowerCase();
 
-    const uc = s.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    if (uc?.[1]) return uc[1];
+        if (host === 'google.com' || host === 'www.google.com') {
+            if (u.pathname === '/url') {
+                const q = u.searchParams.get('q') || u.searchParams.get('url');
+                if (q && (q.includes('drive.google') || q.includes('docs.google'))) {
+                    const nested = extractGoogleDriveFileId(q);
+                    if (nested) return nested;
+                }
+            }
+        }
 
-    return null;
+        if (isDriveFileHostname(host)) {
+            const dMatch = u.pathname.match(/\/d\/([a-zA-Z0-9_-]+)/);
+            if (dMatch?.[1]) return dMatch[1];
+            const idParam = u.searchParams.get('id')?.trim();
+            if (idParam && /^[a-zA-Z0-9_-]+$/.test(idParam)) return idParam;
+        }
+
+        return null;
+    } catch {
+        const dMatch = s.match(/\/d\/([a-zA-Z0-9_-]+)/);
+        if (dMatch?.[1]) return dMatch[1];
+        const idMatch = s.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+        if (idMatch?.[1]) return idMatch[1];
+        return null;
+    }
 }
 
 /**
