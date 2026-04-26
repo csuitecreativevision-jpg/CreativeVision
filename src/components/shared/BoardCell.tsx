@@ -5,6 +5,7 @@ import { normalizeMondayFileUrl, uploadFileToItemColumn } from '../../services/m
 import { MondayItem, MondayColumn } from '../../types/monday';
 import { createNotification, createNotificationsForRole } from '../../services/notificationService';
 import { supabase } from '../../lib/supabaseClient';
+import { maybeClearSubmissionVideoFeedback } from '../../services/submissionVideoFeedbackService';
 
 interface BoardCellProps {
     item: MondayItem;
@@ -376,6 +377,9 @@ export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dro
                 setOptimisticValue(newValue);
                 setIsEditing(false);
                 onUpdate();
+                if (column.title.toLowerCase().includes('status')) {
+                    maybeClearSubmissionVideoFeedback(sourceBoardId, sourceItemId, newValue);
+                }
 
             } else {
                 // 1. Update the Main Column (e.g., Status)
@@ -426,6 +430,7 @@ export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dro
             // ─── Notification Triggers on Status Change ─────────────────────────
             const isStatusColumn = column.title.toLowerCase().includes('status') || column.type === 'status' || column.type === 'color';
             if (isStatusColumn) {
+                maybeClearSubmissionVideoFeedback(boardId, item.id, newValue);
                 const val = newValue.toLowerCase();
 
                 // 1. PROJECT COMPLETED → Notify client
@@ -462,6 +467,9 @@ export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dro
 
                 // 2. FOR APPROVAL → Notify all admins (editor finished output)
                 const movedToForApproval = val.includes('for approval');
+                const isEditorRevisionStatus =
+                    val.includes('sent for revision') || val.includes('sent for review');
+
                 if (movedToForApproval) {
                     createNotificationsForRole('admin', {
                         type: 'warning',
@@ -470,6 +478,52 @@ export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dro
                         source_type: 'project',
                         source_id: item.id
                     }).catch(err => console.error('[Notification] Failed to notify admins:', err));
+                } else if (isEditorRevisionStatus) {
+                    (async () => {
+                        try {
+                            if (!boardId || !allColumns?.length) return;
+                            const editorCol = allColumns.find(
+                                (c: any) =>
+                                    String(c.title || '').toLowerCase().includes('editor') || c.type === 'people'
+                            );
+                            const editorVal = editorCol
+                                ? item.column_values?.find((v: any) => v.id === editorCol.id)
+                                : null;
+                            const editorLabel = String(
+                                editorVal?.text || editorVal?.display_value || ''
+                            ).trim();
+                            if (!editorLabel) return;
+                            const norm = (s: string) =>
+                                String(s || '')
+                                    .toLowerCase()
+                                    .replace(/\(.*?\)/g, '')
+                                    .replace(/[^a-z0-9]+/g, '')
+                                    .trim();
+                            const needle = norm(editorLabel);
+                            const { data: editorUsers } = await supabase
+                                .from('users')
+                                .select('email, name')
+                                .eq('role', 'editor');
+                            const targets =
+                                editorUsers?.filter(u => {
+                                    const n = norm(u.name || '');
+                                    if (!n || !needle) return false;
+                                    return n === needle || n.includes(needle) || needle.includes(n);
+                                }) || [];
+                            for (const u of targets) {
+                                await createNotification({
+                                    user_email: u.email,
+                                    type: 'warning',
+                                    title: 'Revision requested',
+                                    message: `"${item.name}" is now ${newValue}. Please review and update the cut.`,
+                                    source_type: 'project',
+                                    source_id: item.id,
+                                });
+                            }
+                        } catch (err) {
+                            console.error('[Notification] Failed to notify editors (revision):', err);
+                        }
+                    })();
                 } else {
                     // 3. Other review/approval states → generic admin notification
                     const needsApproval = val.includes('approval') || val.includes('review') || val.includes('q&a');

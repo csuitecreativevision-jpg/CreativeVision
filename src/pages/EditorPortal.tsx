@@ -25,7 +25,9 @@ import { NotificationBell } from '../components/shared/NotificationBell';
 import AdminSettings from './admin/AdminSettings';
 import { usePortalTheme } from '../contexts/PortalThemeContext';
 import { getUserNotifications, subscribeToNotifications, type Notification } from '../services/notificationService';
-import { parseFeedbackSourceId } from '../services/projectFeedbackService';
+import { parseSubmissionVideoFeedbackSourceId } from '../services/submissionVideoFeedbackService';
+import { EDITOR_BACKLOG_POPUP_SESSION_KEY } from '../lib/editorBacklogPopup';
+import { fetchEditorBacklogEntries, formatEditorBacklogForSwal } from '../services/editorBacklogService';
 import { fireCvSwal } from '../lib/swalTheme';
 import { fetchLatestFollowUpMessage, fetchRecentFollowUpMessages, parseFollowUpSourceId, sendFollowUpReply, subscribeToFollowUpMessages, type FollowUpRealtimeMessage } from '../services/projectFollowUpService';
 
@@ -142,7 +144,6 @@ function EditorPortalContent() {
     const feedbackPromptShownRef = useRef(false);
     const followUpSeenIdsRef = useRef<Set<string>>(new Set());
     const followUpSessionStartRef = useRef<string>(new Date().toISOString());
-
     // User info (synced when profile is edited in Settings)
     const [sidebarUserName, setSidebarUserName] = useState(() => localStorage.getItem('portal_user_name') || 'Editor');
 
@@ -285,6 +286,7 @@ function EditorPortalContent() {
     };
 
     const handleLogout = () => {
+        sessionStorage.removeItem(EDITOR_BACKLOG_POPUP_SESSION_KEY);
         // Preserve per-account onboarding flags so they don't re-appear after re-login
         const onboardingKeys = Object.keys(localStorage).filter(k => k.includes('_onboarding_seen'));
         const preserved = onboardingKeys.map(k => [k, localStorage.getItem(k)] as [string, string]);
@@ -309,79 +311,6 @@ function EditorPortalContent() {
         await loadEditorBoards();
         if (!silent) setLoading(false);
     };
-
-    const openItemFromNotification = async (notification: Notification) => {
-        if (notification.source_type === 'project_feedback') {
-            const parsed = parseFeedbackSourceId(notification.source_id);
-            if (!parsed) return;
-            setIsProcessingNavigation(true);
-            try {
-                const sortedBoards = [...boards].sort((a: any, b: any) =>
-                    a.id === parsed.boardId ? -1 : b.id === parsed.boardId ? 1 : 0
-                );
-                for (const board of sortedBoards) {
-                    const fullBoardData = await getBoardItems(board.id, true);
-                    const hasItem = (fullBoardData?.items || []).some((item: any) => item.id === parsed.itemId);
-                    if (!hasItem) continue;
-                    setInitialItemId(parsed.itemId);
-                    setSelectedBoard(fullBoardData);
-                    return;
-                }
-            } catch (error) {
-                console.error('Failed to open feedback item from notification:', error);
-            } finally {
-                setIsProcessingNavigation(false);
-            }
-            return;
-        }
-        if (notification.source_type === 'follow_up_request') {
-            const parsed = parseFollowUpSourceId(notification.source_id);
-            const email = localStorage.getItem('portal_user_email') || '';
-            if (!parsed || !email) return;
-            try {
-                const latest = await fetchLatestFollowUpMessage({
-                    recipientEmail: email,
-                    boardId: parsed.boardId,
-                    itemId: parsed.itemId,
-                    senderRole: 'admin',
-                });
-                if (!latest) return;
-                await handleEditorFollowUp(latest);
-            } catch (error) {
-                console.error('Failed to open follow-up request from notification:', error);
-            }
-        }
-    };
-
-    useEffect(() => {
-        if (feedbackPromptShownRef.current) return;
-        const role = localStorage.getItem('portal_user_role');
-        const email = localStorage.getItem('portal_user_email') || '';
-        if (role !== 'editor' || !email) return;
-        const t = setTimeout(async () => {
-            try {
-                const res = await getUserNotifications(email);
-                if (!res.success || !res.data?.length) return;
-                const first = res.data.find(n => !n.is_read && n.source_type === 'project_feedback');
-                if (!first) return;
-                feedbackPromptShownRef.current = true;
-                const r = await fireCvSwal({
-                    icon: 'info',
-                    title: 'Client feedback received',
-                    text: first.message,
-                    showCancelButton: true,
-                    confirmButtonText: 'Open',
-                    cancelButtonText: 'Later',
-                });
-                if (r.isConfirmed) {
-                    await openItemFromNotification(first);
-                }
-            } catch (e) {
-                console.error('[Feedback prompt] failed', e);
-            }
-        }, 5000);
-        return () => clearTimeout(t);
-    }, [boards]);
 
     const handleEditorFollowUp = useCallback(async (msg: FollowUpRealtimeMessage) => {
         if (msg.sender_role !== 'admin') return;
@@ -456,6 +385,169 @@ function EditorPortalContent() {
         };
         void openPrompt();
     }, []);
+
+    const openItemFromNotification = useCallback(async (notification: Notification) => {
+        if (notification.source_type === 'project' && notification.source_id) {
+            const raw = String(notification.source_id);
+            const itemId = raw.startsWith('waiting_client_') ? raw.replace(/^waiting_client_/, '') : raw;
+            if (!itemId) return;
+            setIsProcessingNavigation(true);
+            try {
+                for (const board of boards) {
+                    const fullBoardData = await getBoardItems(board.id, true);
+                    const hasItem = (fullBoardData?.items || []).some((item: any) => item.id === itemId);
+                    if (!hasItem) continue;
+                    setInitialItemId(itemId);
+                    setSelectedBoard(fullBoardData);
+                    return;
+                }
+            } catch (error) {
+                console.error('Failed to open project from notification:', error);
+            } finally {
+                setIsProcessingNavigation(false);
+            }
+            return;
+        }
+        if (notification.source_type === 'submission_video_feedback') {
+            const parsed = parseSubmissionVideoFeedbackSourceId(notification.source_id);
+            if (!parsed) return;
+            setIsProcessingNavigation(true);
+            try {
+                const sortedBoards = [...boards].sort((a: any, b: any) =>
+                    a.id === parsed.boardId ? -1 : b.id === parsed.boardId ? 1 : 0
+                );
+                for (const board of sortedBoards) {
+                    const fullBoardData = await getBoardItems(board.id, true);
+                    const hasItem = (fullBoardData?.items || []).some((item: any) => item.id === parsed.itemId);
+                    if (!hasItem) continue;
+                    setInitialItemId(parsed.itemId);
+                    setSelectedBoard(fullBoardData);
+                    return;
+                }
+            } catch (error) {
+                console.error('Failed to open feedback item from notification:', error);
+            } finally {
+                setIsProcessingNavigation(false);
+            }
+            return;
+        }
+        if (notification.source_type === 'follow_up_request') {
+            const parsed = parseFollowUpSourceId(notification.source_id);
+            const email = localStorage.getItem('portal_user_email') || '';
+            if (!parsed || !email) return;
+            try {
+                const latest = await fetchLatestFollowUpMessage({
+                    recipientEmail: email,
+                    boardId: parsed.boardId,
+                    itemId: parsed.itemId,
+                    senderRole: 'admin',
+                });
+                if (!latest) return;
+                await handleEditorFollowUp(latest);
+            } catch (error) {
+                console.error('Failed to open follow-up request from notification:', error);
+            }
+        }
+    }, [boards, handleEditorFollowUp]);
+
+    useEffect(() => {
+        if (feedbackPromptShownRef.current) return;
+        const role = localStorage.getItem('portal_user_role');
+        const email = localStorage.getItem('portal_user_email') || '';
+        if (role !== 'editor' || !email) return;
+        const t = setTimeout(async () => {
+            try {
+                const res = await getUserNotifications(email);
+                if (!res.success || !res.data?.length) return;
+                const first = res.data.find(n => !n.is_read && n.source_type === 'submission_video_feedback');
+                if (!first) return;
+                feedbackPromptShownRef.current = true;
+                const r = await fireCvSwal({
+                    icon: 'info',
+                    title: 'Video feedback',
+                    text: first.message,
+                    showCancelButton: true,
+                    confirmButtonText: 'Open',
+                    cancelButtonText: 'Later',
+                });
+                if (r.isConfirmed) {
+                    await openItemFromNotification(first);
+                }
+            } catch (e) {
+                console.error('[Feedback prompt] failed', e);
+            }
+        }, 5000);
+        return () => clearTimeout(t);
+    }, [boards, openItemFromNotification]);
+
+    useEffect(() => {
+        const role = localStorage.getItem('portal_user_role');
+        if (role !== 'editor') return;
+        if (loading || boards.length === 0) return;
+        if (sessionStorage.getItem(EDITOR_BACKLOG_POPUP_SESSION_KEY)) return;
+        const editorName = (localStorage.getItem('portal_user_name') || '').trim();
+        if (!editorName) return;
+
+        let cancelled = false;
+        const timer = window.setTimeout(() => {
+            void (async () => {
+                try {
+                    const boardIds = boards.map((b: any) => b.id).filter(Boolean);
+                    const entries = await fetchEditorBacklogEntries(boardIds, editorName);
+                    if (cancelled || entries.length === 0) return;
+                    sessionStorage.setItem(EDITOR_BACKLOG_POPUP_SESSION_KEY, '1');
+                    const styles = `<style>
+.cv-bl-mascot-wrap{display:flex;justify-content:center;margin:-0.35rem 0 1rem;min-height:3.5rem;align-items:center}
+.cv-bl-mascot{font-size:3.35rem;line-height:1;display:inline-block;transform-origin:50% 85%;will-change:transform;backface-visibility:hidden;animation:cv-bl-mascot-work 1.05s ease-in-out infinite}
+@keyframes cv-bl-mascot-work{0%,100%{transform:translateY(0) rotate(-5deg) scale(1)}20%{transform:translateY(-10px) rotate(4deg) scale(1.06)}40%{transform:translateY(-14px) rotate(-2deg) scale(1.08)}60%{transform:translateY(-8px) rotate(5deg) scale(1.05)}80%{transform:translateY(-4px) rotate(-3deg) scale(1.02)}}
+@media (prefers-reduced-motion:reduce){.cv-bl-mascot{animation:none}}
+.cv-bl-subhead{text-align:center;font-size:14px;line-height:1.5;color:rgba(244,244,245,.78);font-weight:500;margin:0 0 0.75rem;padding:0 0.25rem}
+.cv-bl-scroll{max-height:min(42vh,300px);overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;padding-right:6px;margin-bottom:0.25rem;scrollbar-width:thin;scrollbar-color:rgba(167,139,250,.5) rgba(255,255,255,.08)}
+.cv-bl-scroll::-webkit-scrollbar{width:8px}
+.cv-bl-scroll::-webkit-scrollbar-track{background:rgba(255,255,255,.06);border-radius:8px}
+.cv-bl-scroll::-webkit-scrollbar-thumb{background:rgba(167,139,250,.5);border-radius:8px}
+.cv-bl-scroll::-webkit-scrollbar-thumb:hover{background:rgba(167,139,250,.72)}
+.cv-bl-scroll>.cv-bl-sec~.cv-bl-sec{margin-top:0.85rem;padding-top:0.85rem;border-top:1px solid rgba(255,255,255,.1)}
+.cv-bl-sec{margin-bottom:0;text-align:left}
+.cv-bl-h{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#a78bfa;margin-bottom:.35rem}
+.cv-bl-ul{list-style:none;padding:0;margin:0}
+.cv-bl-item{padding:.4rem 0;border-bottom:1px solid rgba(255,255,255,.08);font-size:12px}
+.cv-bl-item:last-child{border-bottom:none}
+.cv-bl-name{display:block;font-weight:600;color:#f4f4f5}
+.cv-bl-meta{display:block;font-size:10px;color:#a1a1aa;margin-top:.15rem}
+.cv-bl-sec-overdue .cv-bl-h{font-size:12px;letter-spacing:.06em;color:#fb923c}
+.cv-bl-sec-overdue .cv-bl-item{font-size:13px;padding:.5rem 0}
+.cv-bl-sec-overdue .cv-bl-name{font-size:15px;font-weight:700;color:#fafafa}
+.cv-bl-sec-overdue .cv-bl-meta{font-size:12px;margin-top:.2rem;color:#d4d4d8}
+</style>`;
+                    const greetingName = formatDisplayName(editorName);
+                    await fireCvSwal({
+                        icon: false,
+                        title: `Hi ${greetingName}!`,
+                        customClass: {
+                            title: '!font-semibold !tracking-tight !text-white !mb-1',
+                            htmlContainer: '!mt-0 !text-left !overflow-x-hidden',
+                            popup: '!overflow-hidden',
+                        },
+                        html:
+                            styles +
+                            `<p class="cv-bl-subhead">Here are your backlogs.</p>` +
+                            `<div class="cv-bl-mascot-wrap" aria-hidden="true"><span class="cv-bl-mascot">🧑‍💻</span></div>` +
+                            formatEditorBacklogForSwal(entries),
+                        width: 520,
+                        confirmButtonText: 'Got it',
+                    });
+                } catch (e) {
+                    console.error('[Editor backlog popup]', e);
+                }
+            })();
+        }, 2000);
+
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [loading, boards, currentUserName]);
 
     useEffect(() => {
         const email = localStorage.getItem('portal_user_email') || '';

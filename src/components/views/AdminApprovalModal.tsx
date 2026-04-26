@@ -1,8 +1,11 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Smile } from 'lucide-react';
 import { BoardCell } from '../shared/BoardCell';
 import { YouTubeModal } from '../ui/YouTubeModal';
+import { SubmissionVideoPlayer, type SubmissionVideoPlayerHandle } from '../shared/SubmissionVideoPlayer';
+import { SubmissionVideoFeedbackPanel } from '../shared/SubmissionVideoFeedbackPanel';
 import { getBoardColumns, getAssetPublicUrl, normalizeMondayFileUrl } from '../../services/mondayService';
+import { getItemStatusLabel, isMondayStatusForApproval } from '../../lib/mondayItemStatus';
 
 interface AdminApprovalModalProps {
     approvalItems: any[];
@@ -15,69 +18,13 @@ interface AdminApprovalModalProps {
     setPreviewFile: (file: { url: string, name: string, assetId?: string } | null) => void;
 }
 
-// Helper component for video playback with signed URL fetching
-const SubmissionVideoPlayer = ({ url }: { url: string }) => {
-    const [videoSrc, setVideoSrc] = useState<string | null>(null);
-    const [error, setError] = useState(false);
-
-    useEffect(() => {
-        let isMounted = true;
-        const fetchUrl = async () => {
-            // Check if it's a protected Monday URL that needs signing
-            const match = url.match(/\/resources\/(\d+)\//);
-            if (match && match[1]) {
-                try {
-                    const assetId = match[1];
-                    const publicUrl = await getAssetPublicUrl(assetId);
-                    if (isMounted && publicUrl) {
-                        const normalized = normalizeMondayFileUrl(publicUrl);
-                        setVideoSrc(normalized);
-                        return;
-                    }
-                } catch (e) {
-                    console.error("Failed to fetch signed video URL", e);
-                }
-            }
-            if (isMounted) {
-                setVideoSrc(url);
-            }
-        };
-
-        fetchUrl();
-        return () => { isMounted = false; };
-    }, [url]);
-
-    if (error) {
-        return <div className="text-white">Video failed to load. <a href={url} target="_blank" className="underline" rel="noreferrer">Download</a></div>;
-    }
-
-    if (!videoSrc) {
-        return <div className="flex items-center justify-center h-full"><span className="animate-pulse text-gray-400">Loading video...</span></div>;
-    }
-
-    return (
-        <div className="w-full h-full flex items-center justify-center bg-black relative group">
-            <video
-                src={videoSrc}
-                className="w-full h-full object-contain"
-                controls
-                autoPlay
-                muted
-                loop
-                preload="auto"
-                playsInline
-                // @ts-ignore
-                referrerPolicy="no-referrer"
-                onError={(e) => {
-                    console.error("DEBUG: Video Playback Error", e);
-                    setError(true);
-                }}
-            >
-                Your browser does not support the video tag.
-            </video>
-        </div>
-    );
-};
+function editorNameHintFromItem(item: any, columns: any[] | undefined): string {
+    const cv = item?.column_values?.find((v: any) => {
+        const c = columns?.find((x: any) => x.id === v.id);
+        return c?.title?.toLowerCase().includes('editor');
+    });
+    return (cv?.text || '').trim();
+}
 
 export const AdminApprovalModal = ({
     approvalItems,
@@ -90,6 +37,7 @@ export const AdminApprovalModal = ({
     setPreviewFile
 }: AdminApprovalModalProps) => {
 
+    const videoRef = useRef<SubmissionVideoPlayerHandle>(null);
     const [mirrorOptions, setMirrorOptions] = useState<Record<string, any[]>>({});
 
     // Find the full item with column_values from boardData
@@ -298,6 +246,18 @@ export const AdminApprovalModal = ({
         return null;
     }
 
+    const mainAssetVideoInfo = (() => {
+        if (!mainAsset?.url) return { isVideo: false as const, cleanUrl: '' as const };
+        const cleanUrl = mainAsset.url.split('?')[0];
+        const ext = cleanUrl.split('.').pop()?.toLowerCase() || '';
+        const isVideo = ['mp4', 'mov', 'webm', 'ogg', 'avi', 'mkv'].includes(ext);
+        return { isVideo, cleanUrl };
+    })();
+
+    const approvalBoardId = currentApprovalItem?.boardId || boardData?.id || '';
+    const approvalStatusLabel = getItemStatusLabel(selectedProject, boardData?.columns);
+    const canComposeVideoFeedback = isMondayStatusForApproval(approvalStatusLabel);
+
     return (
         <YouTubeModal
             isOpen={true}
@@ -307,21 +267,30 @@ export const AdminApprovalModal = ({
             onPrev={onPrev}
             hasNext={hasNext}
             hasPrev={hasPrev}
+            splitSidePanel={
+                mainAsset?.url && mainAssetVideoInfo.isVideo && approvalBoardId ? (
+                    <SubmissionVideoFeedbackPanel
+                        boardId={approvalBoardId}
+                        itemId={selectedProject.id}
+                        projectName={selectedProject.name}
+                        mode="admin"
+                        videoRef={videoRef}
+                        editorNameHint={editorNameHintFromItem(selectedProject, boardData?.columns)}
+                        canCompose={canComposeVideoFeedback}
+                    />
+                ) : undefined
+            }
             mainContent={
                 mainAsset?.url ? (() => {
-                    const cleanUrl = mainAsset.url.split('?')[0];
-                    const ext = cleanUrl.split('.').pop()?.toLowerCase() || '';
-                    const isVideo = ['mp4', 'mov', 'webm', 'ogg', 'avi', 'mkv'].includes(ext);
-
-                    if (isVideo) {
-                        return <SubmissionVideoPlayer url={mainAsset.url} />;
+                    if (mainAssetVideoInfo.isVideo) {
+                        return <SubmissionVideoPlayer ref={videoRef} url={mainAsset.url} />;
                     }
 
                     return (
-                        <div className="w-full h-full flex items-center justify-center">
+                        <div className="w-full h-full flex items-center justify-center min-h-[40vh]">
                             <iframe
                                 src={mainAsset.url}
-                                className="w-full h-full border-0"
+                                className="w-full h-full border-0 min-h-[40vh]"
                                 title={mainAsset.name}
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                 allowFullScreen

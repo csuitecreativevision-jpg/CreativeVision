@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Lock, Mail, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { loginUser } from '../services/boardsService';
+import { EDITOR_BACKLOG_POPUP_SESSION_KEY } from '../lib/editorBacklogPopup';
 import { PORTAL_CACHED_PASSWORD_KEY } from '../lib/portalPasswordCache';
 import DomeGallery from '../components/ui/DomeGallery';
 const fadeUp = (delay = 0) => ({
@@ -42,6 +43,9 @@ export default function PortalPage() {
         }
         localStorage.setItem(PORTAL_CACHED_PASSWORD_KEY, password);
         window.dispatchEvent(new CustomEvent('cv-portal-login-password-cached'));
+        if (result.user.role === 'editor') {
+            sessionStorage.removeItem(EDITOR_BACKLOG_POPUP_SESSION_KEY);
+        }
         if (result.user.workspace_id) {
             localStorage.setItem('portal_user_workspace', result.user.workspace_id);
         } else {

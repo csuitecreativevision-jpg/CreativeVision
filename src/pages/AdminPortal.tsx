@@ -26,7 +26,7 @@ import { NotificationBell } from '../components/shared/NotificationBell';
 import { PORTAL_CACHED_PASSWORD_KEY } from '../lib/portalPasswordCache';
 import { usePortalTheme } from '../contexts/PortalThemeContext';
 import { getUserNotifications, subscribeToNotifications, type Notification } from '../services/notificationService';
-import { parseFeedbackSourceId } from '../services/projectFeedbackService';
+import { parseSubmissionVideoFeedbackSourceId } from '../services/submissionVideoFeedbackService';
 import { fireCvSwal } from '../lib/swalTheme';
 import { fetchLatestFollowUpMessage, fetchRecentFollowUpMessages, parseFollowUpSourceId, subscribeToFollowUpMessages, type FollowUpRealtimeMessage } from '../services/projectFollowUpService';
 
@@ -187,8 +187,8 @@ function AdminPortalContent() {
     const activeTab = getActiveTab();
 
     const openFeedbackFromNotification = async (notification: Notification) => {
-        if (notification.source_type === 'project_feedback') {
-            const parsed = parseFeedbackSourceId(notification.source_id);
+        if (notification.source_type === 'submission_video_feedback') {
+            const parsed = parseSubmissionVideoFeedbackSourceId(notification.source_id);
             if (!parsed) return;
             navigate('/admin-portal/team', { state: { boardId: parsed.boardId, itemId: parsed.itemId } });
             return;
@@ -219,12 +219,12 @@ function AdminPortalContent() {
         const t = setTimeout(async () => {
             try {
                 const res = await getUserNotifications(email);
-                const first = res.data?.find(n => !n.is_read && n.source_type === 'project_feedback');
+                const first = res.data?.find(n => !n.is_read && n.source_type === 'submission_video_feedback');
                 if (!first) return;
                 feedbackPromptShownRef.current = true;
                 const r = await fireCvSwal({
                     icon: 'info',
-                    title: 'Client feedback received',
+                    title: 'Video feedback',
                     text: first.message,
                     showCancelButton: true,
                     confirmButtonText: 'Open',

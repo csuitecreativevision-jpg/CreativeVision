@@ -22,7 +22,7 @@ import { NotificationBell } from '../components/shared/NotificationBell';
 import { PortalCalendar } from '../components/views/PortalCalendar';
 import { createNotification } from '../services/notificationService';
 import type { Notification } from '../services/notificationService';
-import { parseFeedbackSourceId } from '../services/projectFeedbackService';
+import { parseSubmissionVideoFeedbackSourceId } from '../services/submissionVideoFeedbackService';
 
 function getStatusColumnIds(board: any): string[] {
     if (!board?.columns) return [];
@@ -121,8 +121,8 @@ function ClientPortalContent() {
 
         if (notification.source_type === 'project') {
             itemId = extractItemIdFromNotificationSource(notification.source_id);
-        } else if (notification.source_type === 'project_feedback') {
-            const parsed = parseFeedbackSourceId(notification.source_id);
+        } else if (notification.source_type === 'submission_video_feedback') {
+            const parsed = parseSubmissionVideoFeedbackSourceId(notification.source_id);
             if (parsed) {
                 itemId = parsed.itemId;
                 boardIdHint = parsed.boardId;

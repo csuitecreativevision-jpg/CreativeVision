@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, Calendar, Activity, Smile } from 'lucide-react';
 import { ProjectCard } from '../shared/ProjectCard';
@@ -9,7 +9,8 @@ import { getCycleFromDate } from '../../features/performance-dashboard/utils/dat
 import { getBoardColumns, getAssetPublicUrl, normalizeMondayFileUrl } from '../../services/mondayService';
 import { checkDeadlineNotifications } from '../../services/notificationService';
 import { buildSubmissionRowsForBoard, EditorSubmissionBoardPanel } from './EditorSubmissionHub';
-import { ProjectFeedbackPanel } from '../shared/ProjectFeedbackPanel';
+import { SubmissionVideoPlayer, type SubmissionVideoPlayerHandle } from '../shared/SubmissionVideoPlayer';
+import { SubmissionVideoFeedbackPanel } from '../shared/SubmissionVideoFeedbackPanel';
 
 interface ProjectSelectionViewProps {
     boardData: any;
@@ -20,78 +21,13 @@ interface ProjectSelectionViewProps {
     initialItemId?: string; // NEW: Allow auto-selection of an item
 }
 
-// Helper component for video playback with signed URL fetching
-const SubmissionVideoPlayer = ({ url }: { url: string }) => {
-    const [videoSrc, setVideoSrc] = useState<string | null>(null);
-    const [error, setError] = useState(false);
-
-    useEffect(() => {
-        let isMounted = true;
-        const fetchUrl = async () => {
-            // Check if it's a protected Monday URL that needs signing
-            // Format: .../resources/ASSET_ID/...
-            const match = url.match(/\/resources\/(\d+)\//);
-            if (match && match[1]) {
-                try {
-                    const assetId = match[1];
-                    const publicUrl = await getAssetPublicUrl(assetId);
-                    if (isMounted && publicUrl) {
-                        const normalized = normalizeMondayFileUrl(publicUrl);
-                        setVideoSrc(normalized);
-                        return;
-                    }
-                } catch (e) {
-                    console.error("Failed to fetch signed video URL", e);
-                }
-            }
-
-            // Fallback to original URL if not protected or fetch failed
-            if (isMounted) {
-                setVideoSrc(url);
-            }
-        };
-
-        fetchUrl();
-        return () => { isMounted = false; };
-    }, [url]);
-
-    if (error) {
-        return <div className="text-white">Video failed to load. <a href={url} target="_blank" className="underline">Download</a></div>;
-    }
-
-    if (!videoSrc) {
-        return <div className="flex items-center justify-center h-full"><span className="animate-pulse text-gray-400">Loading video...</span></div>;
-    }
-
-    return (
-        <div className="w-full h-full flex items-center justify-center bg-black relative group">
-            <video
-                src={videoSrc}
-                className="w-full h-full object-contain"
-                controls
-                autoPlay
-                muted
-                loop
-                preload="auto"
-                playsInline
-                // @ts-ignore
-                referrerPolicy="no-referrer"
-                onError={(e) => {
-                    console.error("DEBUG: Video Playback Error", e);
-                    setError(true);
-                }}
-            >
-                Your browser does not support the video tag.
-            </video>
-
-            {/* Fallback Link Overlay (Visible on Error or Hover) */}
-            <div className={`absolute bottom-4 right-4 bg-black/80 px-4 py-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 pointer-events-none`}>
-                <span className="text-xs text-white">Video not playing?</span>
-            </div>
-            {/* Invisible clickable layer for debugging/fallback if needed? No, native controls cover most. */}
-        </div>
-    );
-};
+function editorNameHintFromItem(item: any, columns: any[] | undefined): string {
+    const cv = item?.column_values?.find((v: any) => {
+        const c = columns?.find((x: any) => x.id === v.id);
+        return c?.title?.toLowerCase().includes('editor');
+    });
+    return (cv?.text || '').trim();
+}
 
 export const EditorProjectSelectionView = ({
     boardData,
@@ -104,6 +40,7 @@ export const EditorProjectSelectionView = ({
     // State
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedProject, setSelectedProject] = useState<any | null>(null);
+    const videoRef = useRef<SubmissionVideoPlayerHandle>(null);
 
     // Effect: Auto-select item if initialItemId is provided
     useEffect(() => {
@@ -1073,24 +1010,41 @@ export const EditorProjectSelectionView = ({
                     onPrev={handlePrevProject}
                     hasNext={currentIndex !== -1 && currentIndex < filteredItems.length - 1}
                     hasPrev={currentIndex !== -1 && currentIndex > 0}
+                    splitSidePanel={
+                        selectedProject &&
+                        mainAsset?.url &&
+                        selectedBoardId &&
+                        (() => {
+                            const cleanUrl = mainAsset.url.split('?')[0];
+                            const ext = cleanUrl.split('.').pop()?.toLowerCase() || '';
+                            const isVideo = ['mp4', 'mov', 'webm', 'ogg', 'avi', 'mkv'].includes(ext);
+                            return isVideo ? (
+                                <SubmissionVideoFeedbackPanel
+                                    boardId={selectedBoardId}
+                                    itemId={selectedProject.id}
+                                    projectName={selectedProject.name}
+                                    mode="editor"
+                                    videoRef={videoRef}
+                                    editorNameHint={editorNameHintFromItem(selectedProject, boardData?.columns)}
+                                />
+                            ) : undefined;
+                        })()
+                    }
                     mainContent={
                         mainAsset?.url ? (() => {
-                            // Extract extension ignoring query strings
                             const cleanUrl = mainAsset.url.split('?')[0];
                             const ext = cleanUrl.split('.').pop()?.toLowerCase() || '';
                             const isVideo = ['mp4', 'mov', 'webm', 'ogg', 'avi', 'mkv'].includes(ext);
 
-                            console.log('DEBUG: Video Detection', { url: mainAsset.url, cleanUrl, ext, isVideo });
-
                             if (isVideo) {
-                                return <SubmissionVideoPlayer url={mainAsset.url} />;
+                                return <SubmissionVideoPlayer ref={videoRef} url={mainAsset.url} />;
                             }
 
                             return (
-                                <div className="w-full h-full flex items-center justify-center">
+                                <div className="w-full h-full flex items-center justify-center min-h-[40vh]">
                                     <iframe
                                         src={mainAsset.url}
-                                        className="w-full h-full border-0"
+                                        className="w-full h-full border-0 min-h-[40vh]"
                                         title={mainAsset.name}
                                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                         allowFullScreen
@@ -1188,17 +1142,6 @@ export const EditorProjectSelectionView = ({
                                                 </button>
                                             </div>
                                         </div>
-                                        <ProjectFeedbackPanel
-                                            boardId={selectedBoardId || boardData?.id || ''}
-                                            itemId={selectedProject.id}
-                                            projectName={selectedProject.name}
-                                            editorNameHint={
-                                                selectedProject.column_values?.find((cv: any) => {
-                                                    const c = boardData.columns?.find((x: any) => x.id === cv.id);
-                                                    return c?.title?.toLowerCase().includes('editor');
-                                                })?.text || ''
-                                            }
-                                        />
                                     </div>
                                 </div>
 

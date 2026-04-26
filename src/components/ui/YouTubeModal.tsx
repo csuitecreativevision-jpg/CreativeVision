@@ -8,6 +8,8 @@ interface YouTubeModalProps {
     onClose: () => void;
     title?: string;
     mainContent?: React.ReactNode;
+    /** When set, renders beside the main stage (e.g. video feedback) on large screens. */
+    splitSidePanel?: React.ReactNode;
     sidebarContent?: React.ReactNode;
     onNext?: () => void;
     onPrev?: () => void;
@@ -20,6 +22,7 @@ export const YouTubeModal = ({
     onClose,
     title,
     mainContent,
+    splitSidePanel,
     sidebarContent,
     onNext,
     onPrev,
@@ -110,16 +113,29 @@ export const YouTubeModal = ({
                             </div>
                         </div>
 
-                        {/* Content Grid */}
-                        <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col bg-[#0b0b15]">
-                            {/* Main Stage (Top for Video) */}
-                            <div className="w-full bg-black relative flex-shrink-0 min-h-[50vh] xl:min-h-[65vh] flex flex-col items-center justify-center shadow-2xl z-10">
-                                <div className="w-full h-full absolute inset-0 flex items-center justify-center">
-                                    {mainContent}
+                        {/* Content: optional split (video + side panel), then details */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col bg-[#0b0b15] min-h-0">
+                            <div
+                                className={`flex flex-1 min-h-[50vh] xl:min-h-[58vh] flex-col lg:flex-row lg:min-h-[52vh] shadow-2xl z-10 ${
+                                    splitSidePanel ? 'lg:items-stretch' : ''
+                                }`}
+                            >
+                                <div
+                                    className={`bg-black relative flex flex-col items-center justify-center min-h-[45vh] lg:min-h-0 ${
+                                        splitSidePanel ? 'flex-1 min-w-0' : 'w-full flex-shrink-0 xl:min-h-[65vh]'
+                                    }`}
+                                >
+                                    <div className="w-full h-full min-h-[40vh] lg:min-h-[48vh] flex items-center justify-center p-2 lg:p-4">
+                                        {mainContent}
+                                    </div>
                                 </div>
+                                {splitSidePanel && (
+                                    <div className="relative z-20 w-full lg:w-[min(26rem,38vw)] lg:max-w-md flex-shrink-0 lg:max-h-none max-h-[55vh] lg:h-auto border-t lg:border-t-0 lg:border-l border-white/10 overflow-hidden flex flex-col pointer-events-auto">
+                                        {splitSidePanel}
+                                    </div>
+                                )}
                             </div>
 
-                            {/* Details (Bottom) */}
                             {sidebarContent && (
                                 <div className="w-full max-w-[1600px] mx-auto p-6 md:p-10 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     {sidebarContent}
