@@ -15,6 +15,7 @@ import { SubmissionVideoFeedbackPanel } from '../../components/shared/Submission
 import { isMondayStatusForApproval } from '../../lib/mondayItemStatus';
 import { extractGoogleDriveFileId } from '../../services/googleDriveLinkService';
 import { isCvApprovedMondayStatus, maybeClearSubmissionVideoFeedback } from '../../services/submissionVideoFeedbackService';
+import { ThreeLogoLoader } from '../../components/ui/ThreeLogoLoader';
 
 type QuickRange = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'custom';
 
@@ -136,6 +137,7 @@ function computeRange(kind: QuickRange, customFrom: string, customTo: string): {
 export default function AdminDeployedProjects() {
     const videoRef = useRef<SubmissionVideoPlayerHandle>(null);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [savingRowId, setSavingRowId] = useState<string | null>(null);
     const [veBoardId, setVeBoardId] = useState<string | null>(null);
     const [rows, setRows] = useState<Row[]>([]);
@@ -179,7 +181,8 @@ export default function AdminDeployedProjects() {
     };
 
     const load = async (force = false) => {
-        setLoading(true);
+        if (force) setRefreshing(true);
+        else setLoading(true);
         try {
             const boards = await getAllBoards(force);
             const projectBoard = boards.find(
@@ -273,6 +276,7 @@ export default function AdminDeployedProjects() {
             setRows(allRows);
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
     };
 
@@ -322,6 +326,10 @@ export default function AdminDeployedProjects() {
         return s.includes('revision') || s.includes('review');
     };
 
+    if (refreshing) {
+        return <ThreeLogoLoader />;
+    }
+
     return (
         <AdminPageLayout
             label="Admin"
@@ -332,8 +340,8 @@ export default function AdminDeployedProjects() {
                     onClick={() => void load(true)}
                     className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.04] border border-white/[0.07] hover:bg-white/[0.07] text-white/60 hover:text-white text-xs font-semibold transition-all duration-150"
                 >
-                    <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                    Refresh
+                    <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+                    {refreshing ? 'Refreshing...' : 'Refresh'}
                 </button>
             }
         >
@@ -401,8 +409,15 @@ export default function AdminDeployedProjects() {
                 )}
 
                 {loading ? (
-                    <div className="flex items-center justify-center h-40 text-white/50">
-                        <Loader2 className="w-5 h-5 animate-spin" />
+                    <div className="flex flex-col items-center justify-center h-40 text-white/50 gap-2">
+                        <img
+                            src="/Untitled design (3).png"
+                            alt="Creative Vision loading"
+                            className="w-10 h-10 object-contain animate-spin"
+                            width={40}
+                            height={40}
+                        />
+                        <p className="text-[11px] text-white/45 tracking-[0.14em] uppercase">Loading projects</p>
                     </div>
                 ) : filteredRows.length === 0 ? (
                     <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-8 text-center text-white/40">
