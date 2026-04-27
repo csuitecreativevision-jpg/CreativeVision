@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AdminPageLayout } from '../../components/layout/AdminPageLayout';
-import { Calendar, Loader2, RefreshCw, Save } from 'lucide-react';
+import { Calendar, Loader2, PlayCircle, RefreshCw, Save } from 'lucide-react';
 import {
     getAllBoards,
     getBoardColumns,
@@ -8,6 +8,12 @@ import {
     getUsers,
     updateMondayItemColumns,
 } from '../../services/mondayService';
+import { parseYmdToNoonManila, todaysYmdManila, yesterdaysYmdManila, ymdInManila } from '../../lib/philippinesTime';
+import { YouTubeModal } from '../../components/ui/YouTubeModal';
+import { SubmissionVideoPlayer, type SubmissionVideoPlayerHandle } from '../../components/shared/SubmissionVideoPlayer';
+import { SubmissionVideoFeedbackPanel } from '../../components/shared/SubmissionVideoFeedbackPanel';
+import { isMondayStatusForApproval } from '../../lib/mondayItemStatus';
+import { extractGoogleDriveFileId } from '../../services/googleDriveLinkService';
 
 type QuickRange = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'custom';
 
@@ -18,15 +24,76 @@ type Row = {
     editor: string;
     price: string;
     rawVideoLink: string;
+    submissionLink: string;
     instructions: string;
     deadlineYmd: string | null;
+    /** Date used by quick filters (prefer deployed/deployment date, then deadline, then created_at). */
+    filterDateYmd: string | null;
 };
 
-function ymd(d: Date): string {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+function extractLinkUrlFromColumnValue(cv: any): string {
+    if (!cv) return '';
+    const direct = String(cv?.url || '').trim();
+    if (direct) return direct;
+    if (cv?.value) {
+        try {
+            const parsed = JSON.parse(cv.value) as { url?: string };
+            const u = String(parsed?.url || '').trim();
+            if (u) return u;
+        } catch {
+            /* ignore */
+        }
+    }
+    const text = String(cv?.text || cv?.display_value || '').trim();
+    if (/^https?:\/\//i.test(text)) return text;
+    const m = text.match(/https?:\/\/[^\s]+/i);
+    return m?.[0] || '';
+}
+
+function extractSubmissionUrlFromColumnValue(cv: any): string {
+    if (!cv) return '';
+    if (cv?.value) {
+        try {
+            const parsed = JSON.parse(cv.value) as {
+                url?: string;
+                files?: Array<{ public_url?: string; url?: string; urlThumbnail?: string; thumbnail_url?: string }>;
+            };
+            if (parsed?.files?.length) {
+                const f = parsed.files[0];
+                const fileUrl = String(f.public_url || f.url || f.urlThumbnail || f.thumbnail_url || '').trim();
+                if (fileUrl) return fileUrl;
+            }
+            const u = String(parsed?.url || '').trim();
+            if (u) return u;
+        } catch {
+            /* ignore */
+        }
+    }
+    const display = String(cv?.display_value || cv?.text || '').trim();
+    if (/^https?:\/\//i.test(display)) return display;
+    const match = display.match(/https?:\/\/[^\s]+/i);
+    return match?.[0] || '';
+}
+
+function buildPreviewSource(url: string): { mode: 'video' | 'iframe'; src: string } {
+    const u = String(url || '').trim();
+    if (!u) return { mode: 'iframe', src: '' };
+    const driveId = extractGoogleDriveFileId(u);
+    if (driveId) {
+        return { mode: 'iframe', src: `https://drive.google.com/file/d/${driveId}/preview` };
+    }
+    const cleanUrl = u.split('?')[0];
+    const ext = cleanUrl.split('.').pop()?.toLowerCase() || '';
+    const isVideo = ['mp4', 'mov', 'webm', 'ogg', 'avi', 'mkv', 'm4v'].includes(ext);
+    return isVideo ? { mode: 'video', src: u } : { mode: 'iframe', src: u };
+}
+
+function isPreviewableMediaLink(url: string): boolean {
+    const u = String(url || '').trim();
+    if (!u) return false;
+    if (/drive\.google\.com\/drive\/folders\//i.test(u)) return false;
+    if (/\/folders\//i.test(u) && /drive\.google\.com/i.test(u)) return false;
+    return /^https?:\/\//i.test(u);
 }
 
 function inRange(dateYmd: string | null, from: string, to: string): boolean {
@@ -35,16 +102,14 @@ function inRange(dateYmd: string | null, from: string, to: string): boolean {
 }
 
 function computeRange(kind: QuickRange, customFrom: string, customTo: string): { from: string; to: string } {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0, 0);
+    const todayYmd = todaysYmdManila();
+    const today = parseYmdToNoonManila(todayYmd);
     if (kind === 'today') {
-        const d = ymd(today);
+        const d = todayYmd;
         return { from: d, to: d };
     }
     if (kind === 'yesterday') {
-        const y = new Date(today);
-        y.setDate(y.getDate() - 1);
-        const d = ymd(y);
+        const d = yesterdaysYmdManila();
         return { from: d, to: d };
     }
     if (kind === 'this_week') {
@@ -54,20 +119,21 @@ function computeRange(kind: QuickRange, customFrom: string, customTo: string): {
         start.setDate(start.getDate() + diff);
         const end = new Date(start);
         end.setDate(start.getDate() + 6);
-        return { from: ymd(start), to: ymd(end) };
+        return { from: ymdInManila(start), to: ymdInManila(end) };
     }
     if (kind === 'this_month') {
         const start = new Date(today.getFullYear(), today.getMonth(), 1, 12, 0, 0, 0);
         const end = new Date(today.getFullYear(), today.getMonth() + 1, 0, 12, 0, 0, 0);
-        return { from: ymd(start), to: ymd(end) };
+        return { from: ymdInManila(start), to: ymdInManila(end) };
     }
     return {
-        from: customFrom || ymd(today),
-        to: customTo || ymd(today),
+        from: customFrom || todayYmd,
+        to: customTo || todayYmd,
     };
 }
 
 export default function AdminDeployedProjects() {
+    const videoRef = useRef<SubmissionVideoPlayerHandle>(null);
     const [loading, setLoading] = useState(true);
     const [savingRowId, setSavingRowId] = useState<string | null>(null);
     const [veBoardId, setVeBoardId] = useState<string | null>(null);
@@ -78,16 +144,21 @@ export default function AdminDeployedProjects() {
     const [quickRange, setQuickRange] = useState<QuickRange>('this_week');
     const [customFrom, setCustomFrom] = useState('');
     const [customTo, setCustomTo] = useState('');
+    const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [previewRow, setPreviewRow] = useState<Row | null>(null);
 
     const activeRange = useMemo(
         () => computeRange(quickRange, customFrom, customTo),
         [quickRange, customFrom, customTo]
     );
 
-    const filteredRows = useMemo(
-        () => rows.filter(r => inRange(r.deadlineYmd, activeRange.from, activeRange.to)),
-        [rows, activeRange]
-    );
+    const filteredRows = useMemo(() => {
+        return rows.filter(r => {
+            if (!inRange(r.filterDateYmd, activeRange.from, activeRange.to)) return false;
+            if (statusFilter === 'all') return true;
+            return String(r.status || '').toLowerCase() === statusFilter.toLowerCase();
+        });
+    }, [rows, activeRange, statusFilter]);
 
     const resolveDeadlineYmd = (cv: any): string | null => {
         const rawText = String(cv?.text || cv?.display_value || '');
@@ -138,16 +209,25 @@ export default function AdminDeployedProjects() {
             const editorId = getColId((t, type) => type === 'people' && (t.includes('editor') || t.includes('owner')));
             const priceId = getColId((t) => t.includes('price') || t.includes('budget'));
             const linkId = getColId((t) => t.includes('raw video') || t.includes('video link') || t === 'link');
+            const submissionId = getColId((t) => t.includes('submission'));
             const instructionsId = getColId((t) => t.includes('instruction') || t.includes('notes'));
             const deadlineId = getColId((t) => t.includes('deadline') || t === 'date' || t.includes('due'));
+            const deployedDateId = getColId(
+                (t) =>
+                    (t.includes('deploy') && (t.includes('date') || t.includes('on'))) ||
+                    t.includes('deployment date') ||
+                    t === 'date deployed'
+            );
 
             setColumnMap({
                 statusId,
                 editorId,
                 priceId,
                 linkId,
+                submissionId,
                 instructionsId,
                 deadlineId,
+                deployedDateId,
             });
 
             const statusCol = cols.find((c: any) => c.id === statusId);
@@ -166,23 +246,29 @@ export default function AdminDeployedProjects() {
 
             const allRows: Row[] = (boardData?.items || []).map((it: any) => {
                 const getCv = (id: string) => it.column_values?.find((v: any) => v.id === id);
+                const rawVideoCv = getCv(linkId);
+                const submissionCv = getCv(submissionId);
+                const submissionLink = extractSubmissionUrlFromColumnValue(submissionCv);
+                const rawVideoLink = extractLinkUrlFromColumnValue(rawVideoCv);
                 return {
                     id: String(it.id),
                     name: String(it.name || ''),
                     status: String(getCv(statusId)?.text || getCv(statusId)?.display_value || ''),
                     editor: String(getCv(editorId)?.display_value || getCv(editorId)?.text || '').split(',')[0].trim(),
                     price: String(getCv(priceId)?.text || ''),
-                    rawVideoLink: String(getCv(linkId)?.text || ''),
+                    rawVideoLink,
+                    submissionLink,
                     instructions: String(getCv(instructionsId)?.text || getCv(instructionsId)?.display_value || ''),
                     deadlineYmd: resolveDeadlineYmd(getCv(deadlineId)),
+                    filterDateYmd:
+                        resolveDeadlineYmd(getCv(deployedDateId)) ||
+                        resolveDeadlineYmd(getCv(deadlineId)) ||
+                        (it?.created_at ? ymdInManila(new Date(it.created_at)) : null),
                 };
             });
 
-            const deployedOnly = allRows.filter(r => {
-                const s = r.status.toLowerCase();
-                return s.includes('deployed') || s.includes('done');
-            });
-            setRows(deployedOnly);
+            // Show all statuses; this page should be filtered only by selected date range.
+            setRows(allRows);
         } finally {
             setLoading(false);
         }
@@ -209,21 +295,19 @@ export default function AdminDeployedProjects() {
         setSavingRowId(row.id);
         try {
             const updates: Record<string, unknown> = {};
-            const { statusId, editorId, priceId, linkId, instructionsId } = columnMap;
+            const { statusId, linkId } = columnMap;
             if (statusId) updates[statusId] = { label: row.status };
-            if (priceId) updates[priceId] = row.price || '';
             if (linkId) updates[linkId] = row.rawVideoLink ? { url: row.rawVideoLink, text: 'Raw Video' } : '';
-            if (instructionsId) updates[instructionsId] = { text: row.instructions || '' };
-            if (editorId && row.editor) {
-                const users = await getUsers();
-                const match = (users || []).find((u: any) => String(u.name || '').toLowerCase() === row.editor.toLowerCase())
-                    || (users || []).find((u: any) => String(u.name || '').toLowerCase().includes(row.editor.toLowerCase()));
-                if (match) updates[editorId] = { personsAndTeams: [{ id: Number(match.id), kind: 'person' }] };
-            }
             await updateMondayItemColumns(veBoardId, row.id, updates);
         } finally {
             setSavingRowId(null);
         }
+    };
+
+    const canComposeAdminFeedback = (status: string): boolean => {
+        const s = String(status || '').toLowerCase();
+        if (isMondayStatusForApproval(status)) return true;
+        return s.includes('revision') || s.includes('review');
     };
 
     return (
@@ -280,6 +364,23 @@ export default function AdminDeployedProjects() {
                             />
                         </div>
                     )}
+                    <div className="ml-auto flex items-center gap-2">
+                        <span className="text-[11px] text-white/45 uppercase tracking-wider">Status</span>
+                        <select
+                            value={statusFilter}
+                            onChange={e => setStatusFilter(e.target.value)}
+                            className="bg-white/[0.03] border border-white/[0.08] rounded-lg px-2 py-1 text-xs text-white"
+                        >
+                            <option value="all" className="bg-zinc-900 text-white">
+                                All statuses
+                            </option>
+                            {statusOptions.map(s => (
+                                <option key={s} value={s} className="bg-zinc-900 text-white">
+                                    {s}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
 
                 {loading ? (
@@ -317,65 +418,102 @@ export default function AdminDeployedProjects() {
                                     </div>
                                     <div className="lg:col-span-2">
                                         <label className="text-[10px] text-white/40 uppercase tracking-wider">Editor</label>
-                                        <select
-                                            value={row.editor}
-                                            onChange={e => {
-                                                void savePatch(row.id, { editor: e.target.value });
-                                            }}
-                                            className="mt-1 w-full bg-white/[0.03] border border-white/[0.08] rounded-lg px-2 py-2 text-xs text-white"
-                                        >
-                                            <option value="" className="bg-zinc-900 text-white">Unassigned</option>
-                                            {editorOptions.map(s => (
-                                                <option key={s} value={s} className="bg-zinc-900 text-white">
-                                                    {s}
-                                                </option>
-                                            ))}
-                                        </select>
+                                        <div className="mt-1 w-full bg-white/[0.03] border border-white/[0.08] rounded-lg px-2 py-2 text-xs text-white/90">
+                                            {row.editor || 'Unassigned'}
+                                        </div>
                                     </div>
                                     <div className="lg:col-span-1">
                                         <label className="text-[10px] text-white/40 uppercase tracking-wider">Price</label>
-                                        <input
-                                            value={row.price}
-                                            onChange={e => setRow(row.id, { price: e.target.value })}
-                                            onBlur={() => void saveRow(row)}
-                                            className="mt-1 w-full bg-white/[0.03] border border-white/[0.08] rounded-lg px-2 py-2 text-xs text-white"
-                                        />
+                                        <div className="mt-1 w-full bg-white/[0.03] border border-white/[0.08] rounded-lg px-2 py-2 text-xs text-white/90">
+                                            {row.price || 'N/A'}
+                                        </div>
                                     </div>
                                     <div className="lg:col-span-3">
                                         <label className="text-[10px] text-white/40 uppercase tracking-wider">Raw Video Link</label>
-                                        <input
-                                            value={row.rawVideoLink}
-                                            onChange={e => setRow(row.id, { rawVideoLink: e.target.value })}
-                                            onBlur={() => void saveRow(row)}
-                                            className="mt-1 w-full bg-white/[0.03] border border-white/[0.08] rounded-lg px-2 py-2 text-xs text-white"
-                                        />
+                                        <div className="mt-1 w-full h-9 bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 flex items-center text-xs text-white/90">
+                                            {row.rawVideoLink ? (
+                                                <a
+                                                    href={row.rawVideoLink}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="block text-sky-300 hover:underline truncate"
+                                                >
+                                                    {row.rawVideoLink}
+                                                </a>
+                                            ) : (
+                                                'N/A'
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="lg:col-span-1 flex justify-end">
-                                        <button
-                                            onClick={() => void saveRow(row)}
-                                            disabled={savingRowId === row.id}
-                                            className="mt-5 inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold disabled:opacity-50"
-                                        >
-                                            {savingRowId === row.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                                            Save
-                                        </button>
+                                    <div className="lg:col-span-2 flex items-end">
+                                        <div className="w-full mt-1 lg:mt-0 flex items-center justify-start gap-2">
+                                            <button
+                                                onClick={() => void saveRow(row)}
+                                                disabled={savingRowId === row.id}
+                                                className="h-9 min-w-[88px] inline-flex items-center justify-center gap-1 px-3 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold disabled:opacity-50"
+                                            >
+                                                {savingRowId === row.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                                                Save
+                                            </button>
+                                            {isPreviewableMediaLink(row.submissionLink || row.rawVideoLink) && (
+                                                <button
+                                                    onClick={() => setPreviewRow(row)}
+                                                    className="h-9 min-w-[96px] inline-flex items-center justify-center gap-1 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold"
+                                                >
+                                                    <PlayCircle className="w-3.5 h-3.5" />
+                                                    Preview
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="mt-3">
-                                    <label className="text-[10px] text-white/40 uppercase tracking-wider">Instructions</label>
-                                    <textarea
-                                        rows={3}
-                                        value={row.instructions}
-                                        onChange={e => setRow(row.id, { instructions: e.target.value })}
-                                        onBlur={() => void saveRow(row)}
-                                        className="mt-1 w-full bg-white/[0.03] border border-white/[0.08] rounded-lg px-2 py-2 text-xs text-white resize-y"
-                                    />
+                                    <p className="text-[10px] text-white/30 uppercase tracking-wider">Instructions hidden on this page</p>
                                 </div>
                             </div>
                         ))}
                     </div>
                 )}
             </div>
+            <YouTubeModal
+                isOpen={!!previewRow}
+                onClose={() => setPreviewRow(null)}
+                title={previewRow?.name || 'Preview'}
+                mainContent={
+                    previewRow?.submissionLink || previewRow?.rawVideoLink ? (
+                        (() => {
+                            const preview = buildPreviewSource(previewRow.submissionLink || previewRow.rawVideoLink);
+                            if (preview.mode === 'video') {
+                                return <SubmissionVideoPlayer ref={videoRef} url={preview.src} />;
+                            }
+                            return (
+                                <iframe
+                                    src={preview.src}
+                                    className="w-full h-full border-0 min-h-[40vh]"
+                                    title={previewRow.name}
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowFullScreen
+                                />
+                            );
+                        })()
+                    ) : (
+                        <div className="text-white/60 text-sm">No video link for this row.</div>
+                    )
+                }
+                splitSidePanel={
+                    previewRow && veBoardId && (previewRow.submissionLink || previewRow.rawVideoLink) ? (
+                        <SubmissionVideoFeedbackPanel
+                            boardId={veBoardId}
+                            itemId={previewRow.id}
+                            projectName={previewRow.name}
+                            mode="admin"
+                            videoRef={videoRef}
+                            editorNameHint={previewRow.editor}
+                            canCompose={canComposeAdminFeedback(previewRow.status)}
+                        />
+                    ) : undefined
+                }
+            />
         </AdminPageLayout>
     );
 }
