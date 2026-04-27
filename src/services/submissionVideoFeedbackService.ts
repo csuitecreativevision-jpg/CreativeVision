@@ -107,8 +107,15 @@ export async function addSubmissionVideoFeedback(params: {
                 : null,
         author_role: params.authorRole,
     };
-    const { data, error } = await supabase.from('submission_video_feedback').insert([payload]).select().single();
-    if (error) throw new Error(error.message);
+    let data: unknown = null;
+    let error: { message?: string } | null = null;
+    ({ data, error } = await supabase.from('submission_video_feedback').insert([payload]).select().single());
+    if (error && /author_role/i.test(String(error.message || ''))) {
+        // Backward-compatible fallback for environments where the column migration has not landed yet.
+        const { author_role, ...legacyPayload } = payload;
+        ({ data, error } = await supabase.from('submission_video_feedback').insert([legacyPayload]).select().single());
+    }
+    if (error) throw new Error(error.message || 'Could not send video feedback.');
     const row = data as SubmissionVideoFeedbackRow;
 
     const ts = formatTimestampLabel(params.timestampSeconds ?? null);

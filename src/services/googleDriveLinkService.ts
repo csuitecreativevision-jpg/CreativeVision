@@ -95,8 +95,11 @@ export function deriveTitleFromVideoUrl(raw: string): string | null {
             if (v) return `YouTube ${v.slice(0, 12)}…`;
         }
 
-        if (host.includes('drive.google.com') && parts.includes('file') && parts.includes('d')) {
-            return null;
+        if (host.includes('drive.google.com') || host.includes('docs.google.com')) {
+            const fileId = extractGoogleDriveFileId(s);
+            if (fileId) {
+                return `Drive file ${fileId.slice(0, 8)}...`;
+            }
         }
 
         let candidate = parts[parts.length - 1] || '';

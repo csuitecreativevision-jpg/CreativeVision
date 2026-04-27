@@ -98,6 +98,7 @@ export function SubmissionVideoFeedbackPanel({
     const [pendingSeconds, setPendingSeconds] = useState<number | null>(null);
     const [sending, setSending] = useState(false);
     const [resolveId, setResolveId] = useState<string | null>(null);
+    const [sendError, setSendError] = useState<string | null>(null);
 
     const meEmail = localStorage.getItem('portal_user_email') || '';
     const meName = localStorage.getItem('portal_user_name') || meEmail || (mode === 'client' ? 'Client' : 'Admin');
@@ -141,6 +142,7 @@ export function SubmissionVideoFeedbackPanel({
         if (!meEmail || !draft.trim()) return;
         if (mode === 'editor') return;
         if (!canCompose) return;
+        setSendError(null);
         setSending(true);
         const text = draft.trim();
         const ts = pendingSeconds;
@@ -163,6 +165,7 @@ export function SubmissionVideoFeedbackPanel({
             console.error('[Video feedback] send failed', e);
             setDraft(text);
             setPendingSeconds(ts);
+            setSendError(e instanceof Error ? e.message : 'Could not send feedback. Please try again.');
         } finally {
             setSending(false);
         }
@@ -356,6 +359,12 @@ export function SubmissionVideoFeedbackPanel({
                                 {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                                 Send feedback
                             </button>
+                            {!meEmail && (
+                                <p className="text-[11px] text-amber-300/85">
+                                    Missing account email in this session. Re-login to send feedback.
+                                </p>
+                            )}
+                            {sendError && <p className="text-[11px] text-red-300/90">{sendError}</p>}
                         </>
                     )}
                 </div>
