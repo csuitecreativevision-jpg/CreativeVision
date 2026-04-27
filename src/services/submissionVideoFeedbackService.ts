@@ -16,6 +16,20 @@ export interface SubmissionVideoFeedbackRow {
     author_role?: 'admin' | 'client' | null;
 }
 
+export interface SubmissionVideoFeedbackAttachment {
+    id: string;
+    name: string;
+    mimeType: string;
+    dataUrl: string;
+}
+
+export interface ParsedSubmissionVideoFeedbackMessage {
+    text: string;
+    attachments: SubmissionVideoFeedbackAttachment[];
+}
+
+const FEEDBACK_RICH_PREFIX = '[cv-feedback-v1]';
+
 /** Parse `boardId:itemId` from notification source_id. */
 export function parseSubmissionVideoFeedbackSourceId(sourceId?: string): { boardId: string; itemId: string } | null {
     if (!sourceId) return null;
@@ -66,6 +80,36 @@ export function formatTimestampLabel(seconds: number | string | null | undefined
     return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
+function sanitizeAttachment(input: SubmissionVideoFeedbackAttachment): SubmissionVideoFeedbackAttachment | null {
+    const id = String(input.id || '').trim();
+    const name = String(input.name || 'attachment').trim().slice(0, 120);
+    const mimeType = String(input.mimeType || '').trim().toLowerCase();
+    const dataUrl = String(input.dataUrl || '');
+    if (!id || !name || !mimeType || !dataUrl) return null;
+    if (!mimeType.startsWith('image/')) return null;
+    if (!dataUrl.startsWith('data:image/')) return null;
+    return { id, name, mimeType, dataUrl };
+}
+
+export function parseSubmissionVideoFeedbackMessage(raw: string): ParsedSubmissionVideoFeedbackMessage {
+    const s = String(raw || '');
+    if (!s.startsWith(FEEDBACK_RICH_PREFIX)) return { text: s, attachments: [] };
+    const json = s.slice(FEEDBACK_RICH_PREFIX.length);
+    try {
+        const parsed = JSON.parse(json) as {
+            text?: string;
+            attachments?: SubmissionVideoFeedbackAttachment[];
+        };
+        const text = typeof parsed.text === 'string' ? parsed.text : '';
+        const attachments = Array.isArray(parsed.attachments)
+            ? parsed.attachments.map(sanitizeAttachment).filter((x): x is SubmissionVideoFeedbackAttachment => !!x)
+            : [];
+        return { text, attachments };
+    } catch {
+        return { text: s, attachments: [] };
+    }
+}
+
 /** @param activeOnly When true (default), omit resolved notes (editor view). Admins should pass false. */
 export async function listSubmissionVideoFeedback(
     boardId: string,
@@ -94,13 +138,22 @@ export async function addSubmissionVideoFeedback(params: {
     authorName: string;
     editorNameHint?: string;
     authorRole: 'admin' | 'client';
+    attachments?: SubmissionVideoFeedbackAttachment[];
 }): Promise<SubmissionVideoFeedbackRow> {
+    const cleanText = params.message.trim();
+    const cleanAttachments = Array.isArray(params.attachments)
+        ? params.attachments.map(sanitizeAttachment).filter((x): x is SubmissionVideoFeedbackAttachment => !!x)
+        : [];
+    const storedMessage =
+        cleanAttachments.length > 0
+            ? `${FEEDBACK_RICH_PREFIX}${JSON.stringify({ text: cleanText, attachments: cleanAttachments })}`
+            : cleanText;
     const payload = {
         board_id: params.boardId,
         item_id: params.itemId,
         author_email: params.authorEmail,
         author_name: params.authorName || params.authorEmail,
-        message: params.message.trim(),
+        message: storedMessage,
         timestamp_seconds:
             params.timestampSeconds != null && !Number.isNaN(params.timestampSeconds)
                 ? params.timestampSeconds
@@ -119,7 +172,7 @@ export async function addSubmissionVideoFeedback(params: {
     const row = data as SubmissionVideoFeedbackRow;
 
     const ts = formatTimestampLabel(params.timestampSeconds ?? null);
-    const preview = `${params.message.slice(0, 120)}${params.message.length > 120 ? '…' : ''}`;
+    const preview = `${cleanText.slice(0, 120)}${cleanText.length > 120 ? '…' : ''}`;
     const editorEmails = await resolveEditorEmails(params.editorNameHint);
     const title = params.authorRole === 'client' ? 'Client video feedback' : 'Admin video feedback';
     await Promise.all(

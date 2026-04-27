@@ -14,6 +14,7 @@ import { SubmissionVideoPlayer, type SubmissionVideoPlayerHandle } from '../../c
 import { SubmissionVideoFeedbackPanel } from '../../components/shared/SubmissionVideoFeedbackPanel';
 import { isMondayStatusForApproval } from '../../lib/mondayItemStatus';
 import { extractGoogleDriveFileId } from '../../services/googleDriveLinkService';
+import { isCvApprovedMondayStatus, maybeClearSubmissionVideoFeedback } from '../../services/submissionVideoFeedbackService';
 
 type QuickRange = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'custom';
 
@@ -146,6 +147,7 @@ export default function AdminDeployedProjects() {
     const [customTo, setCustomTo] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [previewRow, setPreviewRow] = useState<Row | null>(null);
+    const [statusToast, setStatusToast] = useState<string | null>(null);
 
     const activeRange = useMemo(
         () => computeRange(quickRange, customFrom, customTo),
@@ -278,6 +280,12 @@ export default function AdminDeployedProjects() {
         void load(false);
     }, []);
 
+    useEffect(() => {
+        if (!statusToast) return;
+        const t = window.setTimeout(() => setStatusToast(null), 2400);
+        return () => window.clearTimeout(t);
+    }, [statusToast]);
+
     const setRow = (rowId: string, patch: Partial<Row>) => {
         setRows(prev => prev.map(r => (r.id === rowId ? { ...r, ...patch } : r)));
     };
@@ -299,6 +307,10 @@ export default function AdminDeployedProjects() {
             if (statusId) updates[statusId] = { label: row.status };
             if (linkId) updates[linkId] = row.rawVideoLink ? { url: row.rawVideoLink, text: 'Raw Video' } : '';
             await updateMondayItemColumns(veBoardId, row.id, updates);
+            maybeClearSubmissionVideoFeedback(veBoardId, row.id, row.status);
+            if (isCvApprovedMondayStatus(row.status)) {
+                setStatusToast('Approved (CV): video feedback has been auto-cleared.');
+            }
         } finally {
             setSavingRowId(null);
         }
@@ -382,6 +394,11 @@ export default function AdminDeployedProjects() {
                         </select>
                     </div>
                 </div>
+                {statusToast && (
+                    <div className="rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-3 py-2 text-[12px] text-emerald-200">
+                        {statusToast}
+                    </div>
+                )}
 
                 {loading ? (
                     <div className="flex items-center justify-center h-40 text-white/50">
