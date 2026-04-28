@@ -102,7 +102,7 @@ export default function App() {
       <AnimatePresence>
         {routeLoading ? (
           <motion.div
-            className={`fixed inset-0 z-[120] ${isPortalPath ? 'lg:left-[240px]' : ''}`}
+            className={`fixed inset-0 z-[120] ${isPortalPath && !isNativeAppShell ? 'lg:left-[240px]' : ''}`}
             initial={{ opacity: 1 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

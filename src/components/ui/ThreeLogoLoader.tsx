@@ -11,6 +11,7 @@ export const ThreeLogoLoader = () => {
     useEffect(() => {
         const host = containerRef.current;
         if (!host) return;
+        const size = Math.max(220, Math.min(window.innerWidth * 0.62, 320));
 
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
@@ -18,7 +19,7 @@ export const ThreeLogoLoader = () => {
 
         const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        renderer.setSize(320, 320);
+        renderer.setSize(size, size);
         renderer.setClearAlpha(0);
         host.appendChild(renderer.domElement);
 
@@ -26,7 +27,7 @@ export const ThreeLogoLoader = () => {
         const texture = loader.load('/Untitled design (3).png');
         texture.colorSpace = THREE.SRGBColorSpace;
 
-        const geometry = new THREE.PlaneGeometry(1.8, 1.8);
+        const geometry = new THREE.PlaneGeometry(1.5, 1.5);
         const material = new THREE.MeshBasicMaterial({
             map: texture,
             color: isDark ? 0xffffff : 0x111111,
@@ -136,7 +137,10 @@ export const ThreeLogoLoader = () => {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 transition={{ duration: 0.55, ease: 'easeOut' }}
             >
-                <div ref={containerRef} className="w-[320px] h-[320px] flex items-center justify-center overflow-visible" />
+                <div
+                    ref={containerRef}
+                    className="w-[min(62vw,320px)] h-[min(62vw,320px)] min-w-[220px] min-h-[220px] flex items-center justify-center overflow-visible"
+                />
                 <p className={`mt-4 text-xs tracking-[0.2em] ${isDark ? 'text-white/70' : 'text-zinc-800'}`}>CREATIVE VISION</p>
                 <p className={`mt-2 text-[10px] tracking-[0.14em] uppercase ${isDark ? 'text-white/45' : 'text-zinc-500'}`}>Drag or click the logo</p>
             </motion.div>
