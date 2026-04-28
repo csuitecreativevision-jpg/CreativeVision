@@ -61,7 +61,7 @@ export const YouTubeModal = ({
     return createPortal(
         <AnimatePresence>
             {isOpen && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 md:p-6">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-2 md:p-4">
                     {/* Backdrop */}
                     <motion.div
                         initial={{ opacity: 0 }}
@@ -77,7 +77,7 @@ export const YouTubeModal = ({
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
                         transition={{ type: "spring", duration: 0.5, bounce: 0.1 }}
-                        className={`relative w-full max-w-[95vw] h-[90vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col border ${
+                        className={`relative w-full max-w-[98vw] h-[95dvh] rounded-3xl overflow-hidden shadow-2xl flex flex-col border ${
                             isDark ? 'bg-[#0E0E1A] border-white/10' : 'bg-white border-zinc-200'
                         }`}
                     >
@@ -137,21 +137,21 @@ export const YouTubeModal = ({
                         {/* Content: optional split (video + side panel), then details */}
                         <div className={`flex-1 overflow-y-auto custom-scrollbar flex flex-col min-h-0 ${isDark ? 'bg-[#0b0b15]' : 'bg-zinc-50'}`}>
                             <div
-                                className={`flex flex-1 min-h-[50vh] xl:min-h-[58vh] flex-col lg:flex-row lg:min-h-[52vh] shadow-2xl z-10 ${
+                                className={`flex flex-1 min-h-[62vh] xl:min-h-[70vh] flex-col lg:flex-row lg:min-h-[66vh] shadow-2xl z-10 ${
                                     splitSidePanel ? 'lg:items-stretch' : ''
                                 }`}
                             >
                                 <div
-                                    className={`bg-black relative flex flex-col items-center justify-center min-h-[45vh] lg:min-h-0 ${
+                                    className={`bg-black relative flex flex-col items-center justify-center min-h-[52vh] lg:min-h-0 ${
                                         splitSidePanel ? 'flex-1 min-w-0' : 'w-full flex-shrink-0 xl:min-h-[65vh]'
                                     }`}
                                 >
-                                    <div className="w-full h-full min-h-[40vh] lg:min-h-[48vh] flex items-center justify-center p-2 lg:p-4">
+                                    <div className="w-full h-full min-h-[48vh] lg:min-h-[62vh] flex items-center justify-center p-2 lg:p-3">
                                         {mainContent}
                                     </div>
                                 </div>
                                 {splitSidePanel && (
-                                    <div className={`relative z-20 w-full lg:w-[min(26rem,38vw)] lg:max-w-md flex-shrink-0 lg:max-h-none max-h-[55vh] lg:h-auto border-t lg:border-t-0 lg:border-l overflow-hidden flex flex-col pointer-events-auto ${
+                                    <div className={`relative z-20 w-full lg:w-[min(34rem,42vw)] lg:max-w-[42vw] flex-shrink-0 lg:max-h-none max-h-[62vh] lg:h-auto border-t lg:border-t-0 lg:border-l overflow-hidden flex flex-col pointer-events-auto ${
                                         isDark ? 'border-white/10' : 'border-zinc-200'
                                     }`}>
                                         {splitSidePanel}

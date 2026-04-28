@@ -70,6 +70,16 @@ export default function App() {
   }, []);
 
   useLayoutEffect(() => {
+    const isStartupNativePath =
+      isNativeAppShell &&
+      (location.pathname === '/' ||
+        location.pathname === '/admin-dashboard' ||
+        location.pathname === '/portal');
+    if (isStartupNativePath) {
+      prevPathRef.current = location.pathname;
+      setRouteLoading(false);
+      return;
+    }
     if (prevPathRef.current === location.pathname) return;
     prevPathRef.current = location.pathname;
     setRouteLoading(true);
@@ -96,11 +106,16 @@ export default function App() {
     location.pathname.startsWith('/admin-portal') ||
     location.pathname.startsWith('/editor-portal') ||
     location.pathname.startsWith('/client-portal');
+  const suppressNativeLoader =
+    isNativeAppShell &&
+    (location.pathname === '/' ||
+      location.pathname === '/admin-dashboard' ||
+      location.pathname === '/portal');
 
   return (
     <BackgroundLayout>
       <AnimatePresence>
-        {routeLoading ? (
+        {!suppressNativeLoader && routeLoading ? (
           <motion.div
             className={`fixed inset-0 z-[120] ${isPortalPath && !isNativeAppShell ? 'lg:left-[240px]' : ''}`}
             initial={{ opacity: 1 }}
@@ -140,10 +155,10 @@ export default function App() {
       {/* Main Routing */}
       <motion.div
         className="max-w-full overflow-x-clip"
-        animate={{ opacity: routeLoading && !isPortalPath ? 0 : 1 }}
+        animate={{ opacity: !suppressNativeLoader && routeLoading && !isPortalPath ? 0 : 1 }}
         transition={{ duration: 0.35, ease: 'easeInOut' }}
       >
-        <Suspense fallback={<ThreeLogoLoader />}>
+        <Suspense fallback={suppressNativeLoader ? null : <ThreeLogoLoader />}>
           <Routes>
             <Route
               path="/"

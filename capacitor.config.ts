@@ -27,6 +27,11 @@ const config: CapacitorConfig = {
     scrollEnabled: true,
   },
   plugins: {
+    SplashScreen: {
+      launchAutoHide: false,
+      launchShowDuration: 0,
+      backgroundColor: '#020204',
+    },
     /**
      * Capacitor 8: injects --safe-area-inset-* CSS variables on Android for edge-to-edge.
      * Keep default `css`; combine with env(safe-area-inset-*) in UI as already used.

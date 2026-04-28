@@ -256,7 +256,7 @@ export function NotificationBell({ onNotificationClick }: NotificationBellProps)
                             type="button"
                             key="notification-backdrop"
                             aria-label="Close notifications"
-                            className={`fixed inset-0 z-[1000010] backdrop-blur-[1px] lg:hidden native:!block ${
+                            className={`fixed inset-0 z-[1000010] md:hidden ${
                                 isDark ? 'bg-black/45' : 'bg-black/25'
                             }`}
                             initial={{ opacity: 0 }}
@@ -273,7 +273,7 @@ export function NotificationBell({ onNotificationClick }: NotificationBellProps)
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: 12 }}
                             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                            className={`fixed left-0 right-0 bottom-0 z-[1000020] flex flex-col max-h-[92dvh] rounded-t-3xl border border-b-0 backdrop-blur-2xl overflow-hidden lg:absolute lg:left-auto lg:right-0 lg:top-full lg:bottom-auto lg:mt-3 lg:max-h-[520px] lg:w-[380px] lg:rounded-2xl lg:border lg:z-[100] ${
+                            className={`fixed left-0 right-0 bottom-0 z-[1000020] flex flex-col max-h-[92dvh] rounded-t-3xl border border-b-0 backdrop-blur-2xl overflow-hidden md:absolute md:left-auto md:right-0 md:top-full md:bottom-auto md:mt-3 md:max-h-[520px] md:w-[380px] md:rounded-2xl md:border md:z-[100] ${
                                 isDark
                                     ? 'border-white/10 bg-[#131322]/98 shadow-[0_-12px_40px_rgba(0,0,0,0.45)] lg:shadow-2xl lg:shadow-black/50'
                                     : 'border-zinc-200 bg-white/98 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] lg:shadow-xl'

@@ -631,8 +631,8 @@ export default function AdminProjectAssignment() {
             subtitle="Configure and assign new projects to your team"
         >
             <div className="w-full max-w-[90rem] mx-auto">
-                <div className="flex flex-col lg:flex-row native:flex-col native:items-stretch lg:items-start gap-6 lg:gap-10">
-                    <div className="flex-1 min-w-0 w-full max-w-2xl lg:mx-0">
+                <div className="flex flex-col xl:flex-row native:flex-col native:items-stretch xl:items-start gap-6 xl:gap-10">
+                    <div className="flex-1 min-w-0 w-full xl:max-w-none">
 
                 {/* ── Step indicator (scrollable on narrow screens) ── */}
                 <div className="w-full overflow-x-auto pb-2 mb-6 lg:mb-10 -mx-0.5 px-0.5">
@@ -1169,10 +1169,10 @@ export default function AdminProjectAssignment() {
 
                     <aside
                         aria-label="Deployment board and Monday.com editor availability"
-                        className="w-full lg:w-[min(100%,26rem)] xl:w-[28rem] flex-shrink-0 space-y-4 lg:sticky lg:top-6 lg:self-start pb-8 lg:pb-0"
+                        className="w-full xl:w-[28rem] flex-shrink-0 space-y-4 xl:sticky xl:top-6 xl:self-start pb-8 xl:pb-0"
                     >
                         <DeploymentBoardPanel variant="sidebar" />
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-white/25 px-0.5 hidden lg:block">Live from Monday</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-white/25 px-0.5 hidden xl:block">Live from Monday</p>
                         <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-3 sm:p-4 space-y-2 sm:space-y-3">
                             <div className="flex items-start justify-between gap-3">
                                 <div className="flex items-center gap-2 min-w-0">

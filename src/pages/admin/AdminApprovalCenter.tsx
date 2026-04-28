@@ -146,15 +146,12 @@ export default function AdminApprovalCenter() {
         }
     };
 
-    if (loading) {
+    if (loading || refreshing) {
         return (
-            <div className="flex items-center justify-center h-64">
-                <Loader2 className="w-5 h-5 text-violet-400/50 animate-spin" />
+            <div className="fixed inset-0 z-[130]">
+                <ThreeLogoLoader />
             </div>
         );
-    }
-    if (refreshing) {
-        return <ThreeLogoLoader />;
     }
 
     return (

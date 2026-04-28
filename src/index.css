@@ -9,10 +9,12 @@
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    background-color: #020204;
   }
 
   body {
     margin: 0;
+    background-color: #020204;
   }
 
   img,
@@ -373,7 +375,7 @@ html::-webkit-scrollbar {
 /* Set Poppins as default font */
 body {
   font-family: 'Poppins', sans-serif;
-  background-color: #050511;
+  background-color: #020204;
   /* Deep premium dark */
   color: #fff;
   overflow-x: hidden;
@@ -388,6 +390,10 @@ body {
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
+}
+
+#root {
+  background-color: #020204;
 }
 
 /* Mobile-Specific Lock removed to prevent scroll freezing */

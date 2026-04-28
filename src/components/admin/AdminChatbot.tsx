@@ -181,15 +181,28 @@ export function AdminChatbotProvider({ children }: { children: ReactNode }) {
                 <div className="fixed z-[999999] flex flex-col items-end gap-3 md:gap-4 pointer-events-none bottom-6 right-6 max-lg:bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] max-lg:right-[max(0.75rem,env(safe-area-inset-right,0px))] lg:bottom-6 lg:right-6 native:!bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] native:!right-[max(0.75rem,env(safe-area-inset-right,0px))]">
                     <AnimatePresence>
                         {isChatOpen && (
-                            <motion.div
-                                initial={{ opacity: 0, y: 20, scale: 0.98 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: 14, scale: 0.98 }}
-                                transition={{ duration: 0.26, ease: 'easeOut' }}
-                                className={`w-[min(22.5rem,calc(100vw-1.5rem))] md:w-[420px] h-[min(32rem,calc(100dvh-8.5rem))] md:h-[620px] backdrop-blur-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col pointer-events-auto max-md:max-h-[calc(100dvh-6.5rem)] ${
-                                    isDark ? 'bg-[#050511]/95 border border-white/10' : 'bg-white border border-zinc-200'
-                                }`}
-                            >
+                            <>
+                                <motion.button
+                                    type="button"
+                                    aria-label="Close assistant"
+                                    className={`fixed inset-0 z-[999998] md:hidden ${
+                                        isDark ? 'bg-black/35' : 'bg-black/20'
+                                    }`}
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                    onClick={() => setIsChatOpen(false)}
+                                />
+                                <motion.div
+                                    initial={{ opacity: 0, y: 20, scale: 0.98 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    exit={{ opacity: 0, y: 14, scale: 0.98 }}
+                                    transition={{ duration: 0.26, ease: 'easeOut' }}
+                                    className={`w-[min(21.5rem,calc(100vw-1.5rem))] md:w-[min(24rem,calc(100vw-2.5rem))] h-[min(29rem,calc(100dvh-9.5rem))] md:h-[min(30rem,calc(100dvh-9rem))] backdrop-blur-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col pointer-events-auto ${
+                                        isDark ? 'bg-[#050511]/95 border border-white/10' : 'bg-white border border-zinc-200'
+                                    }`}
+                                >
                                 <div className={`p-4 border-b flex items-center justify-between shadow-sm ${isDark ? 'bg-white/5 border-white/10' : 'bg-zinc-50 border-zinc-200'}`}>
                                     <div className="flex items-center gap-3">
                                         <img
@@ -303,7 +316,8 @@ export function AdminChatbotProvider({ children }: { children: ReactNode }) {
                                         </motion.button>
                                     </form>
                                 </div>
-                            </motion.div>
+                                </motion.div>
+                            </>
                         )}
                     </AnimatePresence>
 
