@@ -29,6 +29,22 @@ function editorNameHintFromItem(item: any, columns: any[] | undefined): string {
     return (cv?.text || '').trim();
 }
 
+function normalizeSubmissionStatusLabel(label: string): string {
+    return String(label || '')
+        .toLowerCase()
+        .replace(/\(.*?\)/g, '')
+        .replace(/[^a-z0-9]+/g, '');
+}
+
+function isSubmissionStatusLocked(status: string): boolean {
+    const n = normalizeSubmissionStatusLabel(status);
+    return (
+        n === normalizeSubmissionStatusLabel('Approved (CV)') ||
+        n === normalizeSubmissionStatusLabel('Waiting for Client') ||
+        n === normalizeSubmissionStatusLabel('Approved (Client)')
+    );
+}
+
 export const EditorProjectSelectionView = ({
     boardData,
     selectedBoardId,
@@ -612,6 +628,7 @@ export const EditorProjectSelectionView = ({
 
     const filteredSubmissionRows = useMemo(() => {
         let rows = submissionRowsAll;
+        rows = rows.filter((r) => !isSubmissionStatusLocked(getStatusText(r.item)));
         if (searchTerm) {
             const t = searchTerm.toLowerCase();
             rows = rows.filter((r) => r.item.name.toLowerCase().includes(t));

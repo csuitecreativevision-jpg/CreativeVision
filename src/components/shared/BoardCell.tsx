@@ -18,6 +18,21 @@ interface BoardCellProps {
     onPreview: (url: string, name: string, assetId?: string) => void;
 }
 
+const EDITOR_ALLOWED_PROJECT_STATUSES = [
+    'Downloading',
+    'Working on it',
+    'Exporting & Uploading',
+    'Taking a break (cv)',
+    'For Approval',
+];
+
+function normStatusLabel(s: string): string {
+    return String(s || '')
+        .toLowerCase()
+        .replace(/\(.*?\)/g, '')
+        .replace(/[^a-z0-9]+/g, '');
+}
+
 /** Resolve source item + column for a mirror/lookup so file upload hits the real Monday file column. */
 function extractMirrorSourceIds(item: MondayItem, column: MondayColumn): { itemId: string; columnId: string } | null {
     if (column.type !== 'mirror' && column.type !== 'lookup') return null;
@@ -92,6 +107,8 @@ export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dro
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { mutateAsync: updateItem } = useUpdateItemValue();
     const { mutateAsync: updateSourceCol } = useUpdateSourceColumn();
+    const userRole = (localStorage.getItem('portal_user_role') || '').toLowerCase();
+    const isEditor = userRole === 'editor';
 
     const handleMondayFileUpload = async (files: FileList | null) => {
         const file = files?.[0];
@@ -587,6 +604,9 @@ export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dro
             column.title.toLowerCase().includes('priority') ||
             column.title.toLowerCase().includes('client') ||
             column.title.toLowerCase().includes('phase'));
+    const isProjectStatusColumn = column.title.toLowerCase().includes('project status');
+    const editorStatusRestrictionActive = isEditor && isProjectStatusColumn;
+    const allowedEditorStatusSet = new Set(EDITOR_ALLOWED_PROJECT_STATUSES.map(normStatusLabel));
 
     // Status / Dropdown Rendering OR Mirror Status
     // We treat Priority and Client as "Status" for visual rendering (Chips)
@@ -701,13 +721,28 @@ export const BoardCell = ({ item, column, boardId, allColumns, uniqueValues, dro
                         {options.map((opt: any) => (
                             <button
                                 key={opt.id}
-                                onClick={() => handleSave(opt.label)}
-                                className="w-full text-left px-4 py-2 hover:bg-white/10 text-white text-xs transition-colors flex items-center gap-3"
+                                onClick={() => {
+                                    const canSelect =
+                                        !editorStatusRestrictionActive || allowedEditorStatusSet.has(normStatusLabel(opt.label));
+                                    if (!canSelect) return;
+                                    handleSave(opt.label);
+                                }}
+                                disabled={editorStatusRestrictionActive && !allowedEditorStatusSet.has(normStatusLabel(opt.label))}
+                                className={`w-full text-left px-4 py-2 text-xs transition-colors flex items-center gap-3 ${
+                                    editorStatusRestrictionActive && !allowedEditorStatusSet.has(normStatusLabel(opt.label))
+                                        ? 'text-white/30 cursor-not-allowed'
+                                        : 'hover:bg-white/10 text-white'
+                                }`}
                             >
                                 <span className="w-2.5 h-2.5 rounded-full ring-2 ring-white/10" style={{ backgroundColor: opt.color || '#fff' }} />
                                 {opt.label}
                             </button>
                         ))}
+                        {editorStatusRestrictionActive && (
+                            <div className="px-4 py-2 text-[10px] text-amber-300/80 border-t border-white/10">
+                                Editors can only select: Downloading, Working on it, Exporting & Uploading, Taking a break (cv), For Approval.
+                            </div>
+                        )}
                         {options.length === 0 && (
                             <div className="px-4 py-2 text-gray-500 text-xs italic">No options available</div>
                         )}

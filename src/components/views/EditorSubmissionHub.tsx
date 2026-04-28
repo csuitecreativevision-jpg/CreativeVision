@@ -1,6 +1,6 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Upload, Loader2, CheckCircle2, AlertCircle, Link2 } from 'lucide-react';
-import { updateSourceColumn, uploadFileToItemColumn } from '../../services/mondayService';
+import { getBoardColumns, updateSourceColumn, uploadFileToItemColumn } from '../../services/mondayService';
 import { getMondayFileUploadTarget } from '../shared/BoardCell';
 import { fireCvSwal } from '../../lib/swalTheme';
 
@@ -11,6 +11,7 @@ export interface SubmissionRow {
     submissionColumn: any;
     uploadTarget: { itemId: string; columnId: string };
     hasFile: boolean;
+    statusColumn: any | null;
 }
 
 function getSubmissionUpdateTarget(row: SubmissionRow): { boardId: string; itemId: string; columnId: string } | null {
@@ -93,6 +94,100 @@ function findSubmissionColumn(columns: any[] | undefined): any | null {
     return columns.find((c: any) => c.title?.toLowerCase().includes('submission')) || null;
 }
 
+function findStatusColumn(columns: any[] | undefined): any | null {
+    if (!columns) return null;
+    const norm = (s: string) => String(s || '').trim().toLowerCase();
+    const cols = columns;
+    const exactProjectStatus =
+        cols.find((c: any) => norm(c.title) === 'project status') ||
+        cols.find((c: any) => norm(c.title) === 'status (project)') ||
+        cols.find((c: any) => norm(c.title) === 'project status (cv)');
+    if (exactProjectStatus) return exactProjectStatus;
+    const containsProjectStatus = cols.find((c: any) => norm(c.title).includes('project status'));
+    if (containsProjectStatus) return containsProjectStatus;
+    return cols.find(
+        (c: any) =>
+            norm(c.title).includes('status') &&
+            (c.type === 'status' || c.type === 'color' || c.type === 'mirror' || c.type === 'lookup')
+    ) || null;
+}
+
+function getStatusText(item: any, statusColumn: any | null): string {
+    if (!statusColumn) return '';
+    const val = item?.column_values?.find((v: any) => v.id === statusColumn.id);
+    return String(val?.text || val?.display_value || '').trim();
+}
+
+function getStatusUpdateTarget(row: SubmissionRow): { boardId: string; itemId: string; columnId: string } | null {
+    const col = row.statusColumn;
+    if (!col) return null;
+    if (col.type === 'status' || col.type === 'color') {
+        return { boardId: row.boardId, itemId: row.item.id, columnId: col.id };
+    }
+    if ((col.type === 'mirror' || col.type === 'lookup') && col.settings_str) {
+        let sourceBoardId = '';
+        let sourceColumnId = '';
+        let relationColId = '';
+        try {
+            const settings = JSON.parse(col.settings_str);
+            if (settings.displayed_linked_columns) {
+                const boardIds = Object.keys(settings.displayed_linked_columns);
+                if (boardIds.length > 0) {
+                    sourceBoardId = boardIds[0];
+                    const linkedCols = settings.displayed_linked_columns[boardIds[0]];
+                    if (linkedCols && linkedCols.length > 0) sourceColumnId = linkedCols[0];
+                }
+            }
+            if (settings.relation_column) {
+                const relKeys = Object.keys(settings.relation_column);
+                if (relKeys.length > 0) relationColId = relKeys[0];
+            }
+        } catch {
+            return null;
+        }
+        if (!relationColId || !sourceColumnId || !sourceBoardId) return null;
+        const relationColValue = row.item.column_values?.find((c: any) => c.id === relationColId);
+        if (!relationColValue) return null;
+        let sourceItemId = '';
+        const rawLinked = (relationColValue as { linked_item_ids?: string[] }).linked_item_ids;
+        if (rawLinked && Array.isArray(rawLinked) && rawLinked.length > 0) {
+            sourceItemId = String(rawLinked[0]);
+        } else if (relationColValue.value) {
+            try {
+                const parsedRel = JSON.parse(relationColValue.value);
+                if (parsedRel?.linkedPulseIds?.length > 0) {
+                    sourceItemId = String(parsedRel.linkedPulseIds[0].linkedPulseId);
+                }
+            } catch {
+                return null;
+            }
+        }
+        if (!sourceItemId) return null;
+        return { boardId: sourceBoardId, itemId: sourceItemId, columnId: sourceColumnId };
+    }
+    return null;
+}
+
+function getStatusOptions(statusColumn: any | null, rows: SubmissionRow[]): string[] {
+    const fromSettings: string[] = [];
+    if (statusColumn?.settings_str) {
+        try {
+            const parsed = JSON.parse(statusColumn.settings_str);
+            const labelsObj = parsed?.labels || {};
+            const labels = Array.isArray(labelsObj)
+                ? labelsObj.map((x: any) => String(x?.name || x || '').trim()).filter(Boolean)
+                : Object.values(labelsObj).map((x: any) => String(x?.name || x || '').trim()).filter(Boolean);
+            fromSettings.push(...labels);
+        } catch {
+            /* ignore */
+        }
+    }
+    const fromRows = rows
+        .map(r => getStatusText(r.item, r.statusColumn))
+        .filter(Boolean);
+    return Array.from(new Set([...fromSettings, ...fromRows]));
+}
+
 function flattenBoardItems(boardData: any): any[] {
     if (!boardData?.groups || !boardData?.items) return [];
     return boardData.groups.flatMap((g: any) =>
@@ -142,6 +237,7 @@ export function buildSubmissionRowsForBoard(boardData: any, boardId: string, boa
     const editorFilterName =
         typeof localStorage !== 'undefined' ? localStorage.getItem('portal_user_name') || '' : '';
     const submissionCol = findSubmissionColumn(boardData?.columns);
+    const statusCol = findStatusColumn(boardData?.columns);
     if (!submissionCol) return [];
     const items = flattenBoardItems(boardData);
     const boardLabel = displayWorkspaceName(boardName || '');
@@ -157,7 +253,8 @@ export function buildSubmissionRowsForBoard(boardData: any, boardId: string, boa
             item,
             submissionColumn: submissionCol,
             uploadTarget,
-            hasFile
+            hasFile,
+            statusColumn: statusCol,
         });
     }
     next.sort((a, b) => (a.item.name || '').localeCompare(b.item.name || ''));
@@ -165,6 +262,75 @@ export function buildSubmissionRowsForBoard(boardData: any, boardId: string, boa
 }
 
 const FILE_ACCEPT = 'video/*,image/*,.pdf,.mp4,.mov,.webm';
+const EDITOR_ALLOWED_STATUS_LABELS = [
+    'Downloading',
+    'Working on it',
+    'Exporting & Uploading',
+    'Taking a break (cv)',
+    'For Approval',
+];
+const EDITOR_STATUS_LOCKED_LABELS = [
+    'Approved (CV)',
+    'Waiting for Client',
+    'Approved (Client)',
+];
+
+function normalizeStatusLabel(label: string): string {
+    return String(label || '')
+        .toLowerCase()
+        .replace(/\(.*?\)/g, '')
+        .replace(/[^a-z0-9]+/g, '');
+}
+
+function getAllowedStatusMatchKeys(label: string): string[] {
+    const n = normalizeStatusLabel(label);
+    if (n === normalizeStatusLabel('Exporting & Uploading')) {
+        return [n, normalizeStatusLabel('Exporting and Uploading')];
+    }
+    if (n === normalizeStatusLabel('For Approval')) {
+        return [n, normalizeStatusLabel('For Approval (CV)')];
+    }
+    if (n === normalizeStatusLabel('Working on it')) {
+        return [n, normalizeStatusLabel('Working on it (CV)')];
+    }
+    if (n === normalizeStatusLabel('Taking a break (cv)')) {
+        return [n, normalizeStatusLabel('Taking a break')];
+    }
+    return [n];
+}
+
+function isEditorStatusLocked(currentStatus: string): boolean {
+    const n = normalizeStatusLabel(currentStatus);
+    return EDITOR_STATUS_LOCKED_LABELS.some((s) => normalizeStatusLabel(s) === n);
+}
+
+function extractStatusLabelsFromColumn(statusColumn: any | null): string[] {
+    if (!statusColumn?.settings_str) return [];
+    try {
+        const parsed = JSON.parse(String(statusColumn.settings_str || '{}'));
+        const labelsObj = parsed?.labels || {};
+        return (Array.isArray(labelsObj)
+            ? labelsObj.map((x: any) => String(x?.name || x || '').trim())
+            : Object.values(labelsObj).map((x: any) => String(x?.name || x || '').trim())
+        ).filter(Boolean);
+    } catch {
+        return [];
+    }
+}
+
+function getAllowedEditorStatusOptionsFromLabels(mondayLabels: string[]): string[] {
+        const mondayByNorm = new Map(mondayLabels.map((s: string) => [normalizeStatusLabel(s), s]));
+        return EDITOR_ALLOWED_STATUS_LABELS
+            .map((allowed) => {
+                const keys = getAllowedStatusMatchKeys(allowed);
+                for (const k of keys) {
+                    const hit = mondayByNorm.get(k);
+                    if (hit) return hit;
+                }
+                return '';
+            })
+            .filter(Boolean);
+}
 
 export interface EditorSubmissionBoardPanelProps {
     boardData: any;
@@ -186,7 +352,10 @@ export function EditorSubmissionBoardPanel({
     const [uploadingKey, setUploadingKey] = useState<string | null>(null);
     const [savingLinkKey, setSavingLinkKey] = useState<string | null>(null);
     const [deletingLinkKey, setDeletingLinkKey] = useState<string | null>(null);
+    const [savingStatusKey, setSavingStatusKey] = useState<string | null>(null);
     const [linkDrafts, setLinkDrafts] = useState<Record<string, string>>({});
+    const [statusDrafts, setStatusDrafts] = useState<Record<string, string>>({});
+    const [statusOptions, setStatusOptions] = useState<string[]>([]);
     const fileInputsRef = useRef<Record<string, HTMLInputElement | null>>({});
 
     const rows = useMemo(() => {
@@ -194,6 +363,45 @@ export function EditorSubmissionBoardPanel({
         if (!boardData) return [];
         return buildSubmissionRowsForBoard(boardData, boardId, boardData.name || '');
     }, [rowsProp, boardData, boardId]);
+    useEffect(() => {
+        let cancelled = false;
+        const resolveStatusOptions = async () => {
+            const col = rows[0]?.statusColumn || findStatusColumn(boardData?.columns);
+            if (!col) {
+                if (!cancelled) setStatusOptions([]);
+                return;
+            }
+            const directLabels = extractStatusLabelsFromColumn(col);
+            if (directLabels.length > 0) {
+                if (!cancelled) setStatusOptions(getAllowedEditorStatusOptionsFromLabels(directLabels));
+                return;
+            }
+            if ((col.type === 'mirror' || col.type === 'lookup') && col.settings_str) {
+                try {
+                    const settings = JSON.parse(String(col.settings_str || '{}'));
+                    const boardIds = settings?.displayed_linked_columns ? Object.keys(settings.displayed_linked_columns) : [];
+                    const sourceBoardId = boardIds[0];
+                    const sourceColId = sourceBoardId ? settings.displayed_linked_columns[sourceBoardId]?.[0] : null;
+                    if (sourceBoardId && sourceColId) {
+                        const sourceCols = await getBoardColumns(sourceBoardId);
+                        const sourceCol = sourceCols?.find((c: any) => c.id === sourceColId);
+                        const sourceLabels = extractStatusLabelsFromColumn(sourceCol);
+                        if (!cancelled) {
+                            setStatusOptions(getAllowedEditorStatusOptionsFromLabels(sourceLabels));
+                        }
+                        return;
+                    }
+                } catch {
+                    /* ignore */
+                }
+            }
+            if (!cancelled) setStatusOptions([]);
+        };
+        void resolveStatusOptions();
+        return () => {
+            cancelled = true;
+        };
+    }, [rows, boardData?.columns]);
 
     const handleFile = async (row: SubmissionRow, files: FileList | null) => {
         const file = files?.[0];
@@ -328,6 +536,59 @@ export function EditorSubmissionBoardPanel({
         }
     };
 
+    const handleSaveStatus = async (row: SubmissionRow, explicitStatus?: string) => {
+        const key = `${row.boardId}-${row.item.id}`;
+        const currentStatus = getStatusText(row.item, row.statusColumn);
+        if (isEditorStatusLocked(currentStatus)) {
+            await fireCvSwal({
+                icon: 'info',
+                title: 'Status is locked',
+                text: 'This project is already Approved (CV), Waiting for Client, or Approved (Client). Editors can no longer change its status.',
+            });
+            return;
+        }
+        const nextStatus = String(explicitStatus ?? statusDrafts[key] ?? '').trim();
+        if (!nextStatus) return;
+        const allowedNorm = new Set(statusOptions.map(normalizeStatusLabel));
+        if (!allowedNorm.has(normalizeStatusLabel(nextStatus))) {
+            await fireCvSwal({
+                icon: 'warning',
+                title: 'Status not allowed',
+                text: 'Editors can only use: Downloading, Working on it, Exporting & Uploading, Taking a break (cv), and For Approval.',
+            });
+            return;
+        }
+        const target = getStatusUpdateTarget(row);
+        if (!target) {
+            await fireCvSwal({
+                icon: 'error',
+                title: 'Cannot update status',
+                text: 'Status column is not linked to an editable source column.',
+            });
+            return;
+        }
+        setSavingStatusKey(key);
+        try {
+            await updateSourceColumn(target.boardId, target.itemId, target.columnId, JSON.stringify({ label: nextStatus }));
+            await onRefresh();
+            await fireCvSwal({
+                icon: 'success',
+                title: 'Status updated',
+                timer: 1100,
+                showConfirmButton: false,
+            });
+        } catch (err) {
+            console.error(err);
+            await fireCvSwal({
+                icon: 'error',
+                title: 'Failed to update status',
+                text: err instanceof Error ? err.message : 'Could not update status in Monday.',
+            });
+        } finally {
+            setSavingStatusKey(null);
+        }
+    };
+
     if (!boardData) return null;
 
     if (!findSubmissionColumn(boardData.columns)) {
@@ -366,6 +627,9 @@ export function EditorSubmissionBoardPanel({
                 const busy = uploadingKey === key;
                 const submissionValue = getSubmissionDisplayValue(row);
                 const hasHttpLink = /^https?:\/\//i.test(submissionValue);
+                const currentStatus = getStatusText(row.item, row.statusColumn);
+                const selectedStatus = statusDrafts[key] ?? '';
+                const statusLocked = isEditorStatusLocked(currentStatus);
                 return (
                     <li
                         key={key}
@@ -410,6 +674,40 @@ export function EditorSubmissionBoardPanel({
                                 {busy ? 'Uploading…' : 'Upload'}
                             </button>
                             <div className="flex items-center gap-2">
+                                {statusOptions.length > 0 ? (
+                                    <>
+                                        <select
+                                            value={selectedStatus}
+                                            onChange={(e) => {
+                                                const next = e.target.value;
+                                                setStatusDrafts((prev) => ({ ...prev, [key]: next }));
+                                                if (!next || statusLocked || next === currentStatus || savingStatusKey === key) return;
+                                                void handleSaveStatus(row, next);
+                                            }}
+                                            disabled={statusLocked || savingStatusKey === key}
+                                            className="w-64 sm:w-72 bg-[#0e0e1a] border border-white/10 rounded-lg px-2 py-2 text-[11px] text-white focus:outline-none focus:border-violet-500/50"
+                                        >
+                                            <option value="" className="bg-zinc-900 text-white/70">
+                                                {currentStatus ? `Current: ${currentStatus}` : 'Select status...'}
+                                            </option>
+                                            {statusOptions.map((s) => (
+                                                <option key={s} value={s} className="bg-zinc-900 text-white">
+                                                    {s}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {savingStatusKey === key && <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-300" />}
+                                        {statusLocked && (
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-300/85">
+                                                Status locked
+                                            </span>
+                                        )}
+                                    </>
+                                ) : (
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-300/85">
+                                        Status options missing in Monday
+                                    </span>
+                                )}
                                 <input
                                     type="url"
                                     placeholder="Paste Drive/link URL"
