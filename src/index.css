@@ -4,6 +4,68 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Mobile / WebView: text scaling, media bounds, horizontal overflow ── */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+  }
+
+  img,
+  video {
+    max-width: 100%;
+    height: auto;
+  }
+
+  @media (max-width: 1023px) {
+    html {
+      overflow-x: clip;
+      max-width: 100%;
+    }
+
+    body {
+      overflow-x: clip;
+      max-width: 100%;
+    }
+
+    #root {
+      max-width: 100%;
+      overflow-x: clip;
+    }
+  }
+
+  html.cv-native-shell {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+    min-height: 100%;
+    min-height: 100dvh;
+  }
+
+  html.cv-native-shell body {
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+    min-height: 100%;
+    min-height: 100dvh;
+    /* Safe areas are handled in portal chrome (e.g. PortalMobileTopBar); avoid double padding */
+  }
+
+  html.cv-native-shell #root {
+    width: 100%;
+    max-width: 100%;
+    min-height: 100%;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
 /* Thin dark scrollbars (used by AdminPageLayout and overflow panels) */
 .custom-scrollbar {
   scrollbar-width: thin;
@@ -91,6 +153,184 @@
   -webkit-backdrop-filter: blur(30px);
   border: 1px solid rgba(255, 255, 255, 0.06);
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+}
+
+/* Light-theme readability pass across portal content */
+.portal-theme-light [class*="text-white"] {
+  color: rgb(15 23 42) !important;
+}
+
+.portal-theme-light [class*="text-gray-"],
+.portal-theme-light [class*="text-zinc-"] {
+  color: rgb(51 65 85) !important;
+}
+
+.portal-theme-light [class*="placeholder-gray-"],
+.portal-theme-light [class*="placeholder-zinc-"] {
+  color: rgb(100 116 139) !important;
+}
+
+/* Convert common dark portal surfaces to light cards in light mode */
+.portal-theme-light [class*="bg-[#020204]"],
+.portal-theme-light [class*="bg-[#0a0a16]"],
+.portal-theme-light [class*="bg-[#0e0e1a]"],
+.portal-theme-light [class*="bg-[#11111c]"],
+.portal-theme-light [class*="bg-[#13131f]"],
+.portal-theme-light [class*="bg-[#131322]"],
+.portal-theme-light [class*="bg-[#07070b]"] {
+  background-color: rgb(255 255 255) !important;
+}
+
+.portal-theme-light [class*="border-white/"] {
+  border-color: rgb(228 228 231) !important;
+}
+
+/* Extra dark modal/calendar surfaces (mixed-case hex + additional tones) */
+.portal-theme-light [class*="bg-[#0E0E1A]"],
+.portal-theme-light [class*="bg-[#11111C]"],
+.portal-theme-light [class*="bg-[#13131F]"],
+.portal-theme-light [class*="bg-[#131322]"],
+.portal-theme-light [class*="bg-[#1A1A2E]"],
+.portal-theme-light [class*="bg-[#151525]"],
+.portal-theme-light [class*="bg-[#121425]"],
+.portal-theme-light [class*="bg-[#0d1020]"] {
+  background-color: rgb(255 255 255) !important;
+}
+
+.portal-theme-light [class*="text-white/"] {
+  color: rgb(39 39 42) !important;
+}
+
+.portal-theme-light [class*="text-white"] {
+  color: rgb(24 24 27) !important;
+}
+
+.portal-theme-light [class*="placeholder-white/"] {
+  color: rgb(113 113 122) !important;
+}
+
+/* Monochrome light theme across portal roles (admin/editor/client) */
+.portal-theme-light [class*="text-violet-"],
+.portal-theme-light [class*="text-fuchsia-"],
+.portal-theme-light [class*="text-purple-"],
+.portal-theme-light [class*="text-indigo-"],
+.portal-theme-light [class*="text-blue-"],
+.portal-theme-light [class*="text-sky-"],
+.portal-theme-light [class*="text-cyan-"],
+.portal-theme-light [class*="text-emerald-"],
+.portal-theme-light [class*="text-teal-"],
+.portal-theme-light [class*="text-green-"],
+.portal-theme-light [class*="text-amber-"],
+.portal-theme-light [class*="text-yellow-"],
+.portal-theme-light [class*="text-orange-"],
+.portal-theme-light [class*="text-rose-"],
+.portal-theme-light [class*="text-red-"],
+.portal-theme-light [class*="text-pink-"] {
+  color: rgb(24 24 27) !important;
+}
+
+.portal-theme-light [class*="bg-violet-"],
+.portal-theme-light [class*="bg-fuchsia-"],
+.portal-theme-light [class*="bg-purple-"],
+.portal-theme-light [class*="bg-indigo-"],
+.portal-theme-light [class*="bg-blue-"],
+.portal-theme-light [class*="bg-sky-"],
+.portal-theme-light [class*="bg-cyan-"],
+.portal-theme-light [class*="bg-emerald-"],
+.portal-theme-light [class*="bg-teal-"],
+.portal-theme-light [class*="bg-green-"],
+.portal-theme-light [class*="bg-amber-"],
+.portal-theme-light [class*="bg-yellow-"],
+.portal-theme-light [class*="bg-orange-"],
+.portal-theme-light [class*="bg-rose-"],
+.portal-theme-light [class*="bg-red-"],
+.portal-theme-light [class*="bg-pink-"] {
+  background-color: rgb(244 244 245) !important;
+}
+
+.portal-theme-light [class*="border-violet-"],
+.portal-theme-light [class*="border-fuchsia-"],
+.portal-theme-light [class*="border-purple-"],
+.portal-theme-light [class*="border-indigo-"],
+.portal-theme-light [class*="border-blue-"],
+.portal-theme-light [class*="border-sky-"],
+.portal-theme-light [class*="border-cyan-"],
+.portal-theme-light [class*="border-emerald-"],
+.portal-theme-light [class*="border-teal-"],
+.portal-theme-light [class*="border-green-"],
+.portal-theme-light [class*="border-amber-"],
+.portal-theme-light [class*="border-yellow-"],
+.portal-theme-light [class*="border-orange-"],
+.portal-theme-light [class*="border-rose-"],
+.portal-theme-light [class*="border-red-"],
+.portal-theme-light [class*="border-pink-"] {
+  border-color: rgb(212 212 216) !important;
+}
+
+/* Light mode depth pass: thicker box outlines + stronger shadows (all roles) */
+.portal-theme-light :where(div, section, article, aside)[class*="rounded-"][class*="border"] {
+  border-width: 2px !important;
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.08),
+    0 2px 6px rgba(15, 23, 42, 0.05) !important;
+}
+
+.portal-theme-light :where(div, section, article, aside)[class*="rounded-"][class*="border-white/"] {
+  border-color: rgb(212 212 216) !important;
+}
+
+.portal-theme-light :where(div, section, article, aside)[class*="rounded-"][class*="border-zinc-"] {
+  border-color: rgb(212 212 216) !important;
+}
+
+
+.portal-theme-light [class*="from-violet-"],
+.portal-theme-light [class*="from-fuchsia-"],
+.portal-theme-light [class*="from-purple-"],
+.portal-theme-light [class*="from-indigo-"],
+.portal-theme-light [class*="from-blue-"],
+.portal-theme-light [class*="from-emerald-"],
+.portal-theme-light [class*="from-amber-"],
+.portal-theme-light [class*="to-violet-"],
+.portal-theme-light [class*="to-fuchsia-"],
+.portal-theme-light [class*="to-purple-"],
+.portal-theme-light [class*="to-indigo-"],
+.portal-theme-light [class*="to-blue-"],
+.portal-theme-light [class*="to-emerald-"],
+.portal-theme-light [class*="to-amber-"] {
+  --tw-gradient-from: rgb(244 244 245) var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgb(228 228 231 / 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), rgb(228 228 231) var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
+}
+
+/* Convert common dark portal surfaces to light cards in light mode */
+.portal-theme-light [class*="bg-[#020204]"],
+.portal-theme-light [class*="bg-[#0a0a16]"],
+.portal-theme-light [class*="bg-[#0e0e1a]"],
+.portal-theme-light [class*="bg-[#11111c]"],
+.portal-theme-light [class*="bg-[#13131f]"],
+.portal-theme-light [class*="bg-[#131322]"],
+.portal-theme-light [class*="bg-[#07070b]"] {
+  background-color: rgb(255 255 255) !important;
+}
+
+.portal-theme-light [class*="border-white/"] {
+  border-color: rgb(228 228 231) !important;
+}
+
+/* Convert common dark portal surfaces to light cards in light mode */
+.portal-theme-light [class*="bg-[#020204]"],
+.portal-theme-light [class*="bg-[#0a0a16]"],
+.portal-theme-light [class*="bg-[#0e0e1a]"],
+.portal-theme-light [class*="bg-[#11111c]"],
+.portal-theme-light [class*="bg-[#13131f]"],
+.portal-theme-light [class*="bg-[#131322]"],
+.portal-theme-light [class*="bg-[#07070b]"] {
+  background-color: rgb(255 255 255) !important;
+}
+
+.portal-theme-light [class*="border-white/"] {
+  border-color: rgb(228 228 231) !important;
 }
 
 .text-gradient-concept {

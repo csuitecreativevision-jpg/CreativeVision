@@ -20,19 +20,19 @@ export const AdminPageLayout = ({ children, title, subtitle, action, label }: Ad
         >
             {isDark && (
                 <>
-                    <div className="absolute top-0 right-0 w-[50vw] h-[50vh] bg-violet-600/[0.04] rounded-full blur-[140px] pointer-events-none" />
-                    <div className="absolute bottom-0 left-0 w-[35vw] h-[35vh] bg-indigo-500/[0.04] rounded-full blur-[110px] pointer-events-none" />
+                    <div className="absolute top-0 right-0 w-[50vw] h-[50vh] bg-violet-600/[0.04] rounded-full blur-[140px] pointer-events-none max-lg:hidden native:hidden" />
+                    <div className="absolute bottom-0 left-0 w-[35vw] h-[35vh] bg-indigo-500/[0.04] rounded-full blur-[110px] pointer-events-none max-lg:hidden native:hidden" />
                 </>
             )}
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-7 md:p-9 relative z-10">
-                <div className="max-w-7xl mx-auto space-y-8">
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-3 sm:p-6 md:p-9 relative z-10">
+                <div className="max-w-7xl mx-auto space-y-4 sm:space-y-5 md:space-y-8">
                     {(title || action) && (
-                        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-1">
-                            <div>
+                        <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 md:gap-4 pb-1">
+                            <div className="min-w-0">
                                 {label && (
                                     <p
-                                        className={`text-[10px] font-bold tracking-[0.22em] uppercase mb-3 ${
+                                        className={`text-[10px] font-bold tracking-[0.22em] uppercase mb-2 md:mb-3 ${
                                             isDark ? 'text-violet-400/90' : 'text-violet-600'
                                         }`}
                                     >
@@ -41,7 +41,7 @@ export const AdminPageLayout = ({ children, title, subtitle, action, label }: Ad
                                 )}
                                 {title && (
                                     <h1
-                                        className={`text-3xl md:text-4xl font-black tracking-tight leading-none mb-2.5 ${
+                                        className={`text-[1.35rem] sm:text-3xl md:text-4xl font-black tracking-tight leading-tight sm:leading-none mb-1.5 sm:mb-2 md:mb-2.5 ${
                                             isDark
                                                 ? 'text-white text-glow-premium'
                                                 : 'text-zinc-900'
@@ -60,7 +60,7 @@ export const AdminPageLayout = ({ children, title, subtitle, action, label }: Ad
                                     </p>
                                 )}
                             </div>
-                            {action && <div className="flex-shrink-0">{action}</div>}
+                            {action && <div className="flex-shrink-0 w-full md:w-auto">{action}</div>}
                         </div>
                     )}
 

@@ -29,7 +29,7 @@ import { createDiscordThread } from '../../services/discordService';
 // --- Reusable UI Sub-Components (Internal) ---
 
 const GlassCard = ({ children, className = '' }: { children: React.ReactNode, className?: string }) => (
-    <div className={`bg-[#0E0E1A]/80 backdrop-blur-md border border-white/5 rounded-3xl p-6 md:p-8 shadow-xl ${className}`}>
+    <div className={`bg-[#0E0E1A]/80 backdrop-blur-md border border-white/5 rounded-2xl md:rounded-3xl p-4 sm:p-6 md:p-8 shadow-xl ${className}`}>
         {children}
     </div>
 );
@@ -43,7 +43,7 @@ const FormLabel = ({ children, required }: { children: React.ReactNode, required
 const StyledInput = (props: React.InputHTMLAttributes<HTMLInputElement>) => (
     <input
         {...props}
-        className={`w-full bg-[#131322] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/50 transition-all ${props.className}`}
+        className={`w-full bg-[#131322] border border-white/10 rounded-xl px-3 py-2 sm:px-4 sm:py-3 text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/50 transition-all ${props.className}`}
     />
 );
 
@@ -51,7 +51,7 @@ const StyledSelect = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
     <div className="relative">
         <select
             {...props}
-            className={`w-full bg-[#131322] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/50 appearance-none cursor-pointer transition-all ${props.className}`}
+            className={`w-full bg-[#131322] border border-white/10 rounded-xl px-3 py-2 sm:px-4 sm:py-3 text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/50 appearance-none cursor-pointer transition-all ${props.className}`}
         />
         <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
     </div>
@@ -294,7 +294,7 @@ export function UserManagement() {
     return (
         <div className="space-y-6">
             {/* Header/Actions for the Component */}
-            <div className="flex justify-between items-center bg-[#0E0E1A]/50 p-4 rounded-2xl border border-white/5">
+            <div className="flex justify-between items-center bg-[#0E0E1A]/50 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-white/5 gap-3">
                 <div>
                     <h3 className="text-white font-bold">User Database</h3>
                     <p className="text-xs text-gray-500">Create, edit, and manage system access.</p>
@@ -311,15 +311,15 @@ export function UserManagement() {
                 </button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 items-start">
                 {/* --- Left Column: Create/Edit Form --- */}
-                <GlassCard className="space-y-6">
-                    <div className="flex items-center gap-3 pb-6 border-b border-white/5">
-                        <div className="p-3 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-400">
-                            {editingUserId ? <Pencil className="w-6 h-6" /> : <UserPlus className="w-6 h-6" />}
+                <GlassCard className="space-y-4 sm:space-y-6">
+                    <div className="flex items-center gap-2.5 sm:gap-3 pb-4 sm:pb-6 border-b border-white/5">
+                        <div className="p-2 sm:p-3 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-400">
+                            {editingUserId ? <Pencil className="w-5 h-5 sm:w-6 sm:h-6" /> : <UserPlus className="w-5 h-5 sm:w-6 sm:h-6" />}
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold text-white">
+                            <h2 className="text-lg sm:text-xl font-bold text-white">
                                 {editingUserId ? 'Edit Account' : 'New Account'}
                             </h2>
                             <p className="text-sm text-gray-400">
@@ -328,11 +328,11 @@ export function UserManagement() {
                         </div>
                     </div>
 
-                    <form onSubmit={handleCreateUser} className="space-y-6">
+                    <form onSubmit={handleCreateUser} className="space-y-4 sm:space-y-6">
                         {/* Role Selector */}
                         <div>
                             <FormLabel>Access Role</FormLabel>
-                            <div className="grid grid-cols-3 gap-3">
+                            <div className="grid grid-cols-3 gap-2 sm:gap-3">
                                 {[
                                     { id: 'admin', icon: Shield, label: 'Admin', color: 'purple' },
                                     { id: 'editor', icon: Briefcase, label: 'Editor', color: 'blue' },
@@ -342,13 +342,13 @@ export function UserManagement() {
                                         key={role.id}
                                         type="button"
                                         onClick={() => setNewUserRole(role.id as any)}
-                                        className={`relative group p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${newUserRole === role.id
+                                        className={`relative group p-2 sm:p-3 rounded-lg sm:rounded-xl border flex flex-col items-center gap-1 sm:gap-2 transition-all ${newUserRole === role.id
                                             ? `bg-${role.color}-500/20 border-${role.color}-500/50`
                                             : 'bg-[#131322] border-white/5 hover:border-white/10'
                                             }`}
                                     >
-                                        <role.icon className={`w-5 h-5 ${newUserRole === role.id ? `text-${role.color}-400` : 'text-gray-500 group-hover:text-gray-300'}`} />
-                                        <span className={`text-xs font-bold ${newUserRole === role.id ? 'text-white' : 'text-gray-500'}`}>{role.label}</span>
+                                        <role.icon className={`w-4 h-4 sm:w-5 sm:h-5 ${newUserRole === role.id ? `text-${role.color}-400` : 'text-gray-500 group-hover:text-gray-300'}`} />
+                                        <span className={`text-[10px] sm:text-xs font-bold ${newUserRole === role.id ? 'text-white' : 'text-gray-500'}`}>{role.label}</span>
                                         {newUserRole === role.id && (
                                             <motion.div layoutId="role-selected-um" className={`absolute inset-0 rounded-xl border-2 border-${role.color}-500`} />
                                         )}
@@ -358,7 +358,7 @@ export function UserManagement() {
                         </div>
 
                         {newUserRole === 'editor' && (
-                            <label className="flex items-start gap-3 p-4 rounded-xl border border-white/10 bg-[#131322]/80 cursor-pointer select-none">
+                            <label className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl border border-white/10 bg-[#131322]/80 cursor-pointer select-none">
                                 <input
                                     type="checkbox"
                                     checked={newUserFullTimer}
@@ -529,7 +529,7 @@ export function UserManagement() {
                             <button
                                 type="submit"
                                 disabled={isCreatingUser}
-                                className="px-20 py-3 rounded-full bg-white text-black font-bold hover:bg-custom-bright hover:text-white transition-all flex items-center gap-2"
+                                className="w-full max-w-sm sm:w-auto sm:max-w-none px-10 sm:px-20 py-2.5 sm:py-3 rounded-full bg-white text-black font-bold hover:bg-custom-bright hover:text-white transition-all flex items-center justify-center gap-2 mx-auto sm:mx-0"
                             >
                                 {isCreatingUser ? 'Processing...' : (editingUserId ? 'Save Changes' : 'Create User')}
                             </button>
@@ -553,7 +553,7 @@ export function UserManagement() {
 
                 {/* --- Right Column: Info/Help --- */}
                 <div className="space-y-6">
-                    <div className="p-6 md:p-8 rounded-3xl bg-gradient-to-br from-violet-600/20 to-blue-600/5 border border-white/10 relative overflow-hidden">
+                    <div className="p-4 sm:p-6 md:p-8 rounded-2xl md:rounded-3xl bg-gradient-to-br from-violet-600/20 to-blue-600/5 border border-white/10 relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-64 h-64 bg-violet-600/20 blur-[80px] rounded-full pointer-events-none -mr-32 -mt-32" />
 
                         <h3 className="text-lg font-bold text-white mb-4 relative z-10">Role Guidelines</h3>
@@ -563,7 +563,7 @@ export function UserManagement() {
                                 { role: 'Editor', desc: 'Restricted to specific Workspaces. Can view/edit boards assigned to them.', color: 'blue' },
                                 { role: 'Client', desc: 'Restricted view. Can only access "Fulfillment" boards in their workspace.', color: 'emerald' },
                             ].map((item, i) => (
-                                <div key={i} className="flex gap-4 p-4 rounded-2xl bg-[#0E0E1A]/60 border border-white/5 backdrop-blur-sm">
+                                <div key={i} className="flex gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-[#0E0E1A]/60 border border-white/5 backdrop-blur-sm">
                                     <div className={`w-1 h-full rounded-full bg-${item.color}-500 shrink-0`} />
                                     <div>
                                         <span className={`text-xs font-bold uppercase tracking-wider text-${item.color}-400 mb-1 block`}>{item.role}</span>

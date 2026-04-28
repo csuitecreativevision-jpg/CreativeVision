@@ -194,14 +194,14 @@ export default function AdminSettings() {
                                         <h3 className={`font-bold ${labelStrong}`}>Appearance</h3>
                                     </div>
 
-                                    <div className={`flex items-center justify-between p-4 rounded-xl border ${row}`}>
-                                        <div className="flex items-center gap-3">
+                                    <div className={`flex items-start justify-between gap-3 p-4 rounded-xl border ${row}`}>
+                                        <div className="flex items-center gap-3 min-w-0 flex-1">
                                             <div className={`p-2 rounded-lg ${iconBox}`}>
                                                 {isDark ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
                                             </div>
-                                            <div>
+                                            <div className="min-w-0">
                                                 <div className={`text-sm font-bold ${labelStrong}`}>Dark Mode</div>
-                                                <div className={`text-xs ${labelMuted}`}>
+                                                <div className={`text-xs break-words ${labelMuted}`}>
                                                     {isDark
                                                         ? 'On — deep theme for sidebar and portal chrome'
                                                         : 'Off — light theme for sidebar and portal chrome'}
@@ -211,7 +211,7 @@ export default function AdminSettings() {
                                         <button
                                             type="button"
                                             onClick={() => setIsDark(!isDark)}
-                                            className={`relative w-11 h-6 rounded-full transition-colors ${
+                                            className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 mt-0.5 ${
                                                 isDark ? 'bg-violet-600' : 'bg-zinc-300'
                                             }`}
                                             aria-pressed={isDark}
@@ -233,20 +233,20 @@ export default function AdminSettings() {
                                         <h3 className={`font-bold ${labelStrong}`}>Notifications</h3>
                                     </div>
 
-                                    <div className={`flex items-center justify-between p-4 rounded-xl border ${row}`}>
-                                        <div className="flex items-center gap-3">
+                                    <div className={`flex items-start justify-between gap-3 p-4 rounded-xl border ${row}`}>
+                                        <div className="flex items-center gap-3 min-w-0 flex-1">
                                             <div className={`p-2 rounded-lg ${iconBox}`}>
                                                 <Laptop className="w-4 h-4" />
                                             </div>
-                                            <div>
+                                            <div className="min-w-0">
                                                 <div className={`text-sm font-bold ${labelStrong}`}>Email Alerts</div>
-                                                <div className={`text-xs ${labelMuted}`}>Receive updates on project activity</div>
+                                                <div className={`text-xs break-words ${labelMuted}`}>Receive updates on project activity</div>
                                             </div>
                                         </div>
                                         <button
                                             type="button"
                                             onClick={() => setEmailNotifs(!emailNotifs)}
-                                            className={`relative w-11 h-6 rounded-full transition-colors ${
+                                            className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 mt-0.5 ${
                                                 emailNotifs ? 'bg-emerald-500' : isDark ? 'bg-gray-700' : 'bg-zinc-300'
                                             }`}
                                         >

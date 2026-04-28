@@ -10,6 +10,7 @@ import { getBoardColumns, getAssetPublicUrl, normalizeMondayFileUrl } from '../.
 import { ClientAnalytics } from '../analytics/ClientAnalytics';
 import { SubmissionVideoPlayer, type SubmissionVideoPlayerHandle } from '../shared/SubmissionVideoPlayer';
 import { SubmissionVideoFeedbackPanel } from '../shared/SubmissionVideoFeedbackPanel';
+import { usePortalThemeOptional } from '../../contexts/PortalThemeContext';
 import { canClientComposeVideoFeedback } from '../../lib/mondayItemStatus';
 
 interface ProjectSelectionViewProps {
@@ -37,6 +38,8 @@ export const ProjectSelectionView = ({
     useYouTubeModal = false,
     initialItemId
 }: ProjectSelectionViewProps) => {
+    const theme = usePortalThemeOptional();
+    const isDark = theme?.isDark ?? true;
     // State
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedProject, setSelectedProject] = useState<any | null>(null);
@@ -581,22 +584,30 @@ export const ProjectSelectionView = ({
                 {/* Search & Tabs Group */}
                 <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto">
                     {/* Top Level Tabs Switcher */}
-                    <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 relative flex-shrink-0">
+                    <div className={`flex rounded-xl p-1 relative flex-shrink-0 ${
+                        isDark ? 'bg-white/5 border border-white/10' : 'bg-white border border-zinc-200 shadow-sm'
+                    }`}>
                         <div className="relative flex gap-1">
                             {['projects', 'analytics'].map((tab) => (
                                 <button
                                     key={tab}
                                     onClick={() => setViewTab(tab as 'projects' | 'analytics')}
-                                    className={`relative px-4 py-2 rounded-lg text-xs font-bold transition-all z-10 ${viewTab === tab ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+                                    className={`relative px-4 py-2 rounded-lg text-xs font-bold transition-all z-10 ${
+                                        viewTab === tab
+                                            ? (isDark ? 'text-white' : 'text-black')
+                                            : (isDark ? 'text-gray-400 hover:text-white' : 'text-zinc-500 hover:text-zinc-800')
+                                    }`}
                                 >
                                     {viewTab === tab && (
                                         <motion.div
                                             layoutId="viewTabHighlight"
-                                            className="absolute inset-0 bg-white/10 rounded-lg"
+                                            className={`absolute inset-0 rounded-lg z-0 ${isDark ? 'bg-white/10' : 'bg-zinc-100'}`}
                                             transition={{ type: "spring", stiffness: 300, damping: 30 }}
                                         />
                                     )}
-                                    {tab === 'projects' ? 'Projects' : 'Analytics'}
+                                    <span className="relative z-10">
+                                        {tab === 'projects' ? 'Projects' : 'Analytics'}
+                                    </span>
                                 </button>
                             ))}
                         </div>
@@ -614,16 +625,22 @@ export const ProjectSelectionView = ({
                                     <button
                                         key={mode}
                                         onClick={() => setViewMode(mode as 'all' | 'cycles')}
-                                        className={`relative px-4 py-2 rounded-lg text-xs font-bold transition-all z-10 ${viewMode === mode ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+                                        className={`relative px-4 py-2 rounded-lg text-xs font-bold transition-all z-10 ${
+                                            viewMode === mode
+                                                ? (isDark ? 'text-white' : 'text-black')
+                                                : (isDark ? 'text-gray-400 hover:text-white' : 'text-zinc-500 hover:text-zinc-800')
+                                        }`}
                                     >
                                         {viewMode === mode && (
                                             <motion.div
                                                 layoutId="viewModeHighlight"
-                                                className="absolute inset-0 bg-white/10 rounded-lg"
+                                                className={`absolute inset-0 rounded-lg z-0 ${isDark ? 'bg-white/10' : 'bg-zinc-100'}`}
                                                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
                                             />
                                         )}
-                                        {mode === 'all' ? 'All Projects' : 'Cycles Trend'}
+                                        <span className="relative z-10">
+                                            {mode === 'all' ? 'All Projects' : 'Cycles Trend'}
+                                        </span>
                                     </button>
                                 ))}
                             </div>
@@ -635,24 +652,30 @@ export const ProjectSelectionView = ({
                         <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
-                            className="w-full bg-[#0e0e1a] border border-white/5 rounded-xl px-4 py-2.5 text-sm text-white appearance-none focus:outline-none focus:border-violet-500/50 transition-all font-medium cursor-pointer"
+                            className={`w-full rounded-xl px-4 py-2.5 text-sm appearance-none focus:outline-none focus:border-violet-500/50 transition-all font-medium cursor-pointer ${
+                                isDark ? 'bg-[#0e0e1a] border border-white/5 text-white' : 'bg-white border border-zinc-200 text-zinc-900'
+                            }`}
                         >
                             <option value="All">All Statuses</option>
                             {uniqueStatuses.map(s => (
                                 <option key={s} value={s}>{s}</option>
                             ))}
                         </select>
-                        <svg className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                        <svg className={`absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none ${isDark ? 'text-gray-400' : 'text-zinc-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
                     </div>
 
                     <div className="relative w-full md:w-80">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isDark ? 'text-gray-400' : 'text-zinc-500'}`} />
                         <input
                             type="text"
                             placeholder="Search projects..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full bg-[#0e0e1a] border border-white/5 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500/50 transition-all"
+                            className={`w-full rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-violet-500/50 transition-all ${
+                                isDark
+                                    ? 'bg-[#0e0e1a] border border-white/5 text-white placeholder-gray-500'
+                                    : 'bg-white border border-zinc-200 text-zinc-900 placeholder-zinc-500'
+                            }`}
                         />
                     </div>
                 </div>
@@ -660,7 +683,11 @@ export const ProjectSelectionView = ({
                 <div className="flex items-center gap-2 w-full xl:w-auto justify-end">
                     <button
                         onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-[#0e0e1a] border border-white/5 rounded-xl text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                            isDark
+                                ? 'bg-[#0e0e1a] border border-white/5 text-gray-400 hover:text-white hover:bg-white/5'
+                                : 'bg-white border border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
+                        }`}
                     >
                         <Calendar className="w-3.5 h-3.5" />
                         {sortOrder === 'newest' ? 'Newest First' : 'Oldest First'}
@@ -858,12 +885,12 @@ export const ProjectSelectionView = ({
                                 {/* --- YouTube Style Layout --- */}
 
                                 {/* 1. Video Title & Primary Info */}
-                                <div className="flex flex-col md:flex-row gap-6 items-start justify-between border-b border-white/5 pb-6">
+                                <div className={`flex flex-col md:flex-row gap-6 items-start justify-between border-b pb-6 ${isDark ? 'border-white/5' : 'border-zinc-200'}`}>
                                     <div className="space-y-3 flex-1">
 
-                                        <div className="flex items-center gap-4 text-sm text-gray-400">
-                                            <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/5">
-                                                Project ID: <span className="text-gray-200 font-mono">{selectedProject.id}</span>
+                                        <div className={`flex items-center gap-4 text-sm ${isDark ? 'text-gray-400' : 'text-zinc-600'}`}>
+                                            <span className={`flex items-center gap-1.5 px-3 py-1 rounded-full border ${isDark ? 'bg-white/5 border-white/5' : 'bg-zinc-100 border-zinc-200'}`}>
+                                                Project ID: <span className={`font-mono ${isDark ? 'text-gray-200' : 'text-zinc-900'}`}>{selectedProject.id}</span>
                                             </span>
                                             <span>•</span>
                                             <span>Updated {new Date().toLocaleDateString()}</span>
@@ -875,8 +902,8 @@ export const ProjectSelectionView = ({
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                                     {/* Left Column: Description/Main Details */}
                                     <div className="lg:col-span-2 space-y-6">
-                                        <div className="bg-[#13131f] rounded-2xl p-6 border border-white/5">
-                                            <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                                        <div className={`rounded-2xl p-6 border ${isDark ? 'bg-[#13131f] border-white/5' : 'bg-white border-zinc-200'}`}>
+                                            <h3 className={`text-sm font-bold mb-4 flex items-center gap-2 ${isDark ? 'text-white' : 'text-zinc-900'}`}>
                                                 <div className="w-1 h-4 rounded-full bg-violet-500" />
                                                 PROJECT DETAILS
                                             </h3>
@@ -890,8 +917,14 @@ export const ProjectSelectionView = ({
                                                     !col.title.toLowerCase().includes('submission') &&
                                                     !col.title.toLowerCase().includes('subitems')
                                                 ).map((col: any) => (
-                                                    <div key={col.id} className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl hover:bg-white/[0.03] transition-colors border-b border-white/[0.02] last:border-0 gap-2">
-                                                        <span className="text-sm font-medium text-gray-500 group-hover:text-gray-400 transition-colors uppercase tracking-wider min-w-[150px]">
+                                                    <div key={col.id} className={`group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl transition-colors border-b last:border-0 gap-2 ${
+                                                        isDark
+                                                            ? 'hover:bg-white/[0.03] border-white/[0.02]'
+                                                            : 'hover:bg-zinc-50 border-zinc-100'
+                                                    }`}>
+                                                        <span className={`text-sm font-medium transition-colors uppercase tracking-wider min-w-[150px] ${
+                                                            isDark ? 'text-gray-500 group-hover:text-gray-400' : 'text-zinc-500 group-hover:text-zinc-700'
+                                                        }`}>
                                                             {col.title}
                                                         </span>
                                                         <div className="flex-1 flex justify-start sm:justify-end">
@@ -919,12 +952,16 @@ export const ProjectSelectionView = ({
 
                                     {/* Right Column: Quick Actions */}
                                     <div className="space-y-4">
-                                        <div className="bg-[#13131f] rounded-2xl p-6 border border-white/5">
-                                            <p className="text-xs text-gray-500 uppercase tracking-widest font-bold mb-4">Quick Actions</p>
+                                        <div className={`rounded-2xl p-6 border ${isDark ? 'bg-[#13131f] border-white/5' : 'bg-white border-zinc-200'}`}>
+                                            <p className={`text-xs uppercase tracking-widest font-bold mb-4 ${isDark ? 'text-gray-500' : 'text-zinc-500'}`}>Quick Actions</p>
                                             <div className="space-y-2">
                                                 <button
                                                     onClick={handleDownload}
-                                                    className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors text-sm font-medium flex items-center justify-between group"
+                                                    className={`w-full text-left px-4 py-3 rounded-xl transition-colors text-sm font-medium flex items-center justify-between group ${
+                                                        isDark
+                                                            ? 'bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white'
+                                                            : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 hover:text-zinc-900'
+                                                    }`}
                                                 >
                                                     Download <span className="opacity-0 group-hover:opacity-100 transition-opacity">↓</span>
                                                 </button>
@@ -934,8 +971,8 @@ export const ProjectSelectionView = ({
                                 </div>
 
                                 {/* Metadata Footer */}
-                                <div className="pt-6 mt-8 border-t border-white/5 text-center">
-                                    <span className="text-[10px] font-mono text-gray-600">
+                                <div className={`pt-6 mt-8 border-t text-center ${isDark ? 'border-white/5' : 'border-zinc-200'}`}>
+                                    <span className={`text-[10px] font-mono ${isDark ? 'text-gray-600' : 'text-zinc-500'}`}>
                                     </span>
                                 </div>
                             </>

@@ -48,7 +48,7 @@ function StatCard({
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="relative flex flex-col justify-between p-6 bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden"
+            className="relative flex flex-col justify-between p-4 sm:p-6 bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden min-w-0"
         >
             {/* Top accent line */}
             <div className="absolute top-0 left-6 right-6 h-[1px]" style={{ background: `linear-gradient(to right, transparent, ${color}66, transparent)` }} />
@@ -63,7 +63,9 @@ function StatCard({
                 {loading ? (
                     <div className="h-9 w-16 bg-white/5 rounded-lg animate-pulse mb-2" />
                 ) : (
-                    <div className="text-[32px] font-black text-white leading-none tracking-tight mb-1.5">{value}</div>
+                    <div className="text-[26px] sm:text-[30px] lg:text-[32px] font-black text-white leading-none tracking-tight mb-1.5 min-w-0 truncate" title={value}>
+                        {value}
+                    </div>
                 )}
                 <div className="text-[11px] font-bold uppercase tracking-widest" style={{ color: `${color}80` }}>{title}</div>
                 <div className="text-[11px] text-white/25 mt-0.5 font-medium">{sub}</div>
@@ -262,18 +264,19 @@ export default function AdminOverview() {
             action={
                 <div className="relative">
                     <button
+                        type="button"
                         onClick={() => setIsCycleDropdownOpen(!isCycleDropdownOpen)}
-                        className="flex items-center gap-2 px-3.5 py-2 bg-white/[0.04] border border-white/[0.07] rounded-xl text-xs font-semibold text-white/70 hover:text-white transition-all duration-150"
+                        className="flex items-center gap-2 px-3.5 py-2.5 bg-white/[0.04] border border-white/[0.07] rounded-xl text-xs font-semibold text-white/70 hover:text-white transition-all duration-150 w-full md:w-auto justify-between md:justify-start"
                     >
                         <Calendar className="w-3.5 h-3.5 text-violet-400" />
-                        <span className="truncate max-w-[180px]">{cycleLabel}</span>
+                        <span className="truncate min-w-0 flex-1 md:flex-none md:max-w-[180px] text-left">{cycleLabel}</span>
                         <ChevronDown className={`w-3.5 h-3.5 text-white/30 transition-transform duration-200 ${isCycleDropdownOpen ? 'rotate-180' : ''}`} />
                     </button>
 
                     {isCycleDropdownOpen && <div className="fixed inset-0 z-40" onClick={() => setIsCycleDropdownOpen(false)} />}
 
                     {isCycleDropdownOpen && (
-                        <div className="absolute top-full right-0 mt-2 w-72 bg-[#06060a]/95 backdrop-blur-xl border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden z-50">
+                        <div className="absolute top-full left-0 right-0 md:left-auto md:right-0 mt-2 w-full md:w-72 bg-[#06060a]/95 backdrop-blur-xl border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden z-50">
                             <div className="px-4 py-3 border-b border-white/[0.05] flex items-center justify-between">
                                 <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Filter by Cycle</span>
                                 <div className="flex gap-3">
@@ -306,7 +309,7 @@ export default function AdminOverview() {
             }
         >
             {/* ── Stat cards ── */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 <StatCard
                     title="Active Clients"
                     value={overviewLoading ? '—' : String(overviewStats.activeClientsCount)}
@@ -346,7 +349,7 @@ export default function AdminOverview() {
             </div>
 
             {/* ── Charts ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 mt-4 sm:mt-5">
 
                 {/* Client Distribution */}
                 <motion.div
@@ -356,12 +359,12 @@ export default function AdminOverview() {
                     className="bg-white/[0.018] border border-white/[0.06] rounded-2xl overflow-hidden"
                 >
                     {/* Panel header */}
-                    <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.05]">
-                        <div className="flex items-center gap-2.5">
-                            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: '#8b5cf614', border: '1px solid #8b5cf622' }}>
+                    <div className="flex items-center justify-between px-4 py-4 sm:px-6 sm:py-5 border-b border-white/[0.05] gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: '#8b5cf614', border: '1px solid #8b5cf622' }}>
                                 <Activity className="w-3.5 h-3.5" style={{ color: '#8b5cf6' }} />
                             </div>
-                            <div>
+                            <div className="min-w-0">
                                 <h3 className="text-[13px] font-bold text-white/80">Active Projects</h3>
                                 <p className="text-[10px] text-white/25 font-medium mt-0.5">By client</p>
                             </div>
@@ -371,9 +374,9 @@ export default function AdminOverview() {
                         </span>
                     </div>
 
-                    <div className="px-6 py-5 space-y-1 max-h-[320px] overflow-y-auto custom-scrollbar">
+                    <div className="px-4 py-4 sm:px-6 sm:py-5 space-y-1 max-h-[280px] sm:max-h-[320px] overflow-y-auto custom-scrollbar">
                         {overviewLoading ? (
-                            <div className="flex items-center justify-center py-16">
+                            <div className="flex items-center justify-center py-12 sm:py-16">
                                 <Loader2 className="w-4 h-4 animate-spin text-violet-400/40" />
                             </div>
                         ) : overviewStats.clientProjectDistribution.length > 0 ? (
@@ -405,12 +408,12 @@ export default function AdminOverview() {
                     className="bg-white/[0.018] border border-white/[0.06] rounded-2xl overflow-hidden"
                 >
                     {/* Panel header */}
-                    <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.05]">
-                        <div className="flex items-center gap-2.5">
-                            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: '#10b98114', border: '1px solid #10b98122' }}>
+                    <div className="flex items-center justify-between px-4 py-4 sm:px-6 sm:py-5 border-b border-white/[0.05] gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: '#10b98114', border: '1px solid #10b98122' }}>
                                 <TrendingUp className="w-3.5 h-3.5" style={{ color: '#10b981' }} />
                             </div>
-                            <div>
+                            <div className="min-w-0">
                                 <h3 className="text-[13px] font-bold text-white/80">Editor Workload</h3>
                                 <p className="text-[10px] text-white/25 font-medium mt-0.5">By project count</p>
                             </div>
@@ -422,9 +425,9 @@ export default function AdminOverview() {
                         )}
                     </div>
 
-                    <div className="px-6 py-5 space-y-1 max-h-[320px] overflow-y-auto custom-scrollbar">
+                    <div className="px-4 py-4 sm:px-6 sm:py-5 space-y-1 max-h-[280px] sm:max-h-[320px] overflow-y-auto custom-scrollbar">
                         {overviewLoading ? (
-                            <div className="flex items-center justify-center py-16">
+                            <div className="flex items-center justify-center py-12 sm:py-16">
                                 <Loader2 className="w-4 h-4 animate-spin text-emerald-400/40" />
                             </div>
                         ) : overviewStats.editorPerformance.length > 0 ? (

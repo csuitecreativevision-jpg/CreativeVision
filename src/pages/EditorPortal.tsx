@@ -5,11 +5,16 @@ import {
     Loader2,
     Sparkles,
     LogOut,
-    Menu,
     Calendar,
     Settings
 } from 'lucide-react';
 import { PortalLayout } from '../components/shared/PortalLayout';
+import {
+    PortalMobileTopBar,
+    PORTAL_MOBILE_HEADER_PAD_CLASS,
+    PORTAL_MOBILE_TAB_BAR_PAD_CLASS,
+} from '../components/shared/PortalMobileTopBar';
+import { EditorPortalMobileTabs } from '../components/shared/PortalMobileTabs';
 import { SidebarItem } from '../components/shared/SidebarItem';
 import { EditorProjectSelectionView } from '../components/views/EditorProjectSelectionView';
 import { PortalCalendar } from '../components/views/PortalCalendar';
@@ -23,43 +28,14 @@ import { RefreshProvider, useRefresh } from '../contexts/RefreshContext';
 import { TimeTracker } from '../components/shared/TimeTracker';
 import { NotificationBell } from '../components/shared/NotificationBell';
 import AdminSettings from './admin/AdminSettings';
-import { usePortalTheme } from '../contexts/PortalThemeContext';
+import { usePortalTheme, usePortalThemeOptional } from '../contexts/PortalThemeContext';
 import { getUserNotifications, subscribeToNotifications, type Notification } from '../services/notificationService';
 import { parseSubmissionVideoFeedbackSourceId } from '../services/submissionVideoFeedbackService';
 import { EDITOR_BACKLOG_POPUP_SESSION_KEY } from '../lib/editorBacklogPopup';
 import { fetchEditorBacklogEntries, formatEditorBacklogForSwal } from '../services/editorBacklogService';
 import { fireCvSwal } from '../lib/swalTheme';
 import { fetchLatestFollowUpMessage, fetchRecentFollowUpMessages, parseFollowUpSourceId, sendFollowUpReply, subscribeToFollowUpMessages, type FollowUpRealtimeMessage } from '../services/projectFollowUpService';
-
-function EditorPortalMainChrome({
-    onOpenMobileMenu,
-    onNotificationClick,
-}: {
-    onOpenMobileMenu: () => void;
-    onNotificationClick?: (notification: Notification) => void | Promise<void>;
-}) {
-    const { isDark } = usePortalTheme();
-    return (
-        <>
-            <div className="absolute top-4 left-4 z-50 lg:hidden">
-                <button
-                    type="button"
-                    onClick={onOpenMobileMenu}
-                    className={`p-2 rounded-lg transition-colors ${
-                        isDark
-                            ? 'glass-panel text-white hover:bg-white/10'
-                            : 'bg-white border border-zinc-200 text-zinc-900 shadow-sm hover:bg-zinc-50'
-                    }`}
-                >
-                    <Menu className="w-6 h-6" />
-                </button>
-            </div>
-            <div className="absolute top-4 right-4 z-50">
-                <NotificationBell onNotificationClick={onNotificationClick} />
-            </div>
-        </>
-    );
-}
+import { useCapacitorNative } from '../hooks/useCapacitorNative';
 
 function EditorSidebarUserProfile({ name }: { name: string }) {
     const { isDark } = usePortalTheme();
@@ -126,12 +102,15 @@ function EditorSidebarLowerNav({
 
 function EditorPortalContent() {
     const navigate = useNavigate();
+    const isNativeApp = useCapacitorNative();
     const { previewFile, isLoading: isPreviewLoading, setPreviewFile, closePreview } = useProtectedPreview();
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const { refreshKey } = useRefresh();
     const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
     const [initialItemId, setInitialItemId] = useState<string | undefined>(undefined);
     const [isProcessingNavigation, setIsProcessingNavigation] = useState(false);
+    const theme = usePortalThemeOptional();
+    const isDark = theme?.isDark ?? true;
 
     // State
     const [loading, setLoading] = useState(true);
@@ -302,6 +281,11 @@ function EditorPortalContent() {
 
     const openSettings = () => {
         setSelectedBoard('settings');
+        setInitialItemId(undefined);
+    };
+
+    const goWorkspaceHome = () => {
+        setSelectedBoard(null);
         setInitialItemId(undefined);
     };
 
@@ -496,7 +480,7 @@ function EditorPortalContent() {
                     const entries = await fetchEditorBacklogEntries(boardIds, editorName);
                     if (cancelled || entries.length === 0) return;
                     sessionStorage.setItem(EDITOR_BACKLOG_POPUP_SESSION_KEY, '1');
-                    const styles = `<style>
+                    const styles = isDark ? `<style>
 .cv-bl-mascot-wrap{display:flex;justify-content:center;margin:-0.35rem 0 1rem;min-height:3.5rem;align-items:center}
 .cv-bl-mascot{font-size:3.35rem;line-height:1;display:inline-block;transform-origin:50% 85%;will-change:transform;backface-visibility:hidden;animation:cv-bl-mascot-work 1.05s ease-in-out infinite}
 @keyframes cv-bl-mascot-work{0%,100%{transform:translateY(0) rotate(-5deg) scale(1)}20%{transform:translateY(-10px) rotate(4deg) scale(1.06)}40%{transform:translateY(-14px) rotate(-2deg) scale(1.08)}60%{transform:translateY(-8px) rotate(5deg) scale(1.05)}80%{transform:translateY(-4px) rotate(-3deg) scale(1.02)}}
@@ -519,13 +503,38 @@ function EditorPortalContent() {
 .cv-bl-sec-overdue .cv-bl-item{font-size:13px;padding:.5rem 0}
 .cv-bl-sec-overdue .cv-bl-name{font-size:15px;font-weight:700;color:#fafafa}
 .cv-bl-sec-overdue .cv-bl-meta{font-size:12px;margin-top:.2rem;color:#d4d4d8}
+</style>` : `<style>
+.cv-bl-mascot-wrap{display:flex;justify-content:center;margin:-0.35rem 0 1rem;min-height:3.5rem;align-items:center}
+.cv-bl-mascot{font-size:3.35rem;line-height:1;display:inline-block;transform-origin:50% 85%;will-change:transform;backface-visibility:hidden;animation:cv-bl-mascot-work 1.05s ease-in-out infinite}
+@keyframes cv-bl-mascot-work{0%,100%{transform:translateY(0) rotate(-5deg) scale(1)}20%{transform:translateY(-10px) rotate(4deg) scale(1.06)}40%{transform:translateY(-14px) rotate(-2deg) scale(1.08)}60%{transform:translateY(-8px) rotate(5deg) scale(1.05)}80%{transform:translateY(-4px) rotate(-3deg) scale(1.02)}}
+@media (prefers-reduced-motion:reduce){.cv-bl-mascot{animation:none}}
+.cv-bl-subhead{text-align:center;font-size:14px;line-height:1.5;color:#334155;font-weight:500;margin:0 0 0.75rem;padding:0 0.25rem}
+.cv-bl-scroll{max-height:min(42vh,300px);overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;padding-right:6px;margin-bottom:0.25rem;scrollbar-width:thin;scrollbar-color:rgba(107,114,128,.5) rgba(0,0,0,.08)}
+.cv-bl-scroll::-webkit-scrollbar{width:8px}
+.cv-bl-scroll::-webkit-scrollbar-track{background:rgba(0,0,0,.06);border-radius:8px}
+.cv-bl-scroll::-webkit-scrollbar-thumb{background:rgba(107,114,128,.5);border-radius:8px}
+.cv-bl-scroll::-webkit-scrollbar-thumb:hover{background:rgba(107,114,128,.72)}
+.cv-bl-scroll>.cv-bl-sec~.cv-bl-sec{margin-top:0.85rem;padding-top:0.85rem;border-top:1px solid rgba(0,0,0,.1)}
+.cv-bl-sec{margin-bottom:0;text-align:left}
+.cv-bl-h{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#7c3aed;margin-bottom:.35rem}
+.cv-bl-ul{list-style:none;padding:0;margin:0}
+.cv-bl-item{padding:.4rem 0;border-bottom:1px solid rgba(0,0,0,.08);font-size:12px}
+.cv-bl-item:last-child{border-bottom:none}
+.cv-bl-name{display:block;font-weight:700;color:#0f172a}
+.cv-bl-meta{display:block;font-size:10px;color:#475569;margin-top:.15rem}
+.cv-bl-sec-overdue .cv-bl-h{font-size:12px;letter-spacing:.06em;color:#b45309}
+.cv-bl-sec-overdue .cv-bl-item{font-size:13px;padding:.5rem 0}
+.cv-bl-sec-overdue .cv-bl-name{font-size:15px;font-weight:800;color:#111827}
+.cv-bl-sec-overdue .cv-bl-meta{font-size:12px;margin-top:.2rem;color:#374151}
 </style>`;
                     const greetingName = formatDisplayName(editorName);
                     await fireCvSwal({
                         icon: false,
                         title: `Hi ${greetingName}!`,
+                        background: isDark ? '#131322' : '#ffffff',
+                        color: isDark ? '#f4f4f5' : '#0f172a',
                         customClass: {
-                            title: '!font-semibold !tracking-tight !text-white !mb-1',
+                            title: `!font-semibold !tracking-tight !mb-1 ${isDark ? '!text-white' : '!text-zinc-900'}`,
                             htmlContainer: '!mt-0 !text-left !overflow-x-hidden',
                             popup: '!overflow-hidden',
                         },
@@ -534,7 +543,7 @@ function EditorPortalContent() {
                             `<p class="cv-bl-subhead">Here are your backlogs.</p>` +
                             `<div class="cv-bl-mascot-wrap" aria-hidden="true"><span class="cv-bl-mascot">🧑‍💻</span></div>` +
                             formatEditorBacklogForSwal(entries),
-                        width: 520,
+                        width: 'min(520px, calc(100vw - 1rem))',
                         confirmButtonText: 'Got it',
                     });
                 } catch (e) {
@@ -674,7 +683,11 @@ function EditorPortalContent() {
                 </div>
             }
             mainContent={
-                <div className="flex-1 flex flex-col h-full bg-[#020204] overflow-hidden relative">
+                <div
+                    className={`flex-1 flex flex-col h-full overflow-hidden relative ${
+                        isDark ? 'bg-[#020204]' : 'bg-zinc-50'
+                    } ${PORTAL_MOBILE_HEADER_PAD_CLASS} ${PORTAL_MOBILE_TAB_BAR_PAD_CLASS}`}
+                >
 
                     {/* Navigation Overlay */}
                     <AnimatePresence>
@@ -692,15 +705,27 @@ function EditorPortalContent() {
                         )}
                     </AnimatePresence>
 
-                    <EditorPortalMainChrome
-                        onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
-                        onNotificationClick={openItemFromNotification}
+                    <PortalMobileTopBar
+                        showMenuButton={false}
+                        rightSlot={<NotificationBell onNotificationClick={openItemFromNotification} />}
                     />
 
-                    {selectedBoard !== 'settings' && (
+                    <div className="hidden lg:flex native:!hidden absolute top-4 right-6 z-40">
+                        <NotificationBell onNotificationClick={openItemFromNotification} />
+                    </div>
+
+                    <EditorPortalMobileTabs
+                        selectedBoard={selectedBoard}
+                        onHome={goWorkspaceHome}
+                        onCalendar={openCalendar}
+                        onSettings={openSettings}
+                        onOpenMenu={() => setIsMobileSidebarOpen(true)}
+                    />
+
+                    {selectedBoard !== 'settings' && !isNativeApp && (
                         <>
-                            <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-violet-500/[0.03] rounded-full blur-[160px] pointer-events-none" />
-                            <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-indigo-500/[0.03] rounded-full blur-[140px] pointer-events-none" />
+                            <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-violet-500/[0.03] rounded-full blur-[160px] pointer-events-none max-lg:hidden native:hidden" />
+                            <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-indigo-500/[0.03] rounded-full blur-[140px] pointer-events-none max-lg:hidden native:hidden" />
                         </>
                     )}
 
@@ -837,18 +862,24 @@ function EditorPortalContent() {
                                 className="flex-1 flex flex-col h-full z-10"
                             >
                                 {/* Detail Header */}
-                                <div className="h-24 px-8 flex items-center gap-6 border-b border-white/5 bg-[#0a0a16] flex-shrink-0 z-20">
+                                <div className={`px-4 py-3 sm:px-8 sm:h-24 sm:py-0 flex items-center gap-3 sm:gap-6 border-b flex-shrink-0 z-20 ${
+                                    isDark ? 'border-white/5 bg-[#0a0a16]' : 'border-zinc-200 bg-white'
+                                }`}>
                                     <div>
-                                        <h2 className="text-3xl font-black text-white tracking-tight uppercase flex items-center gap-3">
-                                            <Briefcase className="w-8 h-8 text-emerald-400" />
-                                            {selectedBoard.name.replace(/- Workspace/i, '').replace(/\(c-w-[\w-]+\)/gi, '').trim()}
+                                        <h2 className={`text-lg sm:text-3xl font-black tracking-tight uppercase flex items-center gap-2 sm:gap-3 min-w-0 ${
+                                            isDark ? 'text-white' : 'text-zinc-900'
+                                        }`}>
+                                            <Briefcase className={`w-8 h-8 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`} />
+                                            <span className="truncate">{selectedBoard.name.replace(/- Workspace/i, '').replace(/\(c-w-[\w-]+\)/gi, '').trim()}</span>
                                         </h2>
-                                        <p className="text-sm text-gray-400 font-medium">Manage your active tasks and workspace deliverables</p>
+                                        <p className={`text-xs sm:text-sm font-medium leading-snug ${
+                                            isDark ? 'text-gray-400' : 'text-zinc-600'
+                                        }`}>Manage your active tasks and workspace deliverables</p>
                                     </div>
                                 </div>
 
                                 {/* Content */}
-                                <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
+                                <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-8">
                                     <div className="max-w-7xl mx-auto pb-20">
                                         <EditorProjectSelectionView
                                             boardData={selectedBoard}

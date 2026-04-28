@@ -47,6 +47,12 @@ export default function AdminLeaveApprovals() {
         });
     };
 
+    const formatDateRange = (start: string, end: string) => {
+        const a = formatDate(start);
+        const b = formatDate(end);
+        return a === b ? a : `${a} – ${b}`;
+    };
+
     return (
         <AdminPageLayout
             title="Leave Approvals"
@@ -55,9 +61,9 @@ export default function AdminLeaveApprovals() {
             <div className="max-w-7xl mx-auto space-y-6">
                 
                 {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-[#0E0E1A]/80 backdrop-blur-md border border-white/5 rounded-3xl p-6 shadow-xl flex items-center gap-4">
-                        <div className="p-4 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+                    <div className="bg-[#0E0E1A]/80 backdrop-blur-md border border-white/5 rounded-2xl md:rounded-3xl p-4 md:p-6 shadow-xl flex items-center gap-3 md:gap-4">
+                        <div className="p-3 md:p-4 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20">
                             <Clock className="w-6 h-6" />
                         </div>
                         <div>
@@ -67,8 +73,8 @@ export default function AdminLeaveApprovals() {
                             <div className="text-sm font-medium text-gray-500">Pending Requests</div>
                         </div>
                     </div>
-                    <div className="bg-[#0E0E1A]/80 backdrop-blur-md border border-white/5 rounded-3xl p-6 shadow-xl flex items-center gap-4">
-                        <div className="p-4 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <div className="bg-[#0E0E1A]/80 backdrop-blur-md border border-white/5 rounded-2xl md:rounded-3xl p-4 md:p-6 shadow-xl flex items-center gap-3 md:gap-4">
+                        <div className="p-3 md:p-4 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                             <CheckCircle2 className="w-6 h-6" />
                         </div>
                         <div>
@@ -78,8 +84,8 @@ export default function AdminLeaveApprovals() {
                             <div className="text-sm font-medium text-gray-500">Approved Leaves</div>
                         </div>
                     </div>
-                    <div className="bg-[#0E0E1A]/80 backdrop-blur-md border border-white/5 rounded-3xl p-6 shadow-xl flex items-center gap-4">
-                        <div className="p-4 rounded-2xl bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                    <div className="bg-[#0E0E1A]/80 backdrop-blur-md border border-white/5 rounded-2xl md:rounded-3xl p-4 md:p-6 shadow-xl flex items-center gap-3 md:gap-4">
+                        <div className="p-3 md:p-4 rounded-2xl bg-violet-500/10 text-violet-400 border border-violet-500/20">
                             <CalendarIcon className="w-6 h-6" />
                         </div>
                         <div>
@@ -92,8 +98,8 @@ export default function AdminLeaveApprovals() {
                 </div>
 
                 {/* Data Table */}
-                <div className="bg-[#0E0E1A]/80 backdrop-blur-md border border-white/5 rounded-3xl shadow-xl overflow-hidden mt-8">
-                    <div className="p-6 border-b border-white/10 flex items-center justify-between flex-wrap gap-4">
+                <div className="bg-[#0E0E1A]/80 backdrop-blur-md border border-white/5 rounded-2xl md:rounded-3xl shadow-xl overflow-hidden mt-6 md:mt-8">
+                    <div className="p-4 md:p-6 border-b border-white/10 flex items-center justify-between flex-wrap gap-4">
                         <div className="flex items-center gap-3">
                             <h2 className="text-lg font-bold text-white">All Leave Requests</h2>
                         </div>
@@ -111,7 +117,7 @@ export default function AdminLeaveApprovals() {
                             <thead className="bg-[#131322]">
                                 <tr>
                                     <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-white/5">Employee</th>
-                                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-white/5">Dates</th>
+                                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-white/5 whitespace-nowrap min-w-[10.5rem]">Dates</th>
                                     <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-white/5">Type</th>
                                     <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-white/5">Reason</th>
                                     <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-white/5">Status</th>
@@ -121,14 +127,14 @@ export default function AdminLeaveApprovals() {
                             <tbody className="divide-y divide-white/5">
                                 {isLoading && requests.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="p-8 text-center text-gray-500">
+                                        <td colSpan={6} className="p-8 text-center text-gray-500">
                                             <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                                             Retrieving requests...
                                         </td>
                                     </tr>
                                 ) : requests.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="p-8 text-center text-gray-500 font-medium">
+                                        <td colSpan={6} className="p-8 text-center text-gray-500 font-medium">
                                             No leave requests found.
                                         </td>
                                     </tr>
@@ -139,12 +145,9 @@ export default function AdminLeaveApprovals() {
                                                 <div className="font-bold text-white text-sm">{req.user_name}</div>
                                                 <div className="text-xs text-gray-500 font-mono">{req.user_email}</div>
                                             </td>
-                                            <td className="p-4">
-                                                <div className="text-sm font-bold text-gray-300">
-                                                    {formatDate(req.start_date)}
-                                                </div>
-                                                <div className="text-xs text-gray-500">
-                                                    to {formatDate(req.end_date)}
+                                            <td className="p-4 align-top min-w-[10.5rem]">
+                                                <div className="text-sm font-bold text-gray-300 whitespace-nowrap">
+                                                    {formatDateRange(req.start_date, req.end_date)}
                                                 </div>
                                             </td>
                                             <td className="p-4">

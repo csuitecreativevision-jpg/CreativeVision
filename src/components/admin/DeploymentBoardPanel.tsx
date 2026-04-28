@@ -74,7 +74,7 @@ function InstructionsBlock({ text, sidebar }: { text: string; sidebar: boolean }
         <>
             <div
                 className={`rounded-xl border border-white/[0.08] bg-black/25 flex items-center justify-between gap-2 ${
-                    sidebar ? 'mt-0.5 px-2 py-1.5' : 'mt-1 px-3 py-2'
+                    sidebar ? 'mt-0.5 px-2 py-1.5' : 'mt-1 px-2.5 py-1.5 sm:px-3 sm:py-2'
                 }`}
             >
                 <span
@@ -818,7 +818,7 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                 layout={!sidebar}
                 className={`rounded-2xl border border-white/[0.08] bg-white/[0.02] overflow-hidden ${sidebar ? 'text-[11px]' : ''}`}
             >
-                <div className={`flex flex-col gap-3 ${sidebar ? 'p-3' : 'p-5 lg:flex-row lg:items-start lg:gap-4'}`}>
+                <div className={`flex flex-col gap-2 sm:gap-3 ${sidebar ? 'p-3' : 'p-3 sm:p-4 lg:p-5 lg:flex-row lg:items-start lg:gap-4'}`}>
                     <div className="flex flex-col gap-2 min-w-0 flex-1">
                         <button
                             type="button"
@@ -1215,7 +1215,7 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[101] flex items-center justify-center p-4 bg-black/70"
+                        className={`fixed inset-0 z-[101] flex items-center justify-center p-4 ${isDark ? 'bg-black/70' : 'bg-black/35'}`}
                         onClick={() => !saving && setArchiveModalOpen(false)}
                     >
                         <motion.div
@@ -1223,45 +1223,54 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.96, opacity: 0 }}
                             onClick={e => e.stopPropagation()}
-                            className="w-full max-w-2xl rounded-2xl border border-white/[0.1] bg-[#0c0c10] p-6 space-y-4 shadow-2xl"
+                            className={`w-full max-w-2xl rounded-2xl p-6 space-y-4 shadow-2xl ${
+                                isDark ? 'border border-white/[0.1] bg-[#0c0c10]' : 'border border-zinc-300 bg-white'
+                            }`}
                         >
                             <div className="flex items-center justify-between gap-3">
-                                <h4 className="text-lg font-bold text-white">Archive batch projects</h4>
-                                <span className="text-xs text-white/45">
+                                <h4 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-zinc-900'}`}>Archive batch projects</h4>
+                                <span className={`text-xs ${isDark ? 'text-white/45' : 'text-zinc-500'}`}>
                                     {archivedMains.length} archived
                                 </span>
                             </div>
                             <div className="max-h-[55vh] overflow-y-auto custom-scrollbar space-y-4 pr-1">
                                 <div className="space-y-2">
-                                    <p className="text-[10px] font-bold uppercase tracking-wider text-violet-200/80">
+                                    <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-violet-200/80' : 'text-zinc-500'}`}>
                                         Archived batches
                                     </p>
                                     {archivedMains.length === 0 ? (
-                                        <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
-                                            <p className="text-sm text-white/45">No archived batches yet.</p>
+                                        <div className={`rounded-xl border p-3 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-zinc-200 bg-zinc-50'}`}>
+                                            <p className={`text-sm ${isDark ? 'text-white/45' : 'text-zinc-500'}`}>No archived batches yet.</p>
                                         </div>
                                     ) : (
                                         archivedMains.map(m => {
                                             const doneVideos = (videosByMain[m.id] || []).filter(v => v.status === 'Deployed');
                                             return (
-                                                <div key={m.id} className="rounded-xl border border-violet-500/20 bg-violet-500/[0.05] p-3 space-y-2">
+                                                <div key={m.id} className={`rounded-xl border p-3 space-y-2 ${
+                                                    isDark ? 'border-violet-500/20 bg-violet-500/[0.05]' : 'border-zinc-300 bg-zinc-50'
+                                                }`}>
                                                     <div className="flex items-center justify-between gap-2">
-                                                        <p className="text-sm font-semibold text-white/90">{m.title}</p>
+                                                        <p className={`text-sm font-semibold ${isDark ? 'text-white/90' : 'text-zinc-900'}`}>{m.title}</p>
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-violet-200/90 border border-violet-500/30 bg-violet-500/10 rounded-md px-2 py-0.5">
+                                                            <span className={`text-[10px] font-bold uppercase tracking-wider rounded-md px-2 py-0.5 border ${
+                                                                isDark ? 'text-violet-200/90 border-violet-500/30 bg-violet-500/10' : 'text-zinc-700 border-zinc-300 bg-zinc-100'
+                                                            }`}>
                                                                 Archived
                                                             </span>
                                                             <button
                                                                 type="button"
                                                                 onClick={() => void recoverArchivedBatch(m.id)}
                                                                 disabled={saving}
-                                                                className="text-[10px] font-bold uppercase tracking-wider rounded-md px-2 py-0.5 border border-emerald-500/35 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20 transition-colors disabled:opacity-40"
+                                                                className={`text-[10px] font-bold uppercase tracking-wider rounded-md px-2 py-0.5 border transition-colors disabled:opacity-40 ${
+                                                                    isDark ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20'
+                                                                        : 'border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100'
+                                                                }`}
                                                             >
                                                                 Recover
                                                             </button>
                                                         </div>
                                                     </div>
-                                                    <p className="text-[10px] text-white/40">
+                                                    <p className={`text-[10px] ${isDark ? 'text-white/40' : 'text-zinc-500'}`}>
                                                         {m.archived_at ? `Archived ${new Date(m.archived_at).toLocaleString()}` : 'Archived'}
                                                     </p>
                                                     {m.drive_folder_link ? (
@@ -1269,7 +1278,7 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                                                             href={m.drive_folder_link}
                                                             target="_blank"
                                                             rel="noreferrer"
-                                                            className="inline-flex items-center gap-1 text-[11px] text-sky-300/90 hover:underline"
+                                                            className={`inline-flex items-center gap-1 text-[11px] hover:underline ${isDark ? 'text-sky-300/90' : 'text-zinc-700'}`}
                                                         >
                                                             <FolderOpen className="w-3.5 h-3.5" />
                                                             Open Drive folder
@@ -1279,13 +1288,13 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                                                     {doneVideos.length > 0 ? (
                                                         <ul className="space-y-1">
                                                             {doneVideos.map(v => (
-                                                                <li key={v.id} className="text-xs text-white/65">
+                                                                <li key={v.id} className={`text-xs ${isDark ? 'text-white/65' : 'text-zinc-700'}`}>
                                                                     {v.video_link ? (
                                                                         <a
                                                                             href={v.video_link}
                                                                             target="_blank"
                                                                             rel="noreferrer"
-                                                                            className="inline-flex max-w-full items-center gap-1 hover:text-white hover:underline truncate"
+                                                                            className={`inline-flex max-w-full items-center gap-1 hover:underline truncate ${isDark ? 'hover:text-white' : 'hover:text-zinc-900'}`}
                                                                         >
                                                                             • {v.name?.trim() || 'Untitled video'}
                                                                             <ExternalLink className="w-3 h-3 opacity-70 flex-shrink-0" />
@@ -1308,7 +1317,7 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                                     type="button"
                                     onClick={() => setArchiveModalOpen(false)}
                                     disabled={saving}
-                                    className="px-4 py-2 text-sm text-white/55 hover:text-white"
+                                    className={`px-4 py-2 text-sm ${isDark ? 'text-white/55 hover:text-white' : 'text-zinc-600 hover:text-zinc-900'}`}
                                 >
                                     Close
                                 </button>

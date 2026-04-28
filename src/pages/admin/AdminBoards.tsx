@@ -315,14 +315,14 @@ export default function AdminBoards() {
     const chevronClr = isDark ? 'text-gray-500' : 'text-zinc-500';
 
     return (
-        <div className={`flex h-full w-full overflow-hidden relative animate-in fade-in duration-500 ${shellBg}`}>
-            {/* Left Sidebar - Board List */}
-            <div className={`w-80 border-r flex flex-col flex-shrink-0 ${sidebarChrome}`}>
-                <div className={`p-4 border-b space-y-4 ${panelDivider}`}>
+        <div className={`flex flex-col lg:flex-row native:flex-col h-full w-full min-h-0 overflow-hidden relative animate-in fade-in duration-500 ${shellBg}`}>
+            {/* Board list — full width on mobile, fixed column on desktop */}
+            <div className={`w-full lg:w-80 native:w-full max-h-[42vh] lg:max-h-none native:max-h-[42vh] min-h-0 border-b lg:border-b-0 lg:border-r native:border-b native:border-r-0 flex flex-col flex-shrink-0 max-lg:self-start ${sidebarChrome}`}>
+                <div className={`p-3 sm:p-4 border-b space-y-2 sm:space-y-4 ${panelDivider}`}>
                     {/* Workspace Selector */}
                     {workspaces.length > 0 && (
                         <select
-                            className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-custom-bright/50 [color-scheme:${isDark ? 'dark' : 'light'}] ${fieldShell}`}
+                            className={`w-full border rounded-lg px-3 py-1.5 sm:py-2 text-sm focus:outline-none focus:border-custom-bright/50 [color-scheme:${isDark ? 'dark' : 'light'}] ${fieldShell}`}
                             value={selectedWorkspaceId || ''}
                             onChange={(e) => setSelectedWorkspaceId(e.target.value || null)}
                         >
@@ -340,12 +340,12 @@ export default function AdminBoards() {
                         <input
                             type="text"
                             placeholder="Find a board..."
-                            className={`w-full border rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-custom-bright/50 transition-all ${fieldShell}`}
+                            className={`w-full border rounded-lg pl-9 pr-3 py-1.5 sm:py-2 text-sm focus:outline-none focus:border-custom-bright/50 transition-all ${fieldShell}`}
                         />
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
+                <div className="min-h-0 overflow-y-auto custom-scrollbar p-2 max-lg:max-h-[calc(42vh-6rem)] lg:flex-1 native:max-h-[calc(42vh-6rem)]">
                     {/* Create Board Button */}
                     <button
                         onClick={() => setIsCreateBoardOpen(true)}
@@ -488,9 +488,9 @@ export default function AdminBoards() {
                                     <div className={`p-4 text-center text-xs animate-pulse ${subtleText}`}>Loading workspace...</div>
                                 )}
                                 {!loading && visibleBoards.length === 0 && visibleFolders.length === 0 && (
-                                    <div className={`p-4 text-center text-xs opacity-50 flex flex-col gap-2 ${subtleText}`}>
+                                    <div className={`py-2 px-2 text-center text-[11px] opacity-50 flex flex-col gap-0.5 ${subtleText}`}>
                                         <span>Empty Workspace</span>
-                                        <span className="text-[10px]">(or Main Workspace selected)</span>
+                                        <span className="text-[10px] leading-tight">(or Main Workspace selected)</span>
                                     </div>
                                 )}
                             </>
@@ -500,45 +500,55 @@ export default function AdminBoards() {
             </div>
 
             {/* Main Board View */}
-            <div className={`flex-1 flex flex-col h-full overflow-hidden relative ${mainChrome}`}>
+            <div className={`flex-1 flex flex-col h-full min-h-0 min-w-0 overflow-hidden relative ${mainChrome}`}>
                 {/* Board Header */}
                 {boardData ? (
-                    <div className={`h-16 px-6 border-b flex items-center justify-between flex-shrink-0 ${headerBar}`}>
-                        <div className="flex items-center gap-4">
-                            <div className={`p-2 rounded-lg ${selectedBoardId ? 'bg-custom-bright/10 text-custom-bright' : iconBoxIdle}`}>
+                    <div
+                        className={`px-3 sm:px-4 lg:px-6 border-b flex-shrink-0 ${headerBar} flex flex-col gap-2 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:py-0 sm:h-14 lg:h-16`}
+                    >
+                        <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+                            <div
+                                className={`p-1.5 sm:p-2 rounded-lg flex-shrink-0 ${selectedBoardId ? 'bg-custom-bright/10 text-custom-bright' : iconBoxIdle}`}
+                            >
                                 {(() => {
                                     const Icon = getBoardIcon(boardData.name);
-                                    return <Icon className="w-5 h-5" />;
+                                    return <Icon className="w-4 h-4 sm:w-5 sm:h-5" />;
                                 })()}
                             </div>
-                            <div>
-                                <h2 className={`font-bold text-lg leading-tight ${titleClr}`}>{boardData.name}</h2>
-                                <div className={`text-xs flex items-center gap-2 ${subtleText}`}>
+                            <div className="min-w-0 flex-1">
+                                <h2 className={`font-bold text-base sm:text-lg leading-tight truncate ${titleClr}`} title={boardData.name}>
+                                    {boardData.name}
+                                </h2>
+                                <div
+                                    className={`text-[10px] sm:text-xs flex flex-wrap items-center gap-x-2 gap-y-0.5 ${subtleText}`}
+                                >
                                     <span>{boardData.items?.length || 0} Items</span>
-                                    <span className={`w-1 h-1 rounded-full ${isDark ? 'bg-gray-700' : 'bg-zinc-300'}`}></span>
-                                    <span>Last updated: Just now</span>
+                                    <span className={`w-1 h-1 rounded-full flex-shrink-0 ${isDark ? 'bg-gray-700' : 'bg-zinc-300'}`} />
+                                    <span className="whitespace-nowrap">Updated just now</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-end gap-1.5 sm:gap-2 lg:gap-3 flex-shrink-0 w-full sm:w-auto">
                             <button
+                                type="button"
                                 onClick={() => setIsCreateGroupOpen(true)}
-                                className="px-4 py-2 bg-custom-bright hover:bg-custom-bright/90 text-white text-xs font-bold rounded-lg transition-all shadow-lg shadow-custom-bright/20 flex items-center gap-2"
+                                title="New Group"
+                                className="px-2.5 py-1.5 sm:px-4 sm:py-2 bg-custom-bright hover:bg-custom-bright/90 text-white text-[10px] sm:text-xs font-bold rounded-lg transition-all shadow-lg shadow-custom-bright/20 flex items-center justify-center gap-1.5 sm:gap-2"
                             >
-                                <Plus className="w-4 h-4" />
-                                New Group
+                                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+                                <span className="hidden min-[380px]:inline">New Group</span>
                             </button>
-                            <button type="button" className={`p-2 rounded-lg transition-colors ${headerIconBtn}`}>
-                                <Search className="w-5 h-5" />
+                            <button type="button" className={`p-1.5 sm:p-2 rounded-lg transition-colors ${headerIconBtn}`} aria-label="Search board">
+                                <Search className="w-4 h-4 sm:w-5 sm:h-5" />
                             </button>
-                            <button type="button" className={`p-2 rounded-lg transition-colors ${headerIconBtn}`}>
-                                <MoreHorizontal className="w-5 h-5" />
+                            <button type="button" className={`p-1.5 sm:p-2 rounded-lg transition-colors ${headerIconBtn}`} aria-label="More actions">
+                                <MoreHorizontal className="w-4 h-4 sm:w-5 sm:h-5" />
                             </button>
                         </div>
                     </div>
                 ) : (
-                    <div className={`h-16 px-6 border-b flex items-center justify-between ${headerBar}`}>
+                    <div className={`h-14 sm:h-16 px-4 sm:px-6 border-b flex items-center justify-between ${headerBar}`}>
                         <div className="flex items-center gap-2">
                             <div className={`w-32 h-6 rounded animate-pulse ${pulseBar}`} />
                         </div>
@@ -546,9 +556,9 @@ export default function AdminBoards() {
                 )}
 
                 {/* Board Content */}
-                <div className="flex-1 overflow-auto custom-scrollbar p-6">
+                <div className="flex-1 min-h-0 overflow-auto custom-scrollbar p-3 sm:p-4 lg:p-6">
                     {loading ? (
-                        <div className={`flex flex-col items-center justify-center h-[50vh] gap-4 ${subtleText}`}>
+                        <div className={`flex flex-col items-center justify-center min-h-[28vh] sm:min-h-[40vh] max-h-[70vh] gap-3 sm:gap-4 ${subtleText}`}>
                             <Loader2 className="w-8 h-8 animate-spin text-custom-bright" />
                             <p className="text-sm font-medium animate-pulse">Loading Board Data...</p>
                         </div>
@@ -563,7 +573,7 @@ export default function AdminBoards() {
                                 setPreviewFile={(file) => setPreviewFile(file)}
                             />
                         ) : (
-                            <div className="space-y-8 pb-20">
+                            <div className="space-y-4 sm:space-y-6 lg:space-y-8 pb-8 sm:pb-16 lg:pb-20">
                                 {boardData.groups?.map((group: any) => (
                                     <div key={group.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                         {/* Group Header */}

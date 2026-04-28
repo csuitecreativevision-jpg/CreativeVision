@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Search, Check, LucideIcon } from 'lucide-react';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { usePortalThemeOptional } from '../../contexts/PortalThemeContext';
 
 interface SelectionModalProps {
     isOpen: boolean;
@@ -24,6 +25,8 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const isMobile = useIsMobile();
+    const theme = usePortalThemeOptional();
+    const isDark = theme?.isDark ?? (localStorage.getItem('portal_ui_dark_mode') !== 'false');
 
     // Reset search when modal opens
     useEffect(() => {
@@ -44,7 +47,7 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+                        className={`fixed inset-0 backdrop-blur-sm z-50 ${isDark ? 'bg-black/60' : 'bg-black/35'}`}
                     />
 
                     {/* Modal Content */}
@@ -53,33 +56,39 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="bg-[#1A1A2E] border border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col pointer-events-auto overflow-hidden pointer-events-auto"
+                            className={`rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col pointer-events-auto overflow-hidden ${
+                                isDark ? 'bg-[#1A1A2E] border border-white/10' : 'bg-white border border-zinc-200'
+                            }`}
                             onClick={(e) => e.stopPropagation()}
                         >
                             {/* Header */}
-                            <div className="p-6 border-b border-white/10 flex items-center justify-between bg-white/5">
+                            <div className={`p-6 border-b flex items-center justify-between ${isDark ? 'border-white/10 bg-white/5' : 'border-zinc-200 bg-zinc-50'}`}>
                                 <div className="flex items-center gap-3">
-                                    {Icon && <Icon className="w-6 h-6 text-violet-400" />}
-                                    <h3 className="text-xl font-bold text-white">{title}</h3>
+                                    {Icon && <Icon className={`w-6 h-6 ${isDark ? 'text-violet-400' : 'text-zinc-600'}`} />}
+                                    <h3 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-zinc-900'}`}>{title}</h3>
                                 </div>
                                 <button
                                     onClick={onClose}
-                                    className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-white"
+                                    className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10 text-gray-400 hover:text-white' : 'hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                                 >
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
 
                             {/* Search Bar */}
-                            <div className="p-4 border-b border-white/5 bg-[#151525]">
+                            <div className={`p-4 border-b ${isDark ? 'border-white/5 bg-[#151525]' : 'border-zinc-200 bg-zinc-50'}`}>
                                 <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                    <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isDark ? 'text-gray-400' : 'text-zinc-500'}`} />
                                     <input
                                         type="text"
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
                                         placeholder={`Search ${title.toLowerCase()}...`}
-                                        className="w-full bg-[#0E0E1A] border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-violet-500 transition-colors placeholder:text-gray-600"
+                                        className={`w-full border rounded-xl pl-10 pr-4 py-3 focus:outline-none transition-colors ${
+                                            isDark
+                                                ? 'bg-[#0E0E1A] border-white/10 text-white focus:border-violet-500 placeholder:text-gray-600'
+                                                : 'bg-white border-zinc-200 text-zinc-900 focus:border-zinc-500 placeholder:text-zinc-500'
+                                        }`}
                                         autoFocus={!isMobile}
                                     />
                                 </div>
@@ -99,19 +108,27 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
                                                 className={`
                                                     group relative flex items-center justify-between p-4 rounded-xl border text-left transition-all duration-200
                                                     ${selected === option
-                                                        ? 'bg-violet-500/20 border-violet-500/50 shadow-[0_0_15px_rgba(139,92,246,0.15)]'
-                                                        : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'
+                                                        ? (isDark
+                                                            ? 'bg-violet-500/20 border-violet-500/50 shadow-[0_0_15px_rgba(139,92,246,0.15)]'
+                                                            : 'bg-zinc-100 border-zinc-300')
+                                                        : (isDark
+                                                            ? 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'
+                                                            : 'bg-white border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300')
                                                     }
                                                 `}
                                             >
-                                                <span className={`font-semibold ${selected === option ? 'text-white' : 'text-gray-300 group-hover:text-white'}`}>
+                                                <span className={`font-semibold ${
+                                                    selected === option
+                                                        ? (isDark ? 'text-white' : 'text-zinc-900')
+                                                        : (isDark ? 'text-gray-300 group-hover:text-white' : 'text-zinc-700 group-hover:text-zinc-900')
+                                                }`}>
                                                     {option}
                                                 </span>
                                                 {selected === option && (
                                                     <motion.div
                                                         initial={{ scale: 0 }}
                                                         animate={{ scale: 1 }}
-                                                        className="bg-violet-500 rounded-full p-1"
+                                                        className={`rounded-full p-1 ${isDark ? 'bg-violet-500' : 'bg-zinc-700'}`}
                                                     >
                                                         <Check className="w-3 h-3 text-white" />
                                                     </motion.div>
@@ -120,14 +137,16 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
                                         ))}
                                     </div>
                                 ) : (
-                                    <div className="text-center py-12 text-gray-500">
+                                    <div className={`text-center py-12 ${isDark ? 'text-gray-500' : 'text-zinc-500'}`}>
                                         No options found matching "{searchTerm}"
                                     </div>
                                 )}
                             </div>
 
                             {/* Footer */}
-                            <div className="p-4 bg-white/5 border-t border-white/10 text-xs text-gray-500 text-center uppercase tracking-wider shrink-0">
+                            <div className={`p-4 border-t text-xs text-center uppercase tracking-wider shrink-0 ${
+                                isDark ? 'bg-white/5 border-white/10 text-gray-500' : 'bg-zinc-50 border-zinc-200 text-zinc-500'
+                            }`}>
                                 {filteredOptions.length} Options Available
                             </div>
                         </motion.div>

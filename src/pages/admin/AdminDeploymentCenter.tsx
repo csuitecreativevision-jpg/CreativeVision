@@ -211,9 +211,9 @@ export default function AdminDeploymentCenter() {
             <div className="absolute top-0 left-1/4 w-[800px] h-[500px] bg-violet-600/10 mix-blend-screen rounded-full blur-[100px] opacity-30 pointer-events-none" />
             <div className="absolute bottom-1/4 right-0 w-[600px] h-[600px] bg-emerald-600/5 mix-blend-screen rounded-full blur-[120px] opacity-30 pointer-events-none" />
 
-            <div className="relative flex-1 w-full max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 flex flex-col z-10 mt-16 sm:mt-0">
+            <div className="relative flex-1 w-full max-w-[1600px] mx-auto p-3 sm:p-6 lg:p-8 flex flex-col z-10 mt-16 sm:mt-0">
                 {/* Header */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-8">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3 sm:gap-4 mb-5 sm:mb-8">
                     <div>
                         <div className="flex items-center gap-3 mb-3">
                             {activeFolder && (
@@ -280,11 +280,11 @@ export default function AdminDeploymentCenter() {
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         onClick={() => setActiveFolder(folder)}
-                                        className="bg-[#0e0e1a]/80 backdrop-blur-xl border border-white/10 hover:border-violet-500/40 rounded-2xl p-6 cursor-pointer transition-all hover:-translate-y-1 shadow-lg hover:shadow-violet-500/10 group relative"
+                                        className="bg-[#0e0e1a]/80 backdrop-blur-xl border border-white/10 hover:border-violet-500/40 rounded-2xl p-4 sm:p-5 lg:p-6 cursor-pointer transition-all hover:-translate-y-1 shadow-lg hover:shadow-violet-500/10 group relative"
                                     >
-                                        <div className="flex items-start justify-between mb-4">
-                                            <div className="w-12 h-12 rounded-xl bg-violet-500/10 text-violet-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                                <Folder className="w-6 h-6" />
+                                        <div className="flex items-start justify-between mb-2 sm:mb-4">
+                                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-violet-500/10 text-violet-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                <Folder className="w-5 h-5 sm:w-6 sm:h-6" />
                                             </div>
                                             {(isSuperAdmin || isAdmin) && (
                                                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -303,7 +303,7 @@ export default function AdminDeploymentCenter() {
                                                 </div>
                                             )}
                                         </div>
-                                        <h3 className="text-xl font-bold text-white mb-1 truncate" title={folder.name}>
+                                        <h3 className="text-base sm:text-xl font-bold text-white mb-0.5 sm:mb-1 truncate" title={folder.name}>
                                             {folder.name}
                                         </h3>
                                         <p className="text-gray-500 text-sm font-medium">

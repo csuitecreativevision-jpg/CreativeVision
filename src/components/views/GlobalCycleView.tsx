@@ -109,32 +109,32 @@ export const GlobalCycleView = ({ boardData, selectedBoardId, refreshBoardDetail
     };
 
     return (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
+        <div className="space-y-4 sm:space-y-6 lg:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-6 sm:pb-10 lg:pb-12">
 
             {/* Header Controls: Toggle & Filter */}
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between mb-1 sm:mb-2">
 
                 {/* View Toggle */}
-                <div className="flex items-center gap-1 bg-[#0e0e1a] p-1 rounded-xl border border-white/5">
+                <div className="flex items-center gap-0.5 sm:gap-1 bg-[#0e0e1a] p-0.5 sm:p-1 rounded-lg sm:rounded-xl border border-white/5 w-full sm:w-auto justify-stretch sm:justify-start">
                     <button
                         onClick={() => setCycleViewMode('overview')}
-                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${cycleViewMode === 'overview' ? 'bg-violet-600 text-white shadow-[0_0_15px_rgba(124,58,237,0.5)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                        className={`flex-1 sm:flex-none px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-md sm:rounded-lg text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 ${cycleViewMode === 'overview' ? 'bg-violet-600 text-white shadow-[0_0_15px_rgba(124,58,237,0.5)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                     >
-                        <LayoutGrid className="w-3.5 h-3.5" /> Overview
+                        <LayoutGrid className="w-3.5 h-3.5 flex-shrink-0" /> <span>Overview</span>
                     </button>
-                    <div className="w-[1px] h-4 bg-white/10 mx-1" />
+                    <div className="w-px h-4 sm:h-4 bg-white/10 mx-0.5 sm:mx-1 flex-shrink-0 self-center" />
                     <button
                         onClick={() => setCycleViewMode('cycles')}
-                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${cycleViewMode === 'cycles' ? 'bg-violet-600 text-white shadow-[0_0_15px_rgba(124,58,237,0.5)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                        className={`flex-1 sm:flex-none px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-md sm:rounded-lg text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 ${cycleViewMode === 'cycles' ? 'bg-violet-600 text-white shadow-[0_0_15px_rgba(124,58,237,0.5)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                     >
-                        <Clock className="w-3.5 h-3.5" /> Cycles
+                        <Clock className="w-3.5 h-3.5 flex-shrink-0" /> <span>Cycles</span>
                     </button>
                 </div>
 
                 {/* Month Filter */}
-                <div className="flex justify-end">
+                <div className="flex justify-stretch sm:justify-end w-full sm:w-auto">
                     {sortedMonths.length > 0 && (
-                        <div className="relative z-30">
+                        <div className="relative z-30 w-full sm:w-auto flex justify-end">
                             <div
                                 className="flex items-center gap-2 px-3 py-2 bg-[#0e0e1a] border border-white/10 rounded-xl cursor-pointer hover:bg-white/5 transition-colors"
                                 onClick={() => setIsMonthFilterOpen(!isMonthFilterOpen)}
@@ -322,7 +322,7 @@ export const GlobalCycleView = ({ boardData, selectedBoardId, refreshBoardDetail
                             </motion.div>
                         ))}
                         {filteredItems.length === 0 && (
-                            <div className="col-span-full text-center text-gray-500 italic py-12 bg-[#0e0e1a] rounded-3xl border border-white/5">
+                            <div className="col-span-full text-center text-gray-500 italic py-6 sm:py-10 px-3 text-sm sm:text-base bg-[#0e0e1a] rounded-2xl sm:rounded-3xl border border-white/5">
                                 No items found
                             </div>
                         )}
@@ -456,7 +456,7 @@ export const GlobalCycleView = ({ boardData, selectedBoardId, refreshBoardDetail
                     </div>
                 </div>
             ) : (
-                <div className="text-center text-gray-500 italic py-12 bg-[#0e0e1a] rounded-3xl border border-white/5">
+                <div className="text-center text-gray-500 italic py-6 px-4 sm:py-10 text-sm sm:text-base bg-[#0e0e1a] rounded-2xl sm:rounded-3xl border border-white/5 max-lg:min-h-0">
                     {allItems.length === 0 ? "No items in this board" : "No items match current filter"}
                 </div>
             ))}

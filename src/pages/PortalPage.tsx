@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Lock, Mail, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import { loginUser } from '../services/boardsService';
 import { EDITOR_BACKLOG_POPUP_SESSION_KEY } from '../lib/editorBacklogPopup';
 import { PORTAL_CACHED_PASSWORD_KEY } from '../lib/portalPasswordCache';
@@ -60,29 +61,32 @@ export default function PortalPage() {
     };
 
     return (
-        <div className="relative min-h-screen w-full flex overflow-hidden bg-[#020204]">
+        <div className="relative min-h-screen min-h-[100dvh] w-full max-w-full flex overflow-hidden bg-[#020204]">
             <div className="bg-noise" />
 
             {/* ─── LEFT PANEL : Auth ──────────────────────────────── */}
-            <div className="flex-1 lg:flex-none lg:w-[460px] xl:w-[500px] flex flex-col relative bg-[#020204] [color-scheme:dark]">
+            <div className="flex-1 lg:flex-none lg:w-[460px] xl:w-[500px] native:!w-full native:!max-w-none native:flex-1 flex flex-col relative bg-[#020204] [color-scheme:dark]">
 
-                {/* Back link */}
-                <button
-                    onClick={() => navigate('/')}
-                    className="absolute top-8 left-8 z-50 flex items-center gap-2 text-white/25 hover:text-white/70 transition-colors duration-200 group"
-                >
-                    <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform duration-200" />
-                    <span className="text-[11px] font-semibold tracking-[0.2em] uppercase">Return</span>
-                </button>
+                {/* Back link — hidden in native app; home route redirects to portal */}
+                {!Capacitor.isNativePlatform() && (
+                    <button
+                        type="button"
+                        onClick={() => navigate('/')}
+                        className="absolute top-[max(1.75rem,env(safe-area-inset-top,0px))] left-[max(1.25rem,env(safe-area-inset-left,0px))] z-50 flex items-center gap-2 text-white/25 hover:text-white/70 transition-colors duration-200 group"
+                    >
+                        <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform duration-200" />
+                        <span className="text-[11px] font-semibold tracking-[0.2em] uppercase">Return</span>
+                    </button>
+                )}
 
                 {/* Form area — vertically centered */}
-                <div className="flex-1 flex flex-col items-center justify-center px-10 xl:px-14">
-                    <div className="w-full max-w-[340px]">
+                <div className="flex-1 flex flex-col items-center justify-center px-5 sm:px-8 md:px-10 xl:px-14 py-6 sm:py-0">
+                    <div className="w-full max-w-[340px] min-w-0">
 
                         {/* Heading */}
                         <motion.div {...fadeUp(0.05)} className="mb-10">
                             <p className="text-[10px] font-bold tracking-[0.25em] uppercase text-white/25 mb-4">Portal Access</p>
-                            <h1 className="font-display text-4xl xl:text-5xl font-medium tracking-tight leading-[1.0] text-glow-premium">
+                            <h1 className="font-display text-3xl sm:text-4xl xl:text-5xl font-medium tracking-tight leading-[1.0] text-glow-premium">
                                 Sign <span className="italic text-violet-400 text-glow-violet">in.</span>
                             </h1>
                         </motion.div>
@@ -165,16 +169,16 @@ export default function PortalPage() {
                 </div>
 
                 {/* Footer */}
-                <div className="pb-8 text-center">
+                <div className="pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] sm:pb-8 text-center">
                     <p className="text-[10px] text-white/15 font-medium tracking-wider">© 2024 CreativeVision Inc.</p>
                 </div>
             </div>
 
             {/* Hairline divider */}
-            <div className="hidden lg:block w-px self-stretch bg-gradient-to-b from-transparent via-white/[0.07] to-transparent flex-shrink-0" />
+            <div className="hidden lg:block native:hidden w-px self-stretch bg-gradient-to-b from-transparent via-white/[0.07] to-transparent flex-shrink-0" />
 
             {/* ─── RIGHT PANEL : Brand ──────────────────────────────── */}
-            <div className="hidden lg:flex flex-1 relative flex-col overflow-hidden bg-[#020204]">
+            <div className="hidden lg:flex native:hidden flex-1 relative flex-col overflow-hidden bg-[#020204]">
 
                 {/* Ambient art */}
                 <div className="absolute inset-0">

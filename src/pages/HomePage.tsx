@@ -76,7 +76,7 @@ export default function HomePage() {
   const bgX1 = useTransform(scrollYProgress, [0, 1], ['0%', '30%']);
 
   return (
-    <div className="bg-[#050508] text-white selection:bg-violet-500/30 font-sans">
+    <div className="bg-[#050508] text-white selection:bg-violet-500/30 font-sans overflow-x-hidden max-w-full">
       <div className="bg-noise" />
 
       {/* Global Background Effects */}
@@ -111,7 +111,7 @@ export default function HomePage() {
       </div>
 
       {/* Progress Bar */}
-      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-32 h-[2px] bg-white/10 rounded-full overflow-hidden z-50">
+      <div className="fixed left-1/2 -translate-x-1/2 w-32 h-[2px] bg-white/10 rounded-full overflow-hidden z-50 bottom-[max(1.5rem,env(safe-area-inset-bottom,0px))] sm:bottom-8">
         <motion.div
           className="h-full bg-violet-500/80"
           style={{ scaleX: scrollYProgress, transformOrigin: '0% 50%' }}
@@ -133,9 +133,9 @@ function Scene1() {
   }, []);
 
   return (
-    <section className="w-screen h-full flex flex-col justify-center items-center relative px-8">
+    <section className="w-screen h-full flex flex-col justify-center items-center relative px-4 sm:px-8">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(139,92,246,0.05)_0%,transparent_50%)] pointer-events-none" />
-      <div className="z-10 text-center max-w-5xl mx-auto">
+      <div className="z-10 text-center max-w-5xl mx-auto min-w-0 w-full">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -151,7 +151,7 @@ function Scene1() {
           whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
           viewport={{ amount: 0.3 }}
           transition={{ duration: 1.2, delay: 0.2, ease: "easeOut" }}
-          className="font-display text-5xl md:text-7xl lg:text-9xl font-medium leading-[0.9] tracking-tight mb-6 md:mb-8 text-glow-premium"
+          className="font-display text-4xl sm:text-5xl md:text-7xl lg:text-9xl font-medium leading-[0.9] tracking-tight mb-6 md:mb-8 text-glow-premium"
         >
           <div className="flex flex-col items-center justify-center gap-2 md:gap-4">
             <div>Turn</div>

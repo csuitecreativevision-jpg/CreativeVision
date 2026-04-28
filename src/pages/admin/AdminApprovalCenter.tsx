@@ -106,14 +106,14 @@ export default function AdminApprovalCenter() {
             confirmButtonText: 'Yes, Send Follow-up',
             cancelButtonText: 'Cancel',
             customClass: {
-                popup: 'rounded-3xl border border-white/10 shadow-2xl max-w-[35rem]',
-                title: '!text-white !font-black !tracking-tight',
-                htmlContainer: '!text-white/80 !text-left',
-                actions: '!gap-2 !pt-2',
+                popup: '!w-[calc(100vw-1rem)] !max-w-[35rem] !rounded-3xl border border-white/10 shadow-2xl !my-2 !p-4 sm:!p-5',
+                title: '!text-white !font-black !tracking-tight !text-xl sm:!text-3xl !leading-tight',
+                htmlContainer: '!text-white/80 !text-left !px-0 !mx-0 !max-h-[46dvh] sm:!max-h-none !overflow-y-auto',
+                actions: '!gap-2 !pt-2 !w-full !flex-wrap sm:!flex-nowrap',
                 confirmButton:
-                    '!rounded-xl !px-5 !py-2.5 !font-semibold !text-white !bg-violet-600 hover:!bg-violet-500 focus:!outline-none',
+                    '!rounded-xl !px-4 sm:!px-5 !py-2.5 !font-semibold !text-white !bg-violet-600 hover:!bg-violet-500 focus:!outline-none !flex-1 sm:!flex-none',
                 cancelButton:
-                    '!rounded-xl !px-5 !py-2.5 !font-semibold !text-white !bg-white/10 hover:!bg-white/15 focus:!outline-none',
+                    '!rounded-xl !px-4 sm:!px-5 !py-2.5 !font-semibold !text-white !bg-white/10 hover:!bg-white/15 focus:!outline-none !flex-1 sm:!flex-none',
             },
         });
         if (!first.isConfirmed) return;

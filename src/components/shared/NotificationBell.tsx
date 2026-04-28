@@ -22,6 +22,8 @@ import {
     subscribeToNotifications,
     type Notification
 } from '../../services/notificationService';
+import { showNativeAppNotification } from '../../services/nativeNotificationService';
+import { usePortalTheme } from '../../contexts/PortalThemeContext';
 
 // ─── Helpers ────────────────────────────────────────────────────────────
 
@@ -59,7 +61,7 @@ function getNotificationIcon(type: string) {
     }
 }
 
-function getNotificationColor(type: string) {
+function getNotificationColor(type: string, isDark: boolean) {
     switch (type) {
         case 'leave_request':
             return { bg: 'bg-amber-500/10', ring: 'ring-amber-500/20', text: 'text-amber-400', dot: 'bg-amber-400' };
@@ -74,7 +76,9 @@ function getNotificationColor(type: string) {
         case 'warning':
             return { bg: 'bg-red-500/10', ring: 'ring-red-500/20', text: 'text-red-400', dot: 'bg-red-400' };
         default:
-            return { bg: 'bg-white/5', ring: 'ring-white/10', text: 'text-gray-400', dot: 'bg-gray-400' };
+            return isDark
+                ? { bg: 'bg-white/5', ring: 'ring-white/10', text: 'text-gray-400', dot: 'bg-gray-400' }
+                : { bg: 'bg-zinc-100', ring: 'ring-zinc-200', text: 'text-zinc-600', dot: 'bg-zinc-500' };
     }
 }
 
@@ -85,6 +89,7 @@ interface NotificationBellProps {
 }
 
 export function NotificationBell({ onNotificationClick }: NotificationBellProps) {
+    const { isDark } = usePortalTheme();
     const [isOpen, setIsOpen] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
@@ -120,6 +125,23 @@ export function NotificationBell({ onNotificationClick }: NotificationBellProps)
         loadNotifications();
     }, [loadNotifications]);
 
+    // Proactively request OS notification permission on native (Android/iOS)
+    useEffect(() => {
+        if (!userEmail) return;
+        void (async () => {
+            try {
+                const { Capacitor } = await import('@capacitor/core');
+                if (!Capacitor.isNativePlatform()) return;
+                const { LocalNotifications } = await import('@capacitor/local-notifications');
+                const cur = await LocalNotifications.checkPermissions();
+                if (cur.display === 'granted') return;
+                await LocalNotifications.requestPermissions();
+            } catch {
+                /* ignore */
+            }
+        })();
+    }, [userEmail]);
+
     // Realtime subscription
     useEffect(() => {
         if (!userEmail) return;
@@ -127,6 +149,11 @@ export function NotificationBell({ onNotificationClick }: NotificationBellProps)
         const unsubscribe = subscribeToNotifications(userEmail, (newNotification) => {
             setNotifications(prev => [newNotification, ...prev].slice(0, 50));
             setUnreadCount(prev => prev + 1);
+            void showNativeAppNotification(
+                newNotification.title,
+                newNotification.message,
+                newNotification.id
+            );
         });
 
         return unsubscribe;
@@ -195,7 +222,11 @@ export function NotificationBell({ onNotificationClick }: NotificationBellProps)
             <button
                 id="notification-bell-trigger"
                 onClick={() => setIsOpen(!isOpen)}
-                className="relative p-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-gray-400 hover:text-white transition-all duration-300 group"
+                className={`relative p-2.5 rounded-xl transition-all duration-300 group ${
+                    isDark
+                        ? 'bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-gray-400 hover:text-white'
+                        : 'bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600 hover:text-zinc-900 shadow-sm'
+                }`}
             >
                 <Bell className={`w-5 h-5 transition-transform duration-300 ${isOpen ? 'scale-110' : 'group-hover:scale-110'}`} />
 
@@ -217,25 +248,45 @@ export function NotificationBell({ onNotificationClick }: NotificationBellProps)
                 </AnimatePresence>
             </button>
 
-            {/* Dropdown Panel */}
+            {/* Panel: bottom sheet on small screens, anchored dropdown on lg+ */}
             <AnimatePresence>
                 {isOpen && (
-                    <motion.div
-                        ref={panelRef}
-                        id="notification-panel"
-                        initial={{ opacity: 0, y: -8, scale: 0.96 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -8, scale: 0.96 }}
-                        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                        className="absolute right-0 top-full mt-3 w-[380px] max-h-[520px] flex flex-col rounded-2xl border border-white/10 bg-[#131322]/95 backdrop-blur-2xl shadow-2xl shadow-black/50 z-[100] overflow-hidden"
-                    >
+                    <>
+                        <motion.button
+                            type="button"
+                            key="notification-backdrop"
+                            aria-label="Close notifications"
+                            className={`fixed inset-0 z-[1000010] backdrop-blur-[1px] lg:hidden native:!block ${
+                                isDark ? 'bg-black/45' : 'bg-black/25'
+                            }`}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.18 }}
+                            onClick={() => setIsOpen(false)}
+                        />
+                        <motion.div
+                            ref={panelRef}
+                            key="notification-panel"
+                            id="notification-panel"
+                            initial={{ opacity: 0, y: 16 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 12 }}
+                            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                            className={`fixed left-0 right-0 bottom-0 z-[1000020] flex flex-col max-h-[92dvh] rounded-t-3xl border border-b-0 backdrop-blur-2xl overflow-hidden lg:absolute lg:left-auto lg:right-0 lg:top-full lg:bottom-auto lg:mt-3 lg:max-h-[520px] lg:w-[380px] lg:rounded-2xl lg:border lg:z-[100] ${
+                                isDark
+                                    ? 'border-white/10 bg-[#131322]/98 shadow-[0_-12px_40px_rgba(0,0,0,0.45)] lg:shadow-2xl lg:shadow-black/50'
+                                    : 'border-zinc-200 bg-white/98 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] lg:shadow-xl'
+                            }`}
+                            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))' }}
+                        >
                         {/* Header */}
-                        <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+                        <div className={`flex items-center justify-between px-5 py-4 border-b ${isDark ? 'border-white/5' : 'border-zinc-200'}`}>
                             <div className="flex items-center gap-2.5">
                                 <div className="p-1.5 rounded-lg bg-violet-500/10">
                                     <Sparkles className="w-4 h-4 text-violet-400" />
                                 </div>
-                                <h3 className="text-sm font-black text-white tracking-tight">Notifications</h3>
+                                <h3 className={`text-sm font-black tracking-tight ${isDark ? 'text-white' : 'text-zinc-900'}`}>Notifications</h3>
                                 {unreadCount > 0 && (
                                     <span className="px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 text-[10px] font-bold">
                                         {unreadCount} new
@@ -246,7 +297,9 @@ export function NotificationBell({ onNotificationClick }: NotificationBellProps)
                                 {unreadCount > 0 && (
                                     <button
                                         onClick={handleMarkAllAsRead}
-                                        className="p-1.5 rounded-lg hover:bg-white/5 text-gray-500 hover:text-emerald-400 transition-colors"
+                                        className={`p-1.5 rounded-lg transition-colors ${
+                                            isDark ? 'hover:bg-white/5 text-gray-500 hover:text-emerald-400' : 'hover:bg-zinc-100 text-zinc-500 hover:text-emerald-600'
+                                        }`}
                                         title="Mark all as read"
                                     >
                                         <CheckCheck className="w-4 h-4" />
@@ -255,7 +308,9 @@ export function NotificationBell({ onNotificationClick }: NotificationBellProps)
                                 {notifications.length > 0 && (
                                     <button
                                         onClick={handleDismissAll}
-                                        className="p-1.5 rounded-lg hover:bg-white/5 text-gray-500 hover:text-red-400 transition-colors"
+                                        className={`p-1.5 rounded-lg transition-colors ${
+                                            isDark ? 'hover:bg-white/5 text-gray-500 hover:text-red-400' : 'hover:bg-zinc-100 text-zinc-500 hover:text-red-600'
+                                        }`}
                                         title="Dismiss all"
                                     >
                                         <Trash2 className="w-4 h-4" />
@@ -263,7 +318,9 @@ export function NotificationBell({ onNotificationClick }: NotificationBellProps)
                                 )}
                                 <button
                                     onClick={() => setIsOpen(false)}
-                                    className="p-1.5 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors"
+                                    className={`p-1.5 rounded-lg transition-colors ${
+                                        isDark ? 'hover:bg-white/5 text-gray-500 hover:text-white' : 'hover:bg-zinc-100 text-zinc-500 hover:text-zinc-900'
+                                    }`}
                                 >
                                     <X className="w-4 h-4" />
                                 </button>
@@ -278,16 +335,16 @@ export function NotificationBell({ onNotificationClick }: NotificationBellProps)
                                 </div>
                             ) : notifications.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center py-16 px-6">
-                                    <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
-                                        <Bell className="w-7 h-7 text-gray-600" />
+                                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 ${isDark ? 'bg-white/5' : 'bg-zinc-100'}`}>
+                                        <Bell className={`w-7 h-7 ${isDark ? 'text-gray-600' : 'text-zinc-500'}`} />
                                     </div>
-                                    <p className="text-sm font-bold text-gray-500 mb-1">All caught up!</p>
-                                    <p className="text-xs text-gray-600 text-center">No notifications yet. We'll keep you posted on updates.</p>
+                                    <p className={`text-sm font-bold mb-1 ${isDark ? 'text-gray-500' : 'text-zinc-700'}`}>All caught up!</p>
+                                    <p className={`text-xs text-center ${isDark ? 'text-gray-600' : 'text-zinc-500'}`}>No notifications yet. We'll keep you posted on updates.</p>
                                 </div>
                             ) : (
                                 <div className="py-1">
                                     {notifications.map((notification, index) => {
-                                        const colors = getNotificationColor(notification.type);
+                                        const colors = getNotificationColor(notification.type, isDark);
                                         return (
                                             <motion.div
                                                 key={notification.id}
@@ -296,8 +353,8 @@ export function NotificationBell({ onNotificationClick }: NotificationBellProps)
                                                 transition={{ delay: index * 0.03 }}
                                                 className={`group relative px-4 py-3 mx-1 my-0.5 rounded-xl transition-all duration-200 cursor-pointer ${
                                                     notification.is_read
-                                                        ? 'hover:bg-white/[0.03]'
-                                                        : 'bg-white/[0.03] hover:bg-white/[0.06]'
+                                                        ? (isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-zinc-100/80')
+                                                        : (isDark ? 'bg-white/[0.03] hover:bg-white/[0.06]' : 'bg-zinc-100/70 hover:bg-zinc-100')
                                                 }`}
                                                 onClick={async () => {
                                                     if (onNotificationClick) {
@@ -317,7 +374,9 @@ export function NotificationBell({ onNotificationClick }: NotificationBellProps)
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-start justify-between gap-2">
                                                             <p className={`text-xs font-bold leading-tight ${
-                                                                notification.is_read ? 'text-gray-400' : 'text-white'
+                                                                notification.is_read
+                                                                    ? (isDark ? 'text-gray-400' : 'text-zinc-700')
+                                                                    : (isDark ? 'text-white' : 'text-zinc-900')
                                                             }`}>
                                                                 {notification.title}
                                                             </p>
@@ -328,11 +387,13 @@ export function NotificationBell({ onNotificationClick }: NotificationBellProps)
                                                             </div>
                                                         </div>
                                                         <p className={`text-[11px] mt-0.5 leading-relaxed line-clamp-2 ${
-                                                            notification.is_read ? 'text-gray-600' : 'text-gray-400'
+                                                            notification.is_read
+                                                                ? (isDark ? 'text-gray-600' : 'text-zinc-500')
+                                                                : (isDark ? 'text-gray-400' : 'text-zinc-700')
                                                         }`}>
                                                             {notification.message}
                                                         </p>
-                                                        <p className="text-[10px] text-gray-600 mt-1.5 font-medium">
+                                                        <p className={`text-[10px] mt-1.5 font-medium ${isDark ? 'text-gray-600' : 'text-zinc-500'}`}>
                                                             {getRelativeTime(notification.created_at)}
                                                         </p>
                                                     </div>
@@ -345,7 +406,9 @@ export function NotificationBell({ onNotificationClick }: NotificationBellProps)
                                                                     e.stopPropagation();
                                                                     handleMarkAsRead(notification.id);
                                                                 }}
-                                                                className="p-1 rounded-md hover:bg-emerald-500/10 text-gray-500 hover:text-emerald-400 transition-colors"
+                                                                className={`p-1 rounded-md hover:bg-emerald-500/10 transition-colors ${
+                                                                    isDark ? 'text-gray-500 hover:text-emerald-400' : 'text-zinc-500 hover:text-emerald-600'
+                                                                }`}
                                                                 title="Mark as read"
                                                             >
                                                                 <Check className="w-3.5 h-3.5" />
@@ -356,7 +419,9 @@ export function NotificationBell({ onNotificationClick }: NotificationBellProps)
                                                                 e.stopPropagation();
                                                                 handleDelete(notification.id, !notification.is_read);
                                                             }}
-                                                            className="p-1 rounded-md hover:bg-red-500/10 text-gray-500 hover:text-red-400 transition-colors"
+                                                            className={`p-1 rounded-md hover:bg-red-500/10 transition-colors ${
+                                                                isDark ? 'text-gray-500 hover:text-red-400' : 'text-zinc-500 hover:text-red-600'
+                                                            }`}
                                                             title="Delete"
                                                         >
                                                             <Trash2 className="w-3.5 h-3.5" />
@@ -372,13 +437,14 @@ export function NotificationBell({ onNotificationClick }: NotificationBellProps)
 
                         {/* Footer */}
                         {notifications.length > 0 && (
-                            <div className="px-5 py-3 border-t border-white/5 flex items-center justify-center">
-                                <span className="text-[10px] text-gray-600 font-medium uppercase tracking-widest">
+                            <div className={`px-5 py-3 border-t flex items-center justify-center ${isDark ? 'border-white/5' : 'border-zinc-200'}`}>
+                                <span className={`text-[10px] font-medium uppercase tracking-widest ${isDark ? 'text-gray-600' : 'text-zinc-500'}`}>
                                     Showing latest {notifications.length} notifications
                                 </span>
                             </div>
                         )}
                     </motion.div>
+                    </>
                 )}
             </AnimatePresence>
         </div>

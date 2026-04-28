@@ -68,19 +68,19 @@ function PortalLayoutInner({
     );
 
     return (
-        <div className={`relative min-h-screen ${isDark ? 'bg-[#020204]' : 'bg-zinc-100'}`}>
+        <div className={`relative min-h-screen ${isDark ? 'bg-[#020204] portal-theme-dark' : 'bg-zinc-100 portal-theme-light'}`}>
             {isDark && (
                 <>
-                    <div className="portal-orb-violet w-[40vw] h-[40vw] top-[-10%] left-[-10%] z-0" />
-                    <div className="portal-orb-fuchsia w-[50vw] h-[50vw] bottom-[-10%] right-[-10%] z-0" />
-                    <div className="portal-orb-indigo w-[30vw] h-[30vw] top-[40%] left-[40%] z-0" />
+                    <div className="portal-orb-violet w-[40vw] h-[40vw] top-[-10%] left-[-10%] z-0 max-lg:hidden native:hidden" />
+                    <div className="portal-orb-fuchsia w-[50vw] h-[50vw] bottom-[-10%] right-[-10%] z-0 max-lg:hidden native:hidden" />
+                    <div className="portal-orb-indigo w-[30vw] h-[30vw] top-[40%] left-[40%] z-0 max-lg:hidden native:hidden" />
                     <div className="bg-noise" />
                 </>
             )}
 
-            <div className="flex h-screen relative z-10 overflow-hidden">
+            <div className="flex h-[100dvh] min-h-0 max-w-full overflow-hidden relative z-10">
                 <div
-                    className={`hidden lg:flex w-[240px] flex-shrink-0 flex-col relative z-20 backdrop-blur-sm border-r ${
+                    className={`hidden lg:flex native:hidden w-[240px] flex-shrink-0 flex-col relative z-20 backdrop-blur-sm border-r ${
                         isDark
                             ? 'bg-[#06060a]/95 border-white/[0.05]'
                             : 'bg-white/95 border-zinc-200 shadow-sm'
@@ -101,18 +101,19 @@ function PortalLayoutInner({
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
-                                transition={{ duration: 0.2 }}
+                                transition={{ duration: 0.18 }}
                                 onClick={onMobileSidebarClose}
-                                className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 lg:hidden"
+                                aria-hidden
+                                className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-[2px] lg:hidden native:!block"
                             />
                             <motion.div
                                 initial={{ x: -260 }}
                                 animate={{ x: 0 }}
                                 exit={{ x: -260 }}
-                                transition={{ type: 'spring', damping: 30, stiffness: 240 }}
-                                className={`fixed inset-y-0 left-0 w-[240px] border-r z-50 flex flex-col lg:hidden backdrop-blur-xl ${
+                                transition={{ type: 'tween', duration: 0.22, ease: [0.25, 0.1, 0.25, 1] }}
+                                className={`fixed inset-y-0 left-0 w-[min(280px,85vw)] max-w-[320px] border-r z-[210] flex flex-col shadow-[8px_0_40px_rgba(0,0,0,0.45)] lg:hidden native:!flex ${
                                     isDark
-                                        ? 'bg-[#06060a]/98 border-white/[0.06]'
+                                        ? 'bg-[#06060a] border-white/[0.08]'
                                         : 'bg-white border-zinc-200'
                                 }`}
                             >
@@ -133,7 +134,7 @@ function PortalLayoutInner({
                 </AnimatePresence>
 
                 <div
-                    className={`flex-1 flex flex-col overflow-hidden relative z-30 ${
+                    className={`flex-1 flex flex-col min-w-0 overflow-hidden relative z-30 ${
                         isDark ? 'bg-[#020204]' : 'bg-zinc-100'
                     }`}
                 >

@@ -1,9 +1,12 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { motion } from 'framer-motion';
+import { usePortalThemeOptional } from '../../contexts/PortalThemeContext';
 
 export const ThreeLogoLoader = () => {
     const containerRef = useRef<HTMLDivElement | null>(null);
+    const theme = usePortalThemeOptional();
+    const isDark = theme?.isDark ?? (localStorage.getItem('portal_ui_dark_mode') !== 'false');
 
     useEffect(() => {
         const host = containerRef.current;
@@ -26,6 +29,7 @@ export const ThreeLogoLoader = () => {
         const geometry = new THREE.PlaneGeometry(1.8, 1.8);
         const material = new THREE.MeshBasicMaterial({
             map: texture,
+            color: isDark ? 0xffffff : 0x111111,
             transparent: true,
             side: THREE.DoubleSide,
         });
@@ -34,9 +38,9 @@ export const ThreeLogoLoader = () => {
 
         const haloGeometry = new THREE.RingGeometry(0.96, 1.11, 64);
         const haloMaterial = new THREE.MeshBasicMaterial({
-            color: 0x8b5cf6,
+            color: isDark ? 0x8b5cf6 : 0x52525b,
             transparent: true,
-            opacity: 0.22,
+            opacity: isDark ? 0.22 : 0.18,
             side: THREE.DoubleSide,
         });
         const haloMesh = new THREE.Mesh(haloGeometry, haloMaterial);
@@ -97,7 +101,7 @@ export const ThreeLogoLoader = () => {
             const boostScale = 1 + boost * 0.09;
             logoMesh.scale.set(boostScale, boostScale, 1);
             haloMesh.rotation.z += 0.007 + boost * 0.02;
-            haloMesh.material.opacity = 0.18 + Math.max(0, boost) * 0.3;
+            haloMesh.material.opacity = (isDark ? 0.18 : 0.12) + Math.max(0, boost) * (isDark ? 0.3 : 0.2);
             haloMesh.scale.set(1 + boost * 0.12, 1 + boost * 0.12, 1);
 
             renderer.render(scene, camera);
@@ -122,10 +126,10 @@ export const ThreeLogoLoader = () => {
                 host.removeChild(renderer.domElement);
             }
         };
-    }, []);
+    }, [isDark]);
 
     return (
-        <div className="min-h-screen w-full flex items-center justify-center bg-black">
+        <div className={`min-h-screen w-full flex items-center justify-center ${isDark ? 'bg-black' : 'bg-white'}`}>
             <motion.div
                 className="flex flex-col items-center justify-center"
                 initial={{ opacity: 0, scale: 0.96, y: 8 }}
@@ -133,8 +137,8 @@ export const ThreeLogoLoader = () => {
                 transition={{ duration: 0.55, ease: 'easeOut' }}
             >
                 <div ref={containerRef} className="w-[320px] h-[320px] flex items-center justify-center overflow-visible" />
-                <p className="mt-4 text-xs tracking-[0.2em] text-white/70">CREATIVE VISION</p>
-                <p className="mt-2 text-[10px] tracking-[0.14em] text-white/45 uppercase">Drag or click the logo</p>
+                <p className={`mt-4 text-xs tracking-[0.2em] ${isDark ? 'text-white/70' : 'text-zinc-800'}`}>CREATIVE VISION</p>
+                <p className={`mt-2 text-[10px] tracking-[0.14em] uppercase ${isDark ? 'text-white/45' : 'text-zinc-500'}`}>Drag or click the logo</p>
             </motion.div>
         </div>
     );

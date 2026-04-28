@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import { AnimatePresence, motion } from 'framer-motion';
 import { BackgroundLayout } from './components/layout/BackgroundLayout';
 import { CinematicOverlay } from './components/ui/CinematicOverlay';
@@ -34,6 +35,8 @@ const AdminUserManagement = lazy(() => import('./pages/admin/AdminUserManagement
 const AdminTimeLogs = lazy(() => import('./pages/admin/AdminTimeLogs'));
 const AdminLeaveApprovals = lazy(() => import('./pages/admin/AdminLeaveApprovals'));
 const AdminCalendar = lazy(() => import('./pages/admin/AdminCalendar'));
+
+const isNativeAppShell = Capacitor.isNativePlatform();
 
 export default function App() {
   const navigate = useNavigate();
@@ -113,7 +116,8 @@ export default function App() {
       <CinematicOverlay />
 
       {/* Global Floating Secret Portal Trigger - Bottom Left */}
-      {location.pathname !== '/portal' &&
+      {!isNativeAppShell &&
+        location.pathname !== '/portal' &&
         location.pathname !== '/admin-dashboard' &&
         !location.pathname.startsWith('/admin-portal') &&
         !location.pathname.startsWith('/editor-portal') &&
@@ -135,12 +139,22 @@ export default function App() {
 
       {/* Main Routing */}
       <motion.div
+        className="max-w-full overflow-x-clip"
         animate={{ opacity: routeLoading && !isPortalPath ? 0 : 1 }}
         transition={{ duration: 0.35, ease: 'easeInOut' }}
       >
         <Suspense fallback={<ThreeLogoLoader />}>
           <Routes>
-            <Route path="/" element={<HomePage />} />
+            <Route
+              path="/"
+              element={
+                isNativeAppShell ? (
+                  <Navigate to="/admin-dashboard" replace />
+                ) : (
+                  <HomePage />
+                )
+              }
+            />
             <Route path="/hire" element={<HireUsPage onBack={handleBack} />} />
             <Route path="/join" element={<JoinPage onBack={() => {
               navigate('/', { state: { target: 'services' } });

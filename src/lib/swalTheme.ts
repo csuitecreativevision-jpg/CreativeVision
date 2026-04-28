@@ -5,6 +5,8 @@ const CV_SWAL_BASE: SweetAlertOptions = {
     color: '#f4f4f5',
     confirmButtonColor: '#7c3aed',
     cancelButtonColor: '#4c1d95',
+    heightAuto: false,
+    scrollbarPadding: false,
     buttonsStyling: false,
     customClass: {
         popup: 'rounded-2xl border border-white/10 shadow-2xl',

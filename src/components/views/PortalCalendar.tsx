@@ -17,6 +17,7 @@ import {
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Loader2, ArrowLeft, Briefcase, UserX, Clock, X, ArrowRight, Target, Coffee, Laptop } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BoardCell } from '../shared/BoardCell';
+import { usePortalTheme } from '../../contexts/PortalThemeContext';
 
 interface PortalCalendarProps {
     onBack?: () => void;
@@ -33,6 +34,7 @@ interface PortalCalendarProps {
 }
 
 export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = false, embedded = false, onGoToItem }: PortalCalendarProps) {
+    const { isDark } = usePortalTheme();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
     const [timeLogs, setTimeLogs] = useState<any[]>([]);
@@ -291,20 +293,30 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
     const calendarContent = (
         <div className="max-w-7xl mx-auto space-y-6">
             {/* Controls */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#11111c] p-4 rounded-2xl border border-white/5">
+            <div className={`flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl border ${
+                isDark ? 'bg-[#11111c] border-white/5' : 'bg-white border-zinc-200 shadow-sm'
+            }`}>
                 <div className="flex items-center gap-4">
-                    <div className="flex items-center bg-[#07070b] rounded-xl border border-white/5 p-1">
-                        <button onClick={handlePrevMonth} className="p-2 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-colors">
+                    <div className={`flex items-center rounded-xl border p-1 ${
+                        isDark ? 'bg-[#07070b] border-white/5' : 'bg-zinc-50 border-zinc-200'
+                    }`}>
+                        <button onClick={handlePrevMonth} className={`p-2 rounded-lg transition-colors ${
+                            isDark ? 'hover:bg-white/5 text-gray-400 hover:text-white' : 'hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900'
+                        }`}>
                             <ChevronLeft className="w-5 h-5" />
                         </button>
-                        <button onClick={handleToday} className="px-4 py-2 font-bold text-sm text-gray-300 hover:text-white transition-colors">
+                        <button onClick={handleToday} className={`px-4 py-2 font-bold text-sm transition-colors ${
+                            isDark ? 'text-gray-300 hover:text-white' : 'text-zinc-700 hover:text-zinc-900'
+                        }`}>
                             Today
                         </button>
-                        <button onClick={handleNextMonth} className="p-2 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-colors">
+                        <button onClick={handleNextMonth} className={`p-2 rounded-lg transition-colors ${
+                            isDark ? 'hover:bg-white/5 text-gray-400 hover:text-white' : 'hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900'
+                        }`}>
                             <ChevronRight className="w-5 h-5" />
                         </button>
                     </div>
-                    <h3 className="text-xl font-bold text-white">
+                    <h3 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-zinc-900'}`}>
                         {format(currentDate, 'MMMM yyyy')}
                     </h3>
                 </div>
@@ -328,10 +340,10 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
             </div>
 
             {/* Calendar Grid */}
-            <div className="bg-[#11111c] rounded-2xl border border-white/5 overflow-hidden">
-                <div className="grid grid-cols-7 border-b border-white/5 bg-[#07070b]">
+            <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-[#11111c] border-white/5' : 'bg-white border-zinc-200'}`}>
+                <div className={`grid grid-cols-7 border-b ${isDark ? 'border-white/5 bg-[#07070b]' : 'border-zinc-200 bg-zinc-50'}`}>
                     {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                        <div key={day} className="py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
+                        <div key={day} className={`py-3 text-center text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-500' : 'text-zinc-500'}`}>
                             {day}
                         </div>
                     ))}
@@ -353,15 +365,22 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
                                 <div
                                     key={day.toString()}
                                     className={`
-                                        min-h-[100px] p-2 border-r border-b border-white/5 transition-colors
-                                        ${!isCurrentMonth ? 'bg-[#07070b]/50 opacity-50' : 'hover:bg-white/[0.02]'}
+                                        min-h-[100px] p-2 border-r border-b transition-colors
+                                        ${isDark ? 'border-white/5' : 'border-zinc-200'}
+                                        ${!isCurrentMonth
+                                            ? (isDark ? 'bg-[#07070b]/50 opacity-50' : 'bg-zinc-50 opacity-75')
+                                            : (isDark ? 'hover:bg-white/[0.02]' : 'hover:bg-zinc-50')}
                                         ${idx % 7 === 6 ? 'border-r-0' : ''}
                                     `}
                                 >
                                     <div className="flex items-center justify-between mb-2">
                                         <span className={`
                                             w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold
-                                            ${today ? 'bg-emerald-600 text-white' : (isCurrentMonth ? 'text-gray-300' : 'text-gray-600')}
+                                            ${today
+                                                ? 'bg-emerald-600 text-white'
+                                                : (isCurrentMonth
+                                                    ? (isDark ? 'text-gray-300' : 'text-zinc-800')
+                                                    : (isDark ? 'text-gray-600' : 'text-zinc-400'))}
                                         `}>
                                             {format(day, 'd')}
                                         </span>
@@ -664,25 +683,29 @@ export function PortalCalendar({ onBack, boardIds, portalType, showTimeLogs = fa
             className="flex-1 flex flex-col h-full z-10 w-full"
         >
             {/* Header */}
-            <div className="h-24 px-8 flex items-center gap-6 border-b border-white/5 bg-[#0a0a16] flex-shrink-0">
+            <div className={`h-24 px-8 flex items-center gap-6 border-b flex-shrink-0 ${
+                isDark ? 'border-white/5 bg-[#0a0a16]' : 'border-zinc-200 bg-white'
+            }`}>
                 {portalType === 'admin' && (
                     <button
                         onClick={onBack}
-                        className="p-3 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-all group"
+                        className={`p-3 rounded-full transition-all group ${
+                            isDark ? 'hover:bg-white/10 text-gray-400 hover:text-white' : 'hover:bg-zinc-100 text-zinc-500 hover:text-zinc-900'
+                        }`}
                     >
                         <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 duration-300" />
                     </button>
                 )}
                 <div>
-                    <h2 className="text-3xl font-black text-white tracking-tight uppercase flex items-center gap-3">
+                    <h2 className={`text-3xl font-black tracking-tight uppercase flex items-center gap-3 ${isDark ? 'text-white' : 'text-zinc-900'}`}>
                         <CalendarIcon className={`w-8 h-8 text-${accentColor}-400`} />
                         {titleMap[portalType]}
                     </h2>
-                    <p className="text-sm text-gray-400 font-medium">{subtitleMap[portalType]}</p>
+                    <p className={`text-sm font-medium ${isDark ? 'text-gray-400' : 'text-zinc-600'}`}>{subtitleMap[portalType]}</p>
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
+            <div className={`flex-1 overflow-y-auto custom-scrollbar p-8 ${isDark ? '' : 'bg-zinc-50'}`}>
                 {calendarContent}
             </div>
         </motion.div>

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 const STORAGE_KEY = 'portal_ui_dark_mode';
 
@@ -23,6 +23,13 @@ function readInitialDark(): boolean {
 
 export function PortalThemeProvider({ children }: { children: ReactNode }) {
     const [isDark, setIsDarkState] = useState(readInitialDark);
+
+    useEffect(() => {
+        if (typeof document === 'undefined') return;
+        const root = document.documentElement;
+        root.classList.toggle('portal-theme-dark', isDark);
+        root.classList.toggle('portal-theme-light', !isDark);
+    }, [isDark]);
 
     const setIsDark = useCallback((value: boolean) => {
         setIsDarkState(value);

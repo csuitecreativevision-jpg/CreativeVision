@@ -6,10 +6,10 @@ import {
     LayoutDashboard,
     Users,
     Settings,
-    Menu,
     LogOut,
     Briefcase,
     LayoutList,
+    Table,
     FilePlus,
     CheckSquare,
     TrendingUp,
@@ -21,8 +21,14 @@ import {
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { RefreshProvider, useRefresh } from '../contexts/RefreshContext';
 import { getAllBoards, getAllFolders, getWorkspaceAnalytics, prefetchOverviewData } from '../services/mondayService';
-import { AdminChatbot } from '../components/admin/AdminChatbot';
+import { AdminChatbotProvider, AdminChatbotMobileTrigger } from '../components/admin/AdminChatbot';
 import { NotificationBell } from '../components/shared/NotificationBell';
+import {
+    PortalMobileTopBar,
+    PORTAL_MOBILE_HEADER_PAD_CLASS,
+    PORTAL_MOBILE_TAB_BAR_PAD_CLASS,
+} from '../components/shared/PortalMobileTopBar';
+import { AdminPortalMobileTabs } from '../components/shared/PortalMobileTabs';
 import { PORTAL_CACHED_PASSWORD_KEY } from '../lib/portalPasswordCache';
 import { usePortalTheme } from '../contexts/PortalThemeContext';
 import { getUserNotifications, subscribeToNotifications, type Notification } from '../services/notificationService';
@@ -75,36 +81,6 @@ function AdminSidebarFooter({
                 <span className="text-[13px] font-medium">Log Out</span>
             </button>
         </div>
-    );
-}
-
-function AdminPortalMainHeader({
-    onOpenMobileMenu,
-    onNotificationClick,
-}: {
-    onOpenMobileMenu: () => void;
-    onNotificationClick?: (notification: Notification) => void | Promise<void>;
-}) {
-    const { isDark } = usePortalTheme();
-    return (
-        <>
-            <div className="absolute top-4 left-4 z-50 lg:hidden">
-                <button
-                    type="button"
-                    onClick={onOpenMobileMenu}
-                    className={`p-2 rounded-lg transition-colors ${
-                        isDark
-                            ? 'glass-panel text-white hover:bg-white/10'
-                            : 'bg-white border border-zinc-200 text-zinc-900 shadow-sm hover:bg-zinc-50'
-                    }`}
-                >
-                    <Menu className="w-6 h-6" />
-                </button>
-            </div>
-            <div className="absolute top-4 right-4 z-50">
-                <NotificationBell onNotificationClick={onNotificationClick} />
-            </div>
-        </>
     );
 }
 
@@ -315,6 +291,7 @@ function AdminPortalContent() {
                                 label="Management Hub"
                                 active={
                                     activeTab === 'Assign Project' ||
+                                    activeTab === 'Boards' ||
                                     activeTab === 'Approvals' ||
                                     activeTab === 'Deployed Projects' ||
                                     activeTab === 'Leave Approvals' ||
@@ -330,6 +307,12 @@ function AdminPortalContent() {
                                     label="Assign Project"
                                     active={activeTab === 'Assign Project'}
                                     onClick={() => navigate('/admin-portal/assign-project')}
+                                />
+                                <SidebarItem
+                                    icon={<Table className="w-4 h-4" />}
+                                    label="Boards"
+                                    active={activeTab === 'Boards'}
+                                    onClick={() => navigate('/admin-portal/boards')}
                                 />
                                 <SidebarItem
                                     icon={<CheckSquare className="w-4 h-4" />}
@@ -411,20 +394,34 @@ function AdminPortalContent() {
                 />
             }
             mainContent={
-                <>
-                    <AdminPortalMainHeader
-                        onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
-                        onNotificationClick={openFeedbackFromNotification}
+                <AdminChatbotProvider>
+                    <PortalMobileTopBar
+                        showMenuButton={false}
+                        rightSlot={
+                            <>
+                                <AdminChatbotMobileTrigger />
+                                <NotificationBell onNotificationClick={openFeedbackFromNotification} />
+                            </>
+                        }
                     />
 
-                    {/* Content Area */}
-                    <div className="flex-1 overflow-hidden flex relative">
+                    <div className="hidden lg:flex native:!hidden absolute top-4 right-6 z-40">
+                        <NotificationBell onNotificationClick={openFeedbackFromNotification} />
+                    </div>
+
+                    {/* Content Area — bottom padding for fixed tab bar on mobile */}
+                    <div
+                        className={`flex-1 overflow-hidden flex relative ${PORTAL_MOBILE_HEADER_PAD_CLASS} ${PORTAL_MOBILE_TAB_BAR_PAD_CLASS}`}
+                    >
                         <Outlet />
                     </div>
 
-                    {/* Global Admin Chatbot */}
-                    <AdminChatbot />
-                </>
+                    <AdminPortalMobileTabs
+                        activeTab={activeTab}
+                        navigate={navigate}
+                        onOpenMore={() => setIsMobileSidebarOpen(true)}
+                    />
+                </AdminChatbotProvider>
             }
         />
     );

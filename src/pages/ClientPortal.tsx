@@ -6,10 +6,15 @@ import {
     Loader2,
     Sparkles,
     LogOut,
-    Menu,
     Calendar
 } from 'lucide-react';
 import { PortalLayout } from '../components/shared/PortalLayout';
+import {
+    PortalMobileTopBar,
+    PORTAL_MOBILE_HEADER_PAD_CLASS,
+    PORTAL_MOBILE_TAB_BAR_PAD_CLASS,
+} from '../components/shared/PortalMobileTopBar';
+import { ClientPortalMobileTabs } from '../components/shared/PortalMobileTabs';
 import { SidebarItem } from '../components/shared/SidebarItem';
 import { ProjectSelectionView } from '../components/views/ProjectSelectionView';
 import { PortalOnboarding } from '../components/shared/PortalOnboarding';
@@ -23,6 +28,8 @@ import { PortalCalendar } from '../components/views/PortalCalendar';
 import { createNotification } from '../services/notificationService';
 import type { Notification } from '../services/notificationService';
 import { parseSubmissionVideoFeedbackSourceId } from '../services/submissionVideoFeedbackService';
+import { useCapacitorNative } from '../hooks/useCapacitorNative';
+import { usePortalThemeOptional } from '../contexts/PortalThemeContext';
 
 function getStatusColumnIds(board: any): string[] {
     if (!board?.columns) return [];
@@ -96,6 +103,7 @@ async function syncWaitingForClientNotifications(userEmail: string, boardsWithIt
 
 function ClientPortalContent() {
     const navigate = useNavigate();
+    const isNativeApp = useCapacitorNative();
     const [loading, setLoading] = useState(true);
     const [boards, setBoards] = useState<any[]>([]);
     const [selectedBoard, setSelectedBoard] = useState<any | null>(null);
@@ -106,6 +114,8 @@ function ClientPortalContent() {
     const [initialItemId, setInitialItemId] = useState<string | undefined>(undefined);
     const [isProcessingNavigation, setIsProcessingNavigation] = useState(false);
     const [webhookSyncDone, setWebhookSyncDone] = useState(false);
+    const theme = usePortalThemeOptional();
+    const isDark = theme?.isDark ?? true;
 
     const extractItemIdFromNotificationSource = (sourceId?: string) => {
         if (!sourceId) return null;
@@ -379,6 +389,16 @@ function ClientPortalContent() {
         if (!silent) setLoading(false);
     };
 
+    const goClientHome = () => {
+        setSelectedBoard(null);
+        setInitialItemId(undefined);
+    };
+
+    const openClientCalendar = () => {
+        setSelectedBoard('calendar' as any);
+        setInitialItemId(undefined);
+    };
+
     return (
         <PortalLayout
             isMobileSidebarOpen={isMobileSidebarOpen}
@@ -437,7 +457,11 @@ function ClientPortalContent() {
                 </div>
             }
             mainContent={
-                <div className="flex-1 flex flex-col h-full bg-[#020204] overflow-hidden relative">
+                <div
+                    className={`flex-1 flex flex-col h-full overflow-hidden relative ${
+                        isDark ? 'bg-[#020204]' : 'bg-zinc-50'
+                    } ${PORTAL_MOBILE_HEADER_PAD_CLASS} ${PORTAL_MOBILE_TAB_BAR_PAD_CLASS}`}
+                >
 
                     {/* Navigation Overlay */}
                     <AnimatePresence>
@@ -455,24 +479,29 @@ function ClientPortalContent() {
                         )}
                     </AnimatePresence>
 
-                    {/* Mobile Menu Trigger */}
-                    <div className="absolute top-4 left-4 z-50 lg:hidden">
-                        <button
-                            onClick={() => setIsMobileSidebarOpen(true)}
-                            className="p-2 rounded-lg glass-panel text-white hover:bg-white/10 transition-colors"
-                        >
-                            <Menu className="w-6 h-6" />
-                        </button>
-                    </div>
+                    <PortalMobileTopBar
+                        showMenuButton={false}
+                        rightSlot={<NotificationBell onNotificationClick={openItemFromNotification} />}
+                    />
 
-                    {/* Notification Bell - Top Right */}
-                    <div className="absolute top-4 right-4 z-50">
+                    <div className="hidden lg:flex native:!hidden absolute top-4 right-6 z-40">
                         <NotificationBell onNotificationClick={openItemFromNotification} />
                     </div>
 
-                    {/* Ambient orbs */}
-                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-violet-500/[0.04] rounded-full blur-[120px] pointer-events-none" />
-                    <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-indigo-500/[0.03] rounded-full blur-[140px] pointer-events-none" />
+                    <ClientPortalMobileTabs
+                        selectedBoard={selectedBoard}
+                        onHome={goClientHome}
+                        onCalendar={openClientCalendar}
+                        onOpenMenu={() => setIsMobileSidebarOpen(true)}
+                    />
+
+                    {/* Ambient orbs — disabled on native app to reduce GPU lag */}
+                    {!isNativeApp && (
+                        <>
+                            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-violet-500/[0.04] rounded-full blur-[120px] pointer-events-none max-lg:hidden native:hidden" />
+                            <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-indigo-500/[0.03] rounded-full blur-[140px] pointer-events-none max-lg:hidden native:hidden" />
+                        </>
+                    )}
 
                     <PortalOnboarding
                         steps={onboardingSteps}
@@ -588,18 +617,24 @@ function ClientPortalContent() {
                                 className="flex-1 flex flex-col h-full z-10"
                             >
                                 {/* Detail Header */}
-                                <div className="h-24 px-8 flex items-center gap-6 border-b border-white/5 bg-[#0a0a16] flex-shrink-0 z-20">
+                                <div className={`px-4 py-3 sm:px-8 sm:h-24 sm:py-0 flex items-center gap-3 sm:gap-6 border-b flex-shrink-0 z-20 ${
+                                    isDark ? 'border-white/5 bg-[#0a0a16]' : 'border-zinc-200 bg-white'
+                                }`}>
                                     <div>
-                                        <h2 className="text-3xl font-black text-white tracking-tight uppercase flex items-center gap-3">
-                                            <Crown className="w-8 h-8 text-blue-400" />
-                                            {selectedBoard.name.replace(/fulfillment board/i, '').replace(/fullfilment board/i, '').replace(/\(inactive\)/i, '').replace(/\(CF.*?\)/i, '').replace(/\(C-F.*?\)/i, '').replace(/\(c-w-[\w-]+\)/gi, '').replace(/-/g, ' ').trim()}
+                                        <h2 className={`text-lg sm:text-3xl font-black tracking-tight uppercase flex items-center gap-2 sm:gap-3 min-w-0 ${
+                                            isDark ? 'text-white' : 'text-zinc-900'
+                                        }`}>
+                                            <Crown className={`w-8 h-8 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
+                                            <span className="truncate">{selectedBoard.name.replace(/fulfillment board/i, '').replace(/fullfilment board/i, '').replace(/\(inactive\)/i, '').replace(/\(CF.*?\)/i, '').replace(/\(C-F.*?\)/i, '').replace(/\(c-w-[\w-]+\)/gi, '').replace(/-/g, ' ').trim()}</span>
                                         </h2>
-                                        <p className="text-sm text-gray-400 font-medium">Track your project's progress and deliverables</p>
+                                        <p className={`text-xs sm:text-sm font-medium leading-snug ${
+                                            isDark ? 'text-gray-400' : 'text-zinc-600'
+                                        }`}>Track your project's progress and deliverables</p>
                                     </div>
                                 </div>
 
                                 {/* Content */}
-                                <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
+                                <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-8">
                                     <div className="max-w-7xl mx-auto pb-20">
                                         <ProjectSelectionView
                                             boardData={selectedBoard}

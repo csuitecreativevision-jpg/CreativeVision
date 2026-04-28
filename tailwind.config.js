@@ -1,3 +1,5 @@
+import plugin from 'tailwindcss/plugin';
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
@@ -34,5 +36,10 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    plugin(({ addVariant }) => {
+      /** Capacitor shell: keep portal chrome (tabs, header) even when width ≥ lg */
+      addVariant('native', '.cv-native-shell &');
+    }),
+  ],
 };
