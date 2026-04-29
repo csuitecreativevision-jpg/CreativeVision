@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { AdminPageLayout } from '../../components/layout/AdminPageLayout';
 import { fireCvSwal } from '../../lib/swalTheme';
-import { AlertTriangle, ArrowLeft, ChevronRight, CopyPlus, ExternalLink, File, FileVideo, Folder as FolderGlyph, FolderPlus, GripVertical, Info, LayoutGrid, List, Loader2, MoveRight, Pencil, Plus, RefreshCw, Save, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, ChevronRight, CopyPlus, ExternalLink, File, FileVideo, Folder as FolderGlyph, FolderPlus, GripVertical, Info, LayoutGrid, List, Loader2, MoveRight, Pencil, Plus, RefreshCw, Save, Trash2, X } from 'lucide-react';
 import { createGoogleDriveFolderTree, getGoogleDriveItemDetails, getGoogleDriveVideoStreamUrl, listGoogleDriveFolderContents, listGoogleDriveRootFolders, moveGoogleDriveItem, renameGoogleDriveItem, trashGoogleDriveItem, type DriveFolderContentItem, type DriveItemDetails, type DriveRootFolderItem } from '../../services/googleDriveFolderService';
 import Folder from '../../components/ui/Folder';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -165,6 +165,7 @@ export default function AdminClientOnboarding() {
     const [existingFolders, setExistingFolders] = useState<DriveRootFolderItem[]>([]);
     const [isLoadingFolders, setIsLoadingFolders] = useState(false);
     const [folderSearch, setFolderSearch] = useState('');
+    const [selectedRootFolderIds, setSelectedRootFolderIds] = useState<string[]>([]);
     const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
     const [dragOverNodeId, setDragOverNodeId] = useState<string | null>(null);
     const [isBuilderOpen, setIsBuilderOpen] = useState(false);
@@ -365,12 +366,15 @@ export default function AdminClientOnboarding() {
 
     const handleTrashItem = async (item: DriveFolderContentItem) => {
         const result = await fireCvSwal({
-            icon: 'warning',
             title: `Delete "${item.name}"?`,
             text: 'This will move it to Google Drive trash.',
             showCancelButton: true,
             confirmButtonText: 'Delete',
             cancelButtonText: 'Cancel',
+            customClass: {
+                confirmButton:
+                    '!rounded-xl !px-5 !py-2.5 !font-semibold !text-white !bg-red-600 hover:!bg-red-500 focus:!outline-none',
+            },
         });
         if (!result.isConfirmed) return;
 
@@ -378,6 +382,12 @@ export default function AdminClientOnboarding() {
         try {
             await trashGoogleDriveItem(item.id);
             if (currentExplorerFolder) await loadExplorerItems(currentExplorerFolder.id, explorerSearch);
+            await fireCvSwal({
+                icon: 'success',
+                title: `Deleted "${item.name}"`,
+                text: 'Folder moved to Google Drive trash.',
+                confirmButtonText: 'Done',
+            });
         } catch (error: any) {
             await fireCvSwal({
                 icon: 'error',
@@ -392,12 +402,15 @@ export default function AdminClientOnboarding() {
 
     const handleTrashRootFolder = async (folder: DriveRootFolderItem) => {
         const result = await fireCvSwal({
-            icon: 'warning',
             title: `Delete "${folder.name}"?`,
             text: 'This will move the folder to Google Drive trash.',
             showCancelButton: true,
             confirmButtonText: 'Delete',
             cancelButtonText: 'Cancel',
+            customClass: {
+                confirmButton:
+                    '!rounded-xl !px-5 !py-2.5 !font-semibold !text-white !bg-red-600 hover:!bg-red-500 focus:!outline-none',
+            },
         });
         if (!result.isConfirmed) return;
 
@@ -405,6 +418,12 @@ export default function AdminClientOnboarding() {
         try {
             await trashGoogleDriveItem(folder.id);
             await loadRootFolders(folderSearch);
+            await fireCvSwal({
+                icon: 'success',
+                title: `Deleted "${folder.name}"`,
+                text: 'Folder moved to Google Drive trash.',
+                confirmButtonText: 'Done',
+            });
         } catch (error: any) {
             await fireCvSwal({
                 icon: 'error',
@@ -460,6 +479,96 @@ export default function AdminClientOnboarding() {
         }
     };
 
+    const handleMoveSelectedRootFolders = async () => {
+        if (selectedRootFolderIds.length === 0) return;
+        const selectedSet = new Set(selectedRootFolderIds);
+        const folderCandidates = existingFolders.filter(f => !selectedSet.has(f.id));
+        if (folderCandidates.length === 0) {
+            await fireCvSwal({
+                icon: 'info',
+                title: 'No destination folders',
+                text: 'Create another root folder first, then try move again.',
+                confirmButtonText: 'OK',
+            });
+            return;
+        }
+
+        const options: Record<string, string> = {};
+        folderCandidates.forEach(f => {
+            options[f.id] = f.name;
+        });
+        const result = await fireCvSwal({
+            title: `Move ${selectedRootFolderIds.length} selected folders`,
+            input: 'select',
+            inputOptions: options,
+            inputPlaceholder: 'Select destination folder',
+            showCancelButton: true,
+            confirmButtonText: 'Move all',
+            cancelButtonText: 'Cancel',
+        });
+        const destination = String(result.value || '');
+        if (!result.isConfirmed || !destination) return;
+
+        setIsLoadingFolders(true);
+        try {
+            await Promise.all(selectedRootFolderIds.map(id => moveGoogleDriveItem(id, destination)));
+            setSelectedRootFolderIds([]);
+            await loadRootFolders(folderSearch);
+            await fireCvSwal({
+                icon: 'success',
+                title: `Moved ${selectedRootFolderIds.length} folders`,
+                confirmButtonText: 'Done',
+            });
+        } catch (error: any) {
+            await fireCvSwal({
+                icon: 'error',
+                title: 'Failed to move selected folders',
+                text: error?.message || 'Could not move one or more folders.',
+                confirmButtonText: 'OK',
+            });
+        } finally {
+            setIsLoadingFolders(false);
+        }
+    };
+
+    const handleDeleteSelectedRootFolders = async () => {
+        if (selectedRootFolderIds.length === 0) return;
+        const result = await fireCvSwal({
+            title: `Delete ${selectedRootFolderIds.length} selected folders?`,
+            text: 'This will move all selected folders to Google Drive trash.',
+            showCancelButton: true,
+            confirmButtonText: 'Delete all',
+            cancelButtonText: 'Cancel',
+            customClass: {
+                confirmButton:
+                    '!rounded-xl !px-5 !py-2.5 !font-semibold !text-white !bg-red-600 hover:!bg-red-500 focus:!outline-none',
+            },
+        });
+        if (!result.isConfirmed) return;
+
+        setIsLoadingFolders(true);
+        try {
+            await Promise.all(selectedRootFolderIds.map(id => trashGoogleDriveItem(id)));
+            setSelectedRootFolderIds([]);
+            await loadRootFolders(folderSearch);
+            await fireCvSwal({
+                icon: 'success',
+                title: `Deleted ${selectedRootFolderIds.length} folders`,
+                text: 'Folders moved to Google Drive trash.',
+                confirmButtonText: 'Done',
+            });
+        } catch (error: any) {
+            await fireCvSwal({
+                icon: 'error',
+                title: 'Failed to delete selected folders',
+                text: error?.message || 'Could not delete one or more folders.',
+                confirmButtonText: 'OK',
+            });
+        } finally {
+            setIsLoadingFolders(false);
+        }
+    };
+
     const openContextMenuItem = async (menuItem: ContextMenuItem) => {
         if (menuItem.mimeType === 'application/vnd.google-apps.folder') {
             if (menuItem.source === 'root') {
@@ -496,16 +605,24 @@ export default function AdminClientOnboarding() {
 
     const onCardContextMenu = (e: React.MouseEvent, item: ContextMenuItem) => {
         e.preventDefault();
+        if (selectedRootFolderIds.length > 0 && item.source === 'root') return;
         openContextMenuAt(e.clientX, e.clientY, item);
     };
 
     const onCardTouchStart = (e: React.TouchEvent, item: ContextMenuItem) => {
+        if (selectedRootFolderIds.length > 0 && item.source === 'root') return;
         clearLongPress();
         const t = e.touches[0];
         longPressTimerRef.current = window.setTimeout(() => {
             openContextMenuAt(t.clientX, t.clientY, item);
             longPressTimerRef.current = null;
         }, 450);
+    };
+
+    const toggleRootFolderSelection = (folderId: string) => {
+        setSelectedRootFolderIds(prev =>
+            prev.includes(folderId) ? prev.filter(id => id !== folderId) : [...prev, folderId]
+        );
     };
 
     const toExplorerItem = (folder: DriveRootFolderItem): DriveFolderContentItem => ({
@@ -638,17 +755,24 @@ export default function AdminClientOnboarding() {
                 mainFolderName: folderName,
                 foldersTree: payloadTree,
             });
-            const swalResult = await fireCvSwal({
+            await fireCvSwal({
                 icon: 'success',
-                title: 'Client folder structure created',
-                html: `Main folder: <b>${result.mainFolderName}</b><br/><br/>Created <b>${countNodes(result.foldersTree)}</b> nested folders.`,
-                confirmButtonText: 'Open Main Folder',
-                showCancelButton: true,
-                cancelButtonText: 'Close',
+                title: `Successfully created folder "${result.mainFolderName}"`,
+                html: `
+                    <div style="display:flex;align-items:center;justify-content:center;gap:8px;">
+                      <span style="font-size:18px;display:inline-block;animation:cvFolderPop .75s ease-out;">📁</span>
+                      <span style="font-size:12px;opacity:.95;">Created ${countNodes(result.foldersTree)} folders in structure.</span>
+                    </div>
+                    <style>
+                      @keyframes cvFolderPop {
+                        0% { transform: scale(.8) translateY(4px); opacity: .2; }
+                        60% { transform: scale(1.12) translateY(-2px); opacity: 1; }
+                        100% { transform: scale(1) translateY(0); opacity: 1; }
+                      }
+                    </style>
+                `,
+                confirmButtonText: 'Done',
             });
-            if (swalResult.isConfirmed) {
-                window.open(result.mainFolderUrl, '_blank', 'noopener,noreferrer');
-            }
             setIsBuilderOpen(false);
             await loadRootFolders(folderSearch);
         } catch (error: any) {
@@ -800,7 +924,6 @@ export default function AdminClientOnboarding() {
                         Refresh
                     </button>
                 </div>
-
                 {existingFolders.length === 0 ? (
                     <div className="py-16 text-center text-[12px] text-white/35">No folders found for current root/search.</div>
                 ) : (
@@ -808,7 +931,7 @@ export default function AdminClientOnboarding() {
                         {existingFolders.map((folder, index) => (
                             <div
                                 key={`${folder.id}-${folderGridRenderKey}`}
-                                className="flex flex-col items-center gap-2 group"
+                                className="flex flex-col items-center gap-2 group relative"
                                 onContextMenu={e =>
                                     onCardContextMenu(e, {
                                         id: folder.id,
@@ -831,6 +954,37 @@ export default function AdminClientOnboarding() {
                                 onTouchMove={clearLongPress}
                                 onTouchCancel={clearLongPress}
                             >
+                                <button
+                                    type="button"
+                                    onClick={e => {
+                                        e.stopPropagation();
+                                        setContextMenu(null);
+                                        toggleRootFolderSelection(folder.id);
+                                    }}
+                                    className={`absolute left-0 top-0 z-10 inline-flex items-center gap-1 rounded-md border px-1.5 py-1 text-[10px] transition-all ${
+                                        selectedRootFolderIds.includes(folder.id)
+                                            ? isDark
+                                                ? 'border-violet-400/60 bg-violet-500/25 text-violet-100 opacity-100'
+                                                : 'border-violet-400 bg-violet-100 text-violet-800 opacity-100'
+                                            : selectedRootFolderIds.length > 0
+                                              ? isDark
+                                                  ? 'border-white/[0.16] bg-[#111425]/85 text-white/75 opacity-100'
+                                                  : 'border-zinc-300 bg-white/95 text-zinc-700 opacity-100'
+                                              : isDark
+                                                ? 'border-white/[0.16] bg-[#111425]/85 text-white/75 opacity-0 group-hover:opacity-100'
+                                                : 'border-zinc-300 bg-white/95 text-zinc-700 opacity-0 group-hover:opacity-100'
+                                    }`}
+                                    title="Select folder"
+                                >
+                                    <span className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm border ${
+                                        selectedRootFolderIds.includes(folder.id)
+                                            ? isDark ? 'border-violet-300 bg-violet-400/50' : 'border-violet-400 bg-violet-400/20'
+                                            : isDark ? 'border-white/45' : 'border-zinc-400'
+                                    }`}>
+                                        {selectedRootFolderIds.includes(folder.id) ? <Check className="w-2.5 h-2.5" /> : null}
+                                    </span>
+                                    Select
+                                </button>
                                 <div style={{ width: 100, height: 110, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
                                     <div
                                         onContextMenu={e =>
@@ -876,12 +1030,73 @@ export default function AdminClientOnboarding() {
                     </div>
                 )}
             </div>
+            <AnimatePresence>
+                {selectedRootFolderIds.length > 0 ? (
+                    <motion.div
+                        className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+5rem)] xl:bottom-8 z-[135] flex justify-center px-3 sm:px-8"
+                        initial={{ opacity: 0, y: 28, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 20, scale: 0.97 }}
+                        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                    >
+                        <div className={`w-full max-w-md sm:w-auto sm:max-w-[calc(100vw-4rem)] rounded-2xl border px-3 py-3 sm:px-5 sm:py-4 shadow-2xl ${
+                            isDark ? 'border-violet-500/35 bg-[#101426]/95 backdrop-blur-sm' : 'border-violet-300 bg-white/95 backdrop-blur-sm'
+                        }`}>
+                            <div className="flex flex-col gap-2 sm:inline-flex sm:flex-row sm:items-center sm:gap-2.5 text-[13px] max-w-full">
+                                <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap">
+                                    <span className={`font-semibold ${isDark ? 'text-violet-100' : 'text-violet-800'}`}>
+                                        {selectedRootFolderIds.length} folder{selectedRootFolderIds.length > 1 ? 's' : ''} selected
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedRootFolderIds(existingFolders.map(f => f.id))}
+                                        className={`rounded-lg px-3 py-1.5 text-[11px] font-semibold ${
+                                            isDark ? 'bg-violet-500/20 text-violet-100 hover:bg-violet-500/30' : 'bg-violet-100 text-violet-800 hover:bg-violet-200'
+                                        }`}
+                                    >
+                                        Select all
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedRootFolderIds([])}
+                                        className={`rounded-lg px-3 py-1.5 text-[11px] font-semibold ${
+                                            isDark ? 'bg-white/[0.08] text-white/80 hover:bg-white/[0.14]' : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
+                                        }`}
+                                    >
+                                        Unselect all
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-2.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleMoveSelectedRootFolders()}
+                                        className={`rounded-lg px-3 py-2 text-[11px] font-semibold text-center ${
+                                            isDark ? 'bg-cyan-500/20 text-cyan-100 hover:bg-cyan-500/30' : 'bg-cyan-100 text-cyan-800 hover:bg-cyan-200'
+                                        }`}
+                                    >
+                                        Move selected
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleDeleteSelectedRootFolders()}
+                                        className={`rounded-lg px-3 py-2 text-[11px] font-semibold text-center ${
+                                            isDark ? 'bg-red-500/20 text-red-100 hover:bg-red-500/30' : 'bg-red-100 text-red-800 hover:bg-red-200'
+                                        }`}
+                                    >
+                                        Delete selected
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+                ) : null}
+            </AnimatePresence>
 
             <AnimatePresence>
                 {isExplorerOpen && (
                     <motion.div
-                        className={`fixed inset-0 z-[119] flex items-center justify-center p-4 ${
-                            isDark ? 'bg-black/70 backdrop-blur-sm' : 'bg-zinc-900/35 backdrop-blur-[2px]'
+                        className={`fixed inset-0 z-[119] flex items-center justify-center px-4 py-5 sm:p-5 ${
+                            isDark ? 'bg-black/75 backdrop-blur-sm' : 'bg-black/45 backdrop-blur-[2px]'
                         }`}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -889,10 +1104,10 @@ export default function AdminClientOnboarding() {
                         transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
                     >
                         <motion.div
-                            className={`w-full max-w-6xl h-[calc(100vh-7rem)] sm:h-[88vh] overflow-hidden rounded-2xl p-4 sm:p-6 space-y-4 mt-16 sm:mt-0 ${
+                            className={`w-full max-w-5xl h-[calc(100vh-7rem)] sm:h-[84vh] overflow-hidden rounded-2xl p-3.5 sm:p-5 space-y-4 mt-16 sm:mt-0 shadow-2xl ${
                                 isDark
-                                    ? 'border border-white/[0.12] bg-[#0d0d18]'
-                                    : 'border border-zinc-200 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.18)]'
+                                    ? 'border border-white/[0.1] bg-[#0c0c10]'
+                                    : 'border border-zinc-300 bg-white'
                             }`}
                             initial={{ opacity: 0, y: 20, scale: 0.98 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -1162,8 +1377,8 @@ export default function AdminClientOnboarding() {
                 )}
                 {isBuilderOpen && (
                     <motion.div
-                        className={`fixed inset-0 z-[120] flex items-center justify-center p-4 ${
-                            isDark ? 'bg-black/70 backdrop-blur-sm' : 'bg-zinc-900/35 backdrop-blur-[2px]'
+                        className={`fixed inset-0 z-[120] flex items-center justify-center px-4 py-5 sm:p-5 ${
+                            isDark ? 'bg-black/75 backdrop-blur-sm' : 'bg-black/45 backdrop-blur-[2px]'
                         }`}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -1171,10 +1386,10 @@ export default function AdminClientOnboarding() {
                         transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
                     >
                         <motion.div
-                            className={`w-full max-w-3xl max-h-[90vh] overflow-auto rounded-2xl p-5 sm:p-6 space-y-5 ${
+                            className={`w-full max-w-2xl max-h-[86vh] overflow-auto rounded-2xl p-4 sm:p-5 space-y-4 shadow-2xl ${
                                 isDark
-                                    ? 'border border-white/[0.12] bg-[#0d0d18]'
-                                    : 'border border-zinc-200 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.18)]'
+                                    ? 'border border-white/[0.1] bg-[#0c0c10]'
+                                    : 'border border-zinc-300 bg-white'
                             }`}
                             initial={{ opacity: 0, y: 24, scale: 0.975 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -1312,8 +1527,8 @@ export default function AdminClientOnboarding() {
                 )}
                 {previewVideo && (
                     <motion.div
-                        className={`fixed inset-0 z-[121] flex items-center justify-center p-4 ${
-                            isDark ? 'bg-black/80 backdrop-blur-sm' : 'bg-zinc-900/40 backdrop-blur-[2px]'
+                        className={`fixed inset-0 z-[121] flex items-center justify-center px-4 py-5 sm:p-5 ${
+                            isDark ? 'bg-black/75 backdrop-blur-sm' : 'bg-black/45 backdrop-blur-[2px]'
                         }`}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -1321,8 +1536,8 @@ export default function AdminClientOnboarding() {
                         transition={{ duration: 0.22 }}
                     >
                         <motion.div
-                            className={`w-full max-w-5xl rounded-2xl p-4 sm:p-5 ${
-                                isDark ? 'bg-[#0b0d18] border border-white/[0.12]' : 'bg-white border border-zinc-200'
+                            className={`w-full max-w-4xl rounded-2xl p-3.5 sm:p-5 shadow-2xl ${
+                                isDark ? 'bg-[#0c0c10] border border-white/[0.1]' : 'bg-white border border-zinc-300'
                             }`}
                             initial={{ opacity: 0, y: 20, scale: 0.98 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -1371,8 +1586,8 @@ export default function AdminClientOnboarding() {
                 )}
                 {isDetailsOpen && detailsItem && (
                     <motion.div
-                        className={`fixed inset-0 z-[121] flex items-center justify-center p-4 ${
-                            isDark ? 'bg-black/80 backdrop-blur-sm' : 'bg-zinc-900/40 backdrop-blur-[2px]'
+                        className={`fixed inset-0 z-[121] flex items-center justify-center px-4 py-5 sm:p-5 ${
+                            isDark ? 'bg-black/75 backdrop-blur-sm' : 'bg-black/45 backdrop-blur-[2px]'
                         }`}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -1380,8 +1595,8 @@ export default function AdminClientOnboarding() {
                         transition={{ duration: 0.22 }}
                     >
                         <motion.div
-                            className={`w-full max-w-2xl rounded-2xl p-4 sm:p-5 ${
-                                isDark ? 'bg-[#0b0d18] border border-white/[0.12]' : 'bg-white border border-zinc-200'
+                            className={`w-full max-w-xl rounded-2xl p-3.5 sm:p-5 shadow-2xl ${
+                                isDark ? 'bg-[#0c0c10] border border-white/[0.1]' : 'bg-white border border-zinc-300'
                             }`}
                             initial={{ opacity: 0, y: 20, scale: 0.98 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}

@@ -1215,7 +1215,7 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className={`fixed inset-0 z-[101] flex items-center justify-center p-4 ${isDark ? 'bg-black/70' : 'bg-black/35'}`}
+                        className={`fixed inset-0 z-[220] flex items-center justify-center p-4 ${isDark ? 'bg-black/75 backdrop-blur-sm' : 'bg-black/45 backdrop-blur-[2px]'}`}
                         onClick={() => !saving && setArchiveModalOpen(false)}
                     >
                         <motion.div
@@ -1330,7 +1330,7 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70"
+                        className="fixed inset-0 z-[210] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
                         onClick={() => !saving && setMainModal(null)}
                     >
                         <motion.div

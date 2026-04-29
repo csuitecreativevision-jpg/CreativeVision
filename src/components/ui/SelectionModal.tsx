@@ -57,7 +57,7 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className={`fixed inset-0 backdrop-blur-sm ${isDark ? 'bg-black/60' : 'bg-black/35'}`}
+                        className={`fixed inset-0 ${isDark ? 'bg-black/75 backdrop-blur-sm' : 'bg-black/45 backdrop-blur-[2px]'}`}
                         style={{ zIndex: PORTAL_Z_BACKDROP }}
                     />
 
@@ -69,27 +69,32 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
                             className={`rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col pointer-events-auto overflow-hidden ${
-                                isDark ? 'bg-[#1A1A2E] border border-white/10' : 'bg-white border border-zinc-200'
+                                isDark ? 'bg-[#0c0c10] border border-white/[0.1]' : 'bg-white border border-zinc-300'
                             }`}
                             onClick={(e) => e.stopPropagation()}
                         >
                             {/* Header */}
-                            <div className={`p-6 border-b flex items-center justify-between ${isDark ? 'border-white/10 bg-white/5' : 'border-zinc-200 bg-zinc-50'}`}>
+                            <div className={`p-5 border-b flex items-center justify-between ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-zinc-200 bg-zinc-50/80'}`}>
                                 <div className="flex items-center gap-3">
-                                    {Icon && <Icon className={`w-6 h-6 ${isDark ? 'text-violet-400' : 'text-zinc-600'}`} />}
-                                    <h3 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-zinc-900'}`}>{title}</h3>
+                                    {Icon && <Icon className={`w-5 h-5 ${isDark ? 'text-violet-300' : 'text-violet-600'}`} />}
+                                    <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-zinc-900'}`}>{title}</h3>
                                 </div>
                                 <button
                                     onClick={onClose}
-                                    className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10 text-gray-400 hover:text-white' : 'hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
+                                    className={`h-8 w-8 inline-flex items-center justify-center rounded-lg border transition-colors ${
+                                        isDark
+                                            ? 'border-white/[0.14] text-white/60 hover:text-white hover:border-white/30'
+                                            : 'border-zinc-300 text-zinc-500 hover:text-zinc-900 hover:border-zinc-400'
+                                    }`}
                                 >
-                                    <X className="w-5 h-5" />
+                                    <X className="w-4 h-4" />
                                 </button>
                             </div>
 
                             {/* Search Bar */}
-                            <div className={`p-4 border-b ${isDark ? 'border-white/5 bg-[#151525]' : 'border-zinc-200 bg-zinc-50'}`}>
+                            <div className={`p-4 border-b ${isDark ? 'border-white/[0.08] bg-white/[0.02]' : 'border-zinc-200 bg-zinc-50/70'}`}>
                                 <div className="relative">
                                     <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isDark ? 'text-gray-400' : 'text-zinc-500'}`} />
                                     <input
@@ -97,10 +102,10 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
                                         placeholder={`Search ${title.toLowerCase()}...`}
-                                        className={`w-full border rounded-xl pl-10 pr-4 py-3 focus:outline-none transition-colors ${
+                                        className={`w-full border rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none transition-colors ${
                                             isDark
-                                                ? 'bg-[#0E0E1A] border-white/10 text-white focus:border-violet-500 placeholder:text-gray-600'
-                                                : 'bg-white border-zinc-200 text-zinc-900 focus:border-zinc-500 placeholder:text-zinc-500'
+                                                ? 'bg-[#0d1020] border-white/[0.14] text-white focus:border-violet-500/60 placeholder:text-white/35'
+                                                : 'bg-white border-zinc-300 text-zinc-900 focus:border-violet-500 placeholder:text-zinc-500'
                                         }`}
                                         autoFocus={!isMobile}
                                     />
@@ -108,7 +113,7 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
                             </div>
 
                             {/* Options Grid */}
-                            <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
+                            <div className="p-4 sm:p-5 overflow-y-auto custom-scrollbar flex-1">
                                 {filteredOptions.length > 0 ? (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         {filteredOptions.map((option) => (
@@ -122,18 +127,18 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
                                                     group relative flex items-center justify-between p-4 rounded-xl border text-left transition-all duration-200
                                                     ${selected === option
                                                         ? (isDark
-                                                            ? 'bg-violet-500/20 border-violet-500/50 shadow-[0_0_15px_rgba(139,92,246,0.15)]'
-                                                            : 'bg-zinc-100 border-zinc-300')
+                                                            ? 'bg-violet-500/18 border-violet-500/45'
+                                                            : 'bg-violet-50 border-violet-300')
                                                         : (isDark
-                                                            ? 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'
-                                                            : 'bg-white border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300')
+                                                            ? 'bg-white/[0.04] border-white/[0.08] hover:bg-white/[0.07] hover:border-white/[0.14]'
+                                                            : 'bg-zinc-50/70 border-zinc-200 hover:bg-zinc-100/80 hover:border-zinc-300')
                                                     }
                                                 `}
                                             >
                                                 <span className={`font-semibold ${
                                                     selected === option
-                                                        ? (isDark ? 'text-white' : 'text-zinc-900')
-                                                        : (isDark ? 'text-gray-300 group-hover:text-white' : 'text-zinc-700 group-hover:text-zinc-900')
+                                                            ? (isDark ? 'text-white' : 'text-zinc-900')
+                                                            : (isDark ? 'text-white/80 group-hover:text-white' : 'text-zinc-700 group-hover:text-zinc-900')
                                                 }`}>
                                                     {option}
                                                 </span>
@@ -141,7 +146,7 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
                                                     <motion.div
                                                         initial={{ scale: 0 }}
                                                         animate={{ scale: 1 }}
-                                                        className={`rounded-full p-1 ${isDark ? 'bg-violet-500' : 'bg-zinc-700'}`}
+                                                        className={`rounded-full p-1 ${isDark ? 'bg-violet-500' : 'bg-violet-600'}`}
                                                     >
                                                         <Check className="w-3 h-3 text-white" />
                                                     </motion.div>
@@ -157,8 +162,8 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
                             </div>
 
                             {/* Footer */}
-                            <div className={`p-4 border-t text-xs text-center uppercase tracking-wider shrink-0 ${
-                                isDark ? 'bg-white/5 border-white/10 text-gray-500' : 'bg-zinc-50 border-zinc-200 text-zinc-500'
+                            <div className={`p-3.5 border-t text-[11px] text-center uppercase tracking-wider shrink-0 ${
+                                isDark ? 'bg-white/[0.03] border-white/[0.08] text-white/35' : 'bg-zinc-50/90 border-zinc-200 text-zinc-500'
                             }`}>
                                 {filteredOptions.length} Options Available
                             </div>
