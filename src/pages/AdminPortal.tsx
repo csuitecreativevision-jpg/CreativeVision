@@ -11,6 +11,7 @@ import {
     LayoutList,
     Table,
     FilePlus,
+    FolderPlus,
     CheckSquare,
     TrendingUp,
     Rocket,
@@ -145,6 +146,7 @@ function AdminPortalContent() {
         const path = location.pathname;
         if (path.includes('overview')) return 'Overview';
         if (path.includes('assign-project')) return 'Assign Project';
+        if (path.includes('client-onboarding')) return 'Client Onboarding';
         if (path.includes('leave-approvals')) return 'Leave Approvals';
         if (path.includes('approvals')) return 'Approvals';
         if (path.includes('deployed-projects')) return 'Deployed Projects';
@@ -291,6 +293,7 @@ function AdminPortalContent() {
                                 label="Management Hub"
                                 active={
                                     activeTab === 'Assign Project' ||
+                                    activeTab === 'Client Onboarding' ||
                                     activeTab === 'Boards' ||
                                     activeTab === 'Approvals' ||
                                     activeTab === 'Deployed Projects' ||
@@ -307,6 +310,12 @@ function AdminPortalContent() {
                                     label="Assign Project"
                                     active={activeTab === 'Assign Project'}
                                     onClick={() => navigate('/admin-portal/assign-project')}
+                                />
+                                <SidebarItem
+                                    icon={<FolderPlus className="w-4 h-4" />}
+                                    label="Client Onboarding"
+                                    active={activeTab === 'Client Onboarding'}
+                                    onClick={() => navigate('/admin-portal/client-onboarding')}
                                 />
                                 <SidebarItem
                                     icon={<Table className="w-4 h-4" />}

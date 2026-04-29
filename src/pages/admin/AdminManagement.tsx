@@ -9,7 +9,8 @@ import {
     ArrowRight,
     ArrowLeft,
     CheckSquare,
-    MonitorCheck
+    MonitorCheck,
+    FolderPlus
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import AdminAnalytics from './AdminAnalytics';
@@ -28,6 +29,15 @@ export default function AdminManagement() {
             action: () => navigate('/admin-portal/assign-project'),
             gradient: 'from-violet-500/20 to-fuchsia-500/20',
             border: 'group-hover:border-violet-500/50'
+        },
+        {
+            id: 'client-onboarding',
+            title: 'Client Onboarding',
+            description: 'Create Google Drive main folder and subfolder structure for new clients.',
+            icon: <FolderPlus className="w-8 h-8 text-fuchsia-300" />,
+            action: () => navigate('/admin-portal/client-onboarding'),
+            gradient: 'from-fuchsia-500/20 to-violet-500/20',
+            border: 'group-hover:border-fuchsia-500/50'
         },
         {
             id: 'approvals',
