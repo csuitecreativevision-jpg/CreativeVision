@@ -1595,6 +1595,40 @@ export async function createDocInColumn(
     }
 }
 
+/** Match portal editor names to Monday `users` names (spacing / case). */
+function normalizeMondayPersonName(s: string): string {
+    return String(s || '')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+/**
+ * Pick the People column that should receive the assigned editor.
+ * Boards often rename columns ("Assignee", "Team member"); strict `title === 'editor'` misses them.
+ */
+function findPeopleColumnForEditorAssignment(columns: any[]): any | undefined {
+    const peopleCols = (columns || []).filter((c: any) => c?.type === 'people');
+    if (peopleCols.length === 0) return undefined;
+    const titleOf = (c: any) => String(c?.title || '').toLowerCase().trim();
+    const rank = (c: any) => {
+        const t = titleOf(c);
+        if (t === 'editor') return 100;
+        if (t.includes('editor')) return 90;
+        if (t.includes('assignee') || t.includes('assigned to')) return 85;
+        if (t.includes('team member') || t.includes('video editor')) return 82;
+        if (t.includes('owner') && !t.includes('client')) return 78;
+        if (t.includes('person') && !t.includes('subitem')) return 45;
+        if (t.includes('checker') || t.includes('qc') || t.includes('quality')) return -100;
+        return 0;
+    };
+    if (peopleCols.length === 1) return peopleCols[0];
+    const sorted = [...peopleCols].sort((a, b) => rank(b) - rank(a));
+    const best = sorted[0];
+    if (rank(best) < 0) return undefined;
+    return best;
+}
+
 export async function submitProjectAssignment(
     boardId: string,
     groupId: string,
@@ -1672,29 +1706,25 @@ export async function submitProjectAssignment(
 
     // Editor Logic for VE Board: Assign to People column only
     if (data.editor) {
-        // Find the People column (usually named "Editor")
-        const peopleCol = columns.find((c: any) => c.type === 'people' && c.title.toLowerCase() === 'editor')
-            || columns.find((c: any) => c.type === 'people' && c.title.toLowerCase().includes('editor'));
+        const peopleCol = findPeopleColumnForEditorAssignment(columns);
 
-        // Assign to People Column
         if (peopleCol) {
             try {
                 const allUsers = await getUsers();
-                // data.editor is the clean name "John Mark Ormido"
+                const edNorm = normalizeMondayPersonName(data.editor);
 
-                // Try exact lowercase match first
-                let matchedUser = allUsers.find((u: any) => u.name.toLowerCase() === data.editor?.toLowerCase());
+                let matchedUser = allUsers.find((u: any) => normalizeMondayPersonName(u.name) === edNorm);
 
-                // If not found, try a looser includes match (e.g. "John" in "John Mark")
                 if (!matchedUser && data.editor) {
-                    matchedUser = allUsers.find((u: any) =>
-                        u.name.toLowerCase().includes(data.editor!.toLowerCase()) ||
-                        data.editor!.toLowerCase().includes(u.name.toLowerCase())
-                    );
+                    matchedUser = allUsers.find((u: any) => {
+                        const un = normalizeMondayPersonName(u.name);
+                        return un.includes(edNorm) || edNorm.includes(un);
+                    });
                 }
 
                 if (matchedUser) {
-                    // Verify the user is actually a board member before assigning
+                    // Do not gate on owners/subscribers: Monday often returns an incomplete list, which caused
+                    // silent skips ("assigned" in portal but empty People column). The API will reject if invalid.
                     try {
                         const boardMembersQuery = `query { boards(ids: [${boardId}]) { owners { id } subscribers { id } } }`;
                         const boardMembersData = await mondayRequest(boardMembersQuery);
@@ -1703,26 +1733,33 @@ export async function submitProjectAssignment(
                             ...(board?.owners || []).map((u: any) => String(u.id)),
                             ...(board?.subscribers || []).map((u: any) => String(u.id))
                         ]);
-
                         if (memberIds.size > 0 && !memberIds.has(String(matchedUser.id))) {
-                            console.warn(`Editor '${data.editor}' (ID: ${matchedUser.id}) is not a member of board ${boardId}. Skipping people column assignment.`);
-                        } else {
-                            columnValues[peopleCol.id] = { personsAndTeams: [{ id: Number(matchedUser.id), kind: "person" }] };
-                            console.log(`Successfully mapped editor '${data.editor}' to Monday ID: ${matchedUser.id}`);
+                            console.warn(
+                                `[Monday] Editor '${data.editor}' (user id ${matchedUser.id}) not in owners/subscribers snapshot for board ${boardId}; assigning anyway.`
+                            );
                         }
                     } catch (memberErr) {
-                        // If board member check fails, attempt the assignment anyway
-                        console.warn('Could not verify board membership, attempting assignment:', memberErr);
-                        columnValues[peopleCol.id] = { personsAndTeams: [{ id: Number(matchedUser.id), kind: "person" }] };
+                        console.warn('[Monday] Could not load board members for logging:', memberErr);
                     }
+
+                    const pid = Number(matchedUser.id);
+                    columnValues[peopleCol.id] = { personsAndTeams: [{ id: pid, kind: 'person' }] };
+                    console.log(`[Monday] People column "${peopleCol.title}" (${peopleCol.id}) ← user ${matchedUser.name} (${pid})`);
                 } else {
-                    console.warn(`Could not find Monday User ID for editor: ${data.editor}. Available users: `, allUsers.map((u: any) => u.name).join(', '));
+                    console.warn(
+                        `Could not find Monday User ID for editor: "${data.editor}". ` +
+                            `Check spelling vs. Monday account name. Users sample: `,
+                        allUsers.slice(0, 40).map((u: any) => u.name).join(', ')
+                    );
                 }
             } catch (err) {
-                console.error("Failed to map editor to User ID", err);
+                console.error('Failed to map editor to User ID', err);
             }
         } else {
-            console.warn("Could not find a 'People' column for Editor mapping.");
+            console.warn(
+                'Could not find a People column to assign the editor. ' +
+                    'Add a Person column on the VE board (e.g. titled Editor or Assignee), then try again.'
+            );
         }
     }
 
@@ -1869,7 +1906,7 @@ export async function getBoardItemsByView(boardId: string, viewName: string) {
 }
 
 export async function getApprovalItems(forceSync: boolean = false) {
-    return getCachedOrFetch('approval_items', async () => {
+    return getCachedOrFetch('approval_items_v2', async () => {
         return getApprovalItemsFresh(forceSync);
     }, true, forceSync);
 }
@@ -2085,6 +2122,19 @@ function resolveWorkspaceClientName(item: any, clientCol: any): string {
     return String(clientVal?.display_value || clientVal?.text || '').trim();
 }
 
+/** Monday item ids are account-unique; same board can still be processed twice if `boardIds` had duplicates. */
+function dedupeListByMondayItemId<T extends { id: string | number }>(items: T[]): T[] {
+    const seen = new Set<string>();
+    const out: T[] = [];
+    for (const it of items) {
+        const k = String(it.id);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        out.push(it);
+    }
+    return out;
+}
+
 function isDeadlineDateTimePassed(dueDate: Date | null, now: Date): boolean {
     return !!(dueDate && !Number.isNaN(dueDate.getTime()) && dueDate.getTime() < now.getTime());
 }
@@ -2111,16 +2161,16 @@ function bucketEditorApprovalDeadline(
 
 export async function getDueTodayItems(forceSync: boolean = false) {
     // v3: Due Today = full calendar day (not hiding rows after due time — those were missing from both lists).
-    return getCachedOrFetch('due_today_items_v3', async () => {
+    return getCachedOrFetch('due_today_items_v4', async () => {
         const allWorkspaceBoards = await getWorkspaceBoards(forceSync);
         const workspaceBoards = allWorkspaceBoards.filter((b: any) =>
             b.name.toLowerCase().includes('- workspace')
         );
-        const boardIds = workspaceBoards.map((b: any) => b.id);
+        const boardIds: string[] = Array.from(new Set(workspaceBoards.map((b: any) => String(b.id))));
         const boardsWithItems = await getMultipleBoardItems(boardIds, forceSync);
 
         const now = new Date();
-        const todayYmd = todaysYmdManila(now);
+        const todayYmd = todaysYmdManila();
         const dueItems: any[] = [];
 
         const pickBestDeadlineColumn = (cols: any[], sampleItem?: any) => {
@@ -2217,7 +2267,7 @@ export async function getDueTodayItems(forceSync: boolean = false) {
             const bx = new Date((b as { dueAt?: string }).dueAt || 0).getTime();
             return (Number.isNaN(ax) ? 0 : ax) - (Number.isNaN(bx) ? 0 : bx);
         });
-        return dueItems;
+        return dedupeListByMondayItemId(dueItems);
     }, true, forceSync);
 }
 
@@ -2231,12 +2281,12 @@ function isApprovedStatusHideFromDueYesterday(progressStatus: string): boolean {
 
 /** Calendar yesterday in Asia/Manila — follow-up list for admin approvals. */
 export async function getDueYesterdayItems(forceSync: boolean = false) {
-    return getCachedOrFetch('due_yesterday_items', async () => {
+    return getCachedOrFetch('due_yesterday_items_v2', async () => {
         const allWorkspaceBoards = await getWorkspaceBoards(forceSync);
         const workspaceBoards = allWorkspaceBoards.filter((b: any) =>
             b.name.toLowerCase().includes('- workspace')
         );
-        const boardIds = workspaceBoards.map((b: any) => b.id);
+        const boardIds: string[] = Array.from(new Set(workspaceBoards.map((b: any) => String(b.id))));
         const boardsWithItems = await getMultipleBoardItems(boardIds, forceSync);
 
         const now = new Date();
@@ -2337,7 +2387,7 @@ export async function getDueYesterdayItems(forceSync: boolean = false) {
             const bx = new Date((b as { dueAt?: string }).dueAt || 0).getTime();
             return (Number.isNaN(ax) ? 0 : ax) - (Number.isNaN(bx) ? 0 : bx);
         });
-        return dueItems;
+        return dedupeListByMondayItemId(dueItems);
     }, true, forceSync);
 }
 
@@ -2350,7 +2400,7 @@ async function getApprovalItemsFresh(forceSync: boolean = false) {
     );
 
     // 2. Fetch Items
-    const boardIds = workspaceBoards.map((b: any) => b.id);
+    const boardIds: string[] = Array.from(new Set(workspaceBoards.map((b: any) => String(b.id))));
     const boardsWithItems = await getMultipleBoardItems(boardIds, forceSync);
 
     const approvalItems: any[] = [];
@@ -2513,5 +2563,5 @@ async function getApprovalItemsFresh(forceSync: boolean = false) {
         });
     });
 
-    return approvalItems;
+    return dedupeListByMondayItemId(approvalItems);
 }

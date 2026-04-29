@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Search, Check, LucideIcon } from 'lucide-react';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { usePortalThemeOptional } from '../../contexts/PortalThemeContext';
+
+/** Above portal chrome (mobile header z-60, deployment modals ~110, assistant ~999999); below notification takeover (z-[1000010]+). */
+const PORTAL_Z_BACKDROP = 1_000_000;
+const PORTAL_Z_CONTENT = 1_000_001;
 
 interface SelectionModalProps {
     isOpen: boolean;
@@ -37,21 +42,29 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
         opt.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    return (
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    const modalTree = (
         <AnimatePresence>
             {isOpen && (
                 <>
-                    {/* Backdrop */}
+                    {/* Backdrop — portaled so overflow/stacking on page layout cannot clip or sit above fixed chrome */}
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className={`fixed inset-0 backdrop-blur-sm z-50 ${isDark ? 'bg-black/60' : 'bg-black/35'}`}
+                        className={`fixed inset-0 backdrop-blur-sm ${isDark ? 'bg-black/60' : 'bg-black/35'}`}
+                        style={{ zIndex: PORTAL_Z_BACKDROP }}
                     />
 
-                    {/* Modal Content */}
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+                    <div
+                        className="fixed inset-0 flex items-center justify-center p-4 pointer-events-none"
+                        style={{ zIndex: PORTAL_Z_CONTENT }}
+                    >
                         <motion.div
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -155,4 +168,7 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
             )}
         </AnimatePresence>
     );
+
+    if (!mounted) return null;
+    return createPortal(modalTree, document.body);
 };

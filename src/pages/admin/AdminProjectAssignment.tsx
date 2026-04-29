@@ -26,7 +26,8 @@ import {
     ListChecks,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getAllBoards, getBoardColumns, getBoardGroups, submitProjectAssignment } from '../../services/mondayService';
+import { getAllBoards, getAllFolders, getBoardColumns, getBoardGroups, submitProjectAssignment } from '../../services/mondayService';
+import { useRefresh } from '../../contexts/RefreshContext';
 import { RichTextEditor } from '../../components/ui/RichTextEditor';
 import { announceAssignment } from '../../services/discordService';
 import { getAllCheckers, Checker } from '../../services/boardsService';
@@ -148,8 +149,21 @@ const BulkToggle = ({ label, checked, onChange }: { label: string; checked: bool
 );
 
 // ────────────────────────────────────────────────────────────────────────────
+/** Match Admin → Clients display names from fulfillment board titles. */
+function cleanClientBoardName(name: string): string {
+    return name
+        .replace(/fulfillment board/i, '')
+        .replace(/fullfilment board/i, '')
+        .replace(/\(inactive\)/i, '')
+        .replace(/\(CF.*?\)/i, '')
+        .replace(/\(C-F.*?\)/i, '')
+        .replace(/-/g, ' ')
+        .trim();
+}
+
 export default function AdminProjectAssignment() {
     const navigate = useNavigate();
+    const { refreshKey } = useRefresh();
     const [step, setStep] = useState(1);
     const [activeModal, setActiveModal] = useState<'status' | 'type' | 'priority' | 'client' | 'team' | 'checker' | null>(null);
 
@@ -185,6 +199,8 @@ export default function AdminProjectAssignment() {
     const timeHourListRef = useRef<HTMLDivElement>(null);
     const timeMinuteListRef = useRef<HTMLDivElement>(null);
     const deadlinePickerRef = useRef<HTMLDivElement>(null);
+    /** Avoid re-applying Monday defaults when refreshKey refetches lists mid-form. */
+    const didApplyMondayDefaultsRef = useRef(false);
 
     const initialProjectState = {
         projectName: '', projectStatus: 'Unassigned', projectType: '', client: '',
@@ -317,8 +333,10 @@ export default function AdminProjectAssignment() {
     useEffect(() => {
         const fetchData = async () => {
             setLoadingClients(true);
+            const forceMondaySync = refreshKey > 0;
+            const shouldApplyDefaults = !didApplyMondayDefaultsRef.current;
             try {
-                const boards = await getAllBoards();
+                const [boards, folders] = await Promise.all([getAllBoards(forceMondaySync), getAllFolders(forceMondaySync)]);
                 const teamBoards = boards.filter((b: any) =>
                     b.name.toLowerCase().includes(' - workspace') && !b.name.startsWith('Subitems')
                 );
@@ -356,27 +374,60 @@ export default function AdminProjectAssignment() {
                         const filtered = labels.filter(l => l.toLowerCase().includes('unassigned'));
                         const val = filtered.length > 0 ? filtered[0] : 'Unassigned (cv)';
                         setProjectStatuses(filtered.length > 0 ? filtered : ['Unassigned (cv)']);
-                        updateCurrentProject({ projectStatus: val });
+                        if (shouldApplyDefaults) updateCurrentProject({ projectStatus: val });
                     }
                     const typeCol = columns.find((c: any) => c.title.toLowerCase() === 'type' || c.title.toLowerCase() === 'project type');
                     if (typeCol?.settings_str) {
                         const labels = parseLabels(typeCol.settings_str);
-                        if (labels.length > 0) { setProjectTypes(labels); updateCurrentProject({ projectType: labels[0] }); }
+                        if (labels.length > 0) {
+                            setProjectTypes(labels);
+                            if (shouldApplyDefaults) updateCurrentProject({ projectType: labels[0] });
+                        }
                     }
                     const priorityCol = columns.find((c: any) => c.title.toLowerCase() === 'priority');
                     if (priorityCol?.settings_str) {
                         const labels = parseLabels(priorityCol.settings_str);
-                        if (labels.length > 0) { setProjectPriorities(labels); updateCurrentProject({ priority: labels[0] }); }
+                        if (labels.length > 0) {
+                            setProjectPriorities(labels);
+                            if (shouldApplyDefaults) updateCurrentProject({ priority: labels[0] });
+                        }
                     }
                     const clientCol = columns.find((c: any) => c.title.toLowerCase() === 'client');
-                    if (clientCol?.settings_str) {
-                        const labels = parseLabels(clientCol.settings_str);
-                        if (labels.length > 0) setAvailableClients(Array.from(new Set(labels)).sort());
-                    }
+                    const labelClients = clientCol?.settings_str ? parseLabels(clientCol.settings_str) : [];
+                    const activeFolder = folders?.find((f: any) => f.name.toLowerCase().trim() === 'active clients');
+                    const inactiveFolder = folders?.find((f: any) => f.name.toLowerCase().trim() === 'inactive clients');
+                    const activeBoardIds = new Set((activeFolder?.children || []).map((c: any) => String(c.id)));
+                    const inactiveBoardIds = new Set((inactiveFolder?.children || []).map((c: any) => String(c.id)));
+                    const fromFolders = (boards || [])
+                        .filter((b: any) => {
+                            const n = b.name.toLowerCase();
+                            const isFulfillment = n.includes('fulfillment board') || n.includes('fullfilment board');
+                            const isSubitem =
+                                b.type === 'sub_items_board' || n.startsWith('subitems') || n.includes('subitems');
+                            const id = String(b.id);
+                            return isFulfillment && !isSubitem && activeBoardIds.has(id) && !inactiveBoardIds.has(id);
+                        })
+                        .map((b: any) => cleanClientBoardName(b.name))
+                        .filter((n: string) => n.length > 0);
+                    const seen = new Set<string>();
+                    const mergedClients: string[] = [];
+                    const pushUnique = (s: string) => {
+                        const t = s.trim();
+                        if (!t) return;
+                        const key = t.toLowerCase();
+                        if (seen.has(key)) return;
+                        seen.add(key);
+                        mergedClients.push(t);
+                    };
+                    labelClients.forEach(pushUnique);
+                    fromFolders.forEach(pushUnique);
+                    mergedClients.sort((a, b) => a.localeCompare(b));
+                    if (mergedClients.length > 0) setAvailableClients(mergedClients);
                     try {
                         const groups = await getBoardGroups(projectBoard.id);
                         if (groups) setVeBoardGroups(groups);
                     } catch { }
+                    didApplyMondayDefaultsRef.current = true;
                 }
             } catch (error: any) {
                 console.error('Failed to fetch data', error);
@@ -390,7 +441,7 @@ export default function AdminProjectAssignment() {
             } catch { }
         };
         fetchData();
-    }, []);
+    }, [refreshKey]);
 
     /** Manual pick wins, then project deadline, then today (always a valid day). */
     const availabilityQueryDay = useMemo(() => {
