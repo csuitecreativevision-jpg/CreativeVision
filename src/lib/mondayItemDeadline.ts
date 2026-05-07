@@ -26,7 +26,8 @@ function extractTimeFromAny(raw: string): { hh: number; mm: number } | null {
     return { hh, mm };
 }
 
-function pickBestDeadlineColumn(cols: any[], itemArg?: any) {
+/** Prefer the real project deadline column (avoids generic "Date" / created-date columns). Safe without `item` when creating new rows. */
+export function pickBestDeadlineColumn(cols: any[], itemArg?: any) {
     const strictCandidates = cols.filter((c: any) => {
         const t = String(c?.title || '').trim().toLowerCase();
         return (t.includes('ve project board') && t.includes('deadline')) || t === 'deadline' || t === 'deadline date';
@@ -50,7 +51,7 @@ function pickBestDeadlineColumn(cols: any[], itemArg?: any) {
         if (t === 'deadline' || t === 'due date') score += 100;
         if (t.includes('deadline')) score += 40;
         if (t.includes('due')) score += 25;
-        if (c?.type === 'date' || c?.type === 'timeline') score += 20;
+        if (c?.type === 'date' || c?.type === 'timeline' || c?.type === 'timerange') score += 20;
         if (t.includes('created') || t.includes('updated') || t.includes('start')) score -= 30;
         if (itemArg?.column_values?.length) {
             const cv = itemArg.column_values.find((v: any) => v.id === c.id);

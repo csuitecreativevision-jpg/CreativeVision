@@ -14,6 +14,7 @@ import {
     mondayDateColumnValueToUtcInstant,
     manilaWallHm24FromDate,
 } from '../lib/philippinesTime';
+import { pickBestDeadlineColumn } from '../lib/mondayItemDeadline';
 import { getCycleDates, isDateInCycle } from '../features/performance-dashboard/utils/dateUtils';
 import { idbGet, idbSet } from './idbService';
 
@@ -740,9 +741,11 @@ export async function getBoardItems(boardId: string, forceSync: boolean = false,
     }, false, forceSync, onFresh); // meta=false -> cache_monday_board_items
 }
 
-export async function getBoardColumns(boardId: string) {
-    return getCachedOrFetch(`columns_${boardId}`, async () => {
-        const query = `query {
+export async function getBoardColumns(boardId: string, forceSync: boolean = false) {
+    return getCachedOrFetch(
+        `columns_${boardId}`,
+        async () => {
+            const query = `query {
         boards (ids: [${boardId}]) {
             columns {
                 id
@@ -752,9 +755,12 @@ export async function getBoardColumns(boardId: string) {
             }
         }
     }`;
-        const data = await mondayRequest(query);
-        return data.boards[0]?.columns || [];
-    }, true); // meta=true -> cache_monday_meta
+            const data = await mondayRequest(query);
+            return data.boards[0]?.columns || [];
+        },
+        true,
+        forceSync
+    ); // meta=true -> cache_monday_meta
 }
 
 export async function createNewBoard(name: string) {
@@ -1763,26 +1769,39 @@ export async function submitProjectAssignment(
         }
     }
 
-    // NEW: Deadline / Date Logic
-    const deadlineId = getColId('deadline') || getColId('date') || getColId('timeline');
+    // Deadline / date column: same ranking as item views (avoids "Created date"). Must be a real calendar column type.
+    let deadlineColResolved = pickBestDeadlineColumn(columns);
+    const pickedType = String(deadlineColResolved?.type || '').toLowerCase();
+    if (deadlineColResolved && !['date', 'timeline', 'timerange'].includes(pickedType)) {
+        deadlineColResolved =
+            columns.find(
+                (c: any) =>
+                    ['date', 'timeline', 'timerange'].includes(String(c?.type || '').toLowerCase()) &&
+                    /deadline|due\b/i.test(String(c?.title || ''))
+            ) || null;
+    }
+    const deadlineId = deadlineColResolved?.id;
     if (data.timeline && deadlineId) {
-        const col = columns.find((c: any) => c.id === deadlineId);
-        if (col?.type === 'date') {
-            // Check if input is datetime (PH wall time, often `…+08:00` from Assign Project; legacy `T` without Z = PH).
+        const col = deadlineColResolved;
+        const colType = String(col?.type || '').toLowerCase();
+        if (colType === 'date') {
+            // Datetime: PH wall time (`…+08:00` from Assign Project; legacy `T` without Z = PH).
             if (data.timeline.includes('T')) {
                 const utc = manilaWallTimeToMondayDateColumnUtc(data.timeline);
                 columnValues[deadlineId] = { date: utc.date, time: utc.time };
             } else {
                 columnValues[deadlineId] = { date: data.timeline };
             }
-        } else if (col?.type === 'timeline') {
-            // Timeline usually doesn't support time well via API in this simple format, send date
+        } else if (colType === 'timeline' || colType === 'timerange') {
             const dateOnly = data.timeline.split('T')[0];
             columnValues[deadlineId] = { from: dateOnly, to: dateOnly };
         } else {
-            // Text fallback - pretty print roughly
             columnValues[deadlineId] = data.timeline.replace('T', ' ');
         }
+    } else if (data.timeline && !deadlineId) {
+        console.warn(
+            '[Monday] submitProjectAssignment: no deadline/date/timeline column matched on board; timeline not written.'
+        );
     }
 
     // Note: Editor Board submission removed - handled by Monday.com automations

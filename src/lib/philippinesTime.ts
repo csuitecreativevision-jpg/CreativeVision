@@ -218,7 +218,7 @@ export function mondayDateColumnValueToUtcInstant(
         return null;
     }
     const ct = String(colType || '').toLowerCase();
-    if (ct === 'timeline') {
+    if (ct === 'timeline' || ct === 'timerange') {
         const f = (parsed.from || parsed.to || '').slice(0, 10);
         if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return null;
         return { instant: new Date(`${f}T00:00:00.000Z`), showTimeInPh: false };

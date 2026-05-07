@@ -7,8 +7,23 @@ import { PremiumModal } from '../ui/PremiumModal';
 import { YouTubeModal } from '../ui/YouTubeModal';
 import { getCycleFromDate } from '../../features/performance-dashboard/utils/dateUtils';
 import { getBoardColumns, getAssetPublicUrl, normalizeMondayFileUrl } from '../../services/mondayService';
+
+/** Authoritative column list from `getBoardColumns` merged onto board payload (items fetch can lag new columns). */
+function mergeBoardColumnsFromFreshMeta(existing: any[] | undefined, fresh: any[]): any[] {
+    const existingById = new Map((existing || []).map((c: any) => [String(c.id), c]));
+    return fresh.map((c: any) => {
+        const id = String(c.id);
+        const prev = existingById.get(id);
+        return prev ? { ...prev, ...c } : { ...c };
+    });
+}
 import { checkDeadlineNotifications } from '../../services/notificationService';
-import { buildSubmissionRowsForBoard, EditorSubmissionBoardPanel } from './EditorSubmissionHub';
+import {
+    buildSubmissionRowsForBoard,
+    EditorSubmissionBoardPanel,
+    findSubmissionLinkColumn,
+    findSubmissionUploadColumn,
+} from './EditorSubmissionHub';
 import { SubmissionVideoPlayer, type SubmissionVideoPlayerHandle } from '../shared/SubmissionVideoPlayer';
 import { SubmissionVideoFeedbackPanel } from '../shared/SubmissionVideoFeedbackPanel';
 import { usePortalThemeOptional } from '../../contexts/PortalThemeContext';
@@ -75,6 +90,53 @@ export const EditorProjectSelectionView = ({
     const [expandedCycles, setExpandedCycles] = useState<Set<string>>(new Set());
     const [statusFilter, setStatusFilter] = useState('All');
     const [mirrorOptions, setMirrorOptions] = useState<Record<string, any[]>>({});
+    /** Submissions tab: columns from forced `getBoardColumns` so new Monday columns appear before board cache TTL. */
+    const [submissionsColumnsMerged, setSubmissionsColumnsMerged] = useState<any[] | null>(null);
+    const boardDataRef = useRef(boardData);
+    boardDataRef.current = boardData;
+    const selectedBoardIdRef = useRef(selectedBoardId);
+    selectedBoardIdRef.current = selectedBoardId;
+
+    const submissionColumnIdsSig = useMemo(
+        () => (boardData?.columns || []).map((c: any) => String(c.id)).sort().join(','),
+        [boardData?.columns]
+    );
+
+    useEffect(() => {
+        if (viewMode !== 'submissions' || !selectedBoardId) {
+            setSubmissionsColumnsMerged(null);
+            return;
+        }
+        setSubmissionsColumnsMerged(null);
+        const boardIdForThisRun = selectedBoardId;
+        let cancelled = false;
+        void (async () => {
+            try {
+                const fresh = await getBoardColumns(boardIdForThisRun, true);
+                if (cancelled) return;
+                if (selectedBoardIdRef.current !== boardIdForThisRun) return;
+                if (!fresh.length) {
+                    setSubmissionsColumnsMerged(null);
+                    return;
+                }
+                const current = boardDataRef.current;
+                setSubmissionsColumnsMerged(mergeBoardColumnsFromFreshMeta(current?.columns, fresh));
+            } catch {
+                if (!cancelled && selectedBoardIdRef.current === boardIdForThisRun) {
+                    setSubmissionsColumnsMerged(null);
+                }
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [viewMode, selectedBoardId, submissionColumnIdsSig]);
+
+    const boardDataForSubmissions = useMemo(() => {
+        if (!boardData || !selectedBoardId) return null;
+        if (viewMode !== 'submissions' || submissionsColumnsMerged == null) return boardData;
+        return { ...boardData, columns: submissionsColumnsMerged };
+    }, [boardData, selectedBoardId, viewMode, submissionsColumnsMerged]);
     const extractTimeFromText = (txt: string): { hh: number; mm: number } | null => {
         const m = txt.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
         if (!m) return null;
@@ -309,36 +371,33 @@ export const EditorProjectSelectionView = ({
         let mainAssetUrl: string | null = null;
         let mainAssetName: string = selectedProject.name;
 
-        // A. Check for "Submission Preview" specifically (File or Link)
-        const submissionCol = boardData.columns?.find((c: any) => c.title.toLowerCase().includes('submission'));
+        // A. VE board: Submission Preview (file) first, then Submission Link (Drive URL) — not first arbitrary "submission" column.
+        const submissionPreviewCol = findSubmissionUploadColumn(boardData.columns);
+        const submissionLinkCol = findSubmissionLinkColumn(boardData.columns);
 
-        if (submissionCol) {
+        for (const submissionCol of [submissionPreviewCol, submissionLinkCol].filter(Boolean)) {
             const val = selectedProject.column_values.find((v: any) => v.id === submissionCol.id);
-            if (val) {
-                // 1. Try Standard File/Link Parsing (JSON value)
-                if (val.value) {
-                    try {
-                        const fileData = JSON.parse(val.value);
-                        if (fileData.files && fileData.files.length > 0) {
-                            const f = fileData.files[0];
-                            mainAssetUrl = f.public_url || f.url || f.urlThumbnail;
-                            mainAssetName = f.name || "Submission Preview";
-                        }
-                        else if (fileData.url) {
-                            mainAssetUrl = fileData.url;
-                            mainAssetName = fileData.text || "Submission Preview";
-                        }
-                    } catch (e) { }
-                }
-
-                // 2. Fallback: Check display_value (Mirror columns often return direct text/url here)
-                if (!mainAssetUrl && val.display_value) {
-                    if (val.display_value.startsWith('http')) {
-                        mainAssetUrl = val.display_value;
-                        mainAssetName = "Submission Preview";
+            if (!val) continue;
+            if (val.value) {
+                try {
+                    const fileData = JSON.parse(val.value);
+                    if (fileData.files && fileData.files.length > 0) {
+                        const f = fileData.files[0];
+                        mainAssetUrl = f.public_url || f.url || f.urlThumbnail;
+                        mainAssetName = f.name || 'Submission Preview';
+                    } else if (fileData.url) {
+                        mainAssetUrl = fileData.url;
+                        mainAssetName = fileData.text || 'Submission Link';
                     }
+                } catch {
+                    /* ignore */
                 }
             }
+            if (!mainAssetUrl && val.display_value && String(val.display_value).startsWith('http')) {
+                mainAssetUrl = String(val.display_value);
+                mainAssetName = submissionCol === submissionLinkCol ? 'Submission Link' : 'Submission Preview';
+            }
+            if (mainAssetUrl) break;
         }
 
         // B. Check File Columns
@@ -625,9 +684,13 @@ export const EditorProjectSelectionView = ({
     }, [filteredItems, boardData]);
 
     const submissionRowsAll = useMemo(() => {
-        if (!boardData || !selectedBoardId) return [];
-        return buildSubmissionRowsForBoard(boardData, selectedBoardId, boardData.name);
-    }, [boardData, selectedBoardId]);
+        if (!boardDataForSubmissions || !selectedBoardId) return [];
+        return buildSubmissionRowsForBoard(
+            boardDataForSubmissions,
+            selectedBoardId,
+            boardDataForSubmissions.name
+        );
+    }, [boardDataForSubmissions, selectedBoardId]);
 
     const filteredSubmissionRows = useMemo(() => {
         let rows = submissionRowsAll;
@@ -1031,7 +1094,7 @@ export const EditorProjectSelectionView = ({
                         opening each project card.
                     </p>
                     <EditorSubmissionBoardPanel
-                        boardData={boardData}
+                        boardData={boardDataForSubmissions ?? boardData}
                         boardId={selectedBoardId}
                         rows={filteredSubmissionRows}
                         onRefresh={() => refreshBoardDetails(selectedBoardId, true)}

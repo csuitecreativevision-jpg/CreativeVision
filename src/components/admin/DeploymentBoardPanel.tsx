@@ -13,6 +13,7 @@ import {
     deriveTitleFromVideoUrl,
     extractGoogleDriveFileId,
     fetchGoogleDriveFileTitle,
+    stripDisplayFileExtension,
 } from '../../services/googleDriveLinkService';
 import { LinkifiedInstructionBody, stripHtmlToPlainText } from '../../lib/instructionLinkify';
 import { RichTextEditor } from '../ui/RichTextEditor';
@@ -224,7 +225,7 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
     const [mains, setMains] = useState<DeploymentBoardMain[]>([]);
     const [videosByMain, setVideosByMain] = useState<Record<string, DeploymentBoardVideo[]>>({});
     const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-    /** Per-video: show Link + Due fields */
+    /** Per-video: expandable section shows display name + deadline (link + status always visible) */
     const [videoRowExpanded, setVideoRowExpanded] = useState<Record<string, boolean>>({});
     const videosByMainRef = useRef(videosByMain);
     const driveAutofillTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -270,7 +271,7 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                 if (!title) {
                     title = deriveTitleFromVideoUrl(link);
                 }
-                const clean = title?.trim();
+                const clean = title?.trim() ? stripDisplayFileExtension(title.trim()) : '';
                 if (!clean) continue;
                 try {
                     const updated = await deploymentBoardService.updateVideo(vid.id, { name: clean });
@@ -511,7 +512,7 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                 delete videoPersistQueueRef.current[videoId];
                 if (!queued || !Object.keys(queued).length) return;
                 const merged: Partial<DeploymentBoardVideo> = { ...queued };
-                if (merged.name !== undefined) merged.name = String(merged.name).trim();
+                if (merged.name !== undefined) merged.name = stripDisplayFileExtension(String(merged.name).trim());
                 try {
                     await deploymentBoardService.updateVideo(videoId, merged);
                 } catch (err) {
@@ -532,7 +533,9 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                 delete videoPersistTimerRef.current[videoId];
                 if (!merged || !Object.keys(merged).length) return;
                 const payload: Partial<DeploymentBoardVideo> = { ...merged };
-                if (payload.name !== undefined) payload.name = String(payload.name).trim();
+                if (payload.name !== undefined) {
+                    payload.name = stripDisplayFileExtension(String(payload.name).trim());
+                }
                 deploymentBoardService
                     .updateVideo(videoId, payload)
                     .then(updated => {
@@ -561,7 +564,7 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
             delete videoPersistQueueRef.current[videoId];
             const merged: Partial<DeploymentBoardVideo> = { ...queued, ...finalPatch };
             if (!Object.keys(merged).length) return;
-            if (merged.name !== undefined) merged.name = String(merged.name).trim();
+            if (merged.name !== undefined) merged.name = stripDisplayFileExtension(String(merged.name).trim());
             try {
                 const updated = await deploymentBoardService.updateVideo(videoId, merged);
                 setVideosByMain(prev => {
@@ -582,10 +585,15 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
     const maybeAutofillVideoNameFromDrive = useCallback(async (mainId: string, videoId: string, driveUrl: string) => {
         const row = videosByMainRef.current[mainId]?.find(x => x.id === videoId);
         if ((row?.name ?? '').trim() !== '') return;
+        let rawTitle: string | null = null;
         const fileId = extractGoogleDriveFileId(driveUrl);
-        if (!fileId) return;
-        const title = await fetchGoogleDriveFileTitle(fileId);
-        const clean = title?.trim();
+        if (fileId) {
+            rawTitle = await fetchGoogleDriveFileTitle(fileId);
+        }
+        if (!rawTitle) {
+            rawTitle = deriveTitleFromVideoUrl(driveUrl);
+        }
+        const clean = rawTitle?.trim() ? stripDisplayFileExtension(rawTitle.trim()) : '';
         if (!clean) return;
         setVideosByMain(prev => {
             const r = prev[mainId]?.find(x => x.id === videoId);
@@ -604,7 +612,7 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
 
     const scheduleDriveNameAutofill = useCallback(
         (mainId: string, videoId: string, url: string) => {
-            if (!extractGoogleDriveFileId(url)) return;
+            if (!url.trim()) return;
             const row = videosByMainRef.current[mainId]?.find(x => x.id === videoId);
             if ((row?.name ?? '').trim() !== '') return;
             if (driveAutofillTimerRef.current[videoId]) clearTimeout(driveAutofillTimerRef.current[videoId]);
@@ -689,7 +697,7 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                         <button
                             type="button"
                             aria-expanded={detailsOpen}
-                            aria-label={detailsOpen ? 'Hide link and deadline' : 'Show link and deadline'}
+                            aria-label={detailsOpen ? 'Hide display title and deadline' : 'Show display title and deadline'}
                             onClick={() =>
                                 setVideoRowExpanded(prev => ({
                                     ...prev,
@@ -700,27 +708,34 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                         >
                             <ChevronDown className={`w-4 h-4 transition-transform ${detailsOpen ? '' : '-rotate-90'}`} />
                         </button>
-                        <label className="flex items-center gap-2 min-w-0 flex-1 basis-[min(100%,14rem)]">
-                            {videoFieldLabel(sidebar, 'Name')}
+                        <div className="flex items-center gap-2 min-w-0 flex-1 basis-[min(100%,18rem)]">
+                            {videoFieldLabel(sidebar, 'Link')}
+                            <Link2 className="w-3.5 h-3.5 text-white/25 flex-shrink-0" aria-hidden />
                             <input
-                                type="text"
-                                value={v.name ?? ''}
+                                type="url"
+                                value={v.video_link}
                                 onChange={e => {
+                                    const url = e.target.value;
                                     patchVideoLocal(m.id, v.id, {
-                                        name: e.target.value,
+                                        video_link: url,
                                     });
-                                    queueVideoPersist(v.id, { name: e.target.value });
+                                    queueVideoPersist(v.id, {
+                                        video_link: url,
+                                    });
+                                    scheduleDriveNameAutofill(m.id, v.id, url);
                                 }}
-                                onBlur={e =>
-                                    void flushVideoPersist(v.id, {
-                                        name: e.target.value.trim(),
-                                    })
-                                }
-                                placeholder="Video title"
+                                onBlur={async e => {
+                                    const url = e.target.value;
+                                    await flushVideoPersist(v.id, {
+                                        video_link: url,
+                                    });
+                                    await maybeAutofillVideoNameFromDrive(m.id, v.id, url);
+                                }}
+                                placeholder="https://…"
                                 className="flex-1 min-w-0 bg-transparent border border-white/[0.08] rounded-lg px-2 py-1.5 text-[10px] text-white placeholder-white/20 focus:outline-none focus:border-violet-500/40"
                             />
-                        </label>
-                        <label className="flex items-center gap-2 min-w-0 flex-shrink-0">
+                        </div>
+                        <div className="flex items-center gap-2 min-w-0 flex-shrink-0">
                             {videoFieldLabel(sidebar, 'Status')}
                             <select
                                 value={v.status}
@@ -737,7 +752,7 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                                     </option>
                                 ))}
                             </select>
-                        </label>
+                        </div>
                         <button
                             type="button"
                             onClick={() => deleteVideo(m.id, v.id)}
@@ -757,33 +772,30 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                                 className="overflow-hidden"
                             >
                                 <div className="flex flex-col gap-2 pt-2 mt-2 border-t border-white/[0.06]">
-                                    <label className="flex items-center gap-2 min-w-0">
-                                        {videoFieldLabel(sidebar, 'Link')}
-                                        <Link2 className="w-3.5 h-3.5 text-white/25 flex-shrink-0" aria-hidden />
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        {videoFieldLabel(sidebar, 'Name')}
                                         <input
-                                            type="url"
-                                            value={v.video_link}
+                                            type="text"
+                                            value={v.name ?? ''}
                                             onChange={e => {
-                                                const url = e.target.value;
                                                 patchVideoLocal(m.id, v.id, {
-                                                    video_link: url,
+                                                    name: e.target.value,
                                                 });
-                                                queueVideoPersist(v.id, {
-                                                    video_link: url,
-                                                });
-                                                scheduleDriveNameAutofill(m.id, v.id, url);
+                                                queueVideoPersist(v.id, { name: e.target.value });
                                             }}
-                                            onBlur={async e => {
-                                                const url = e.target.value;
-                                                await flushVideoPersist(v.id, {
-                                                    video_link: url,
-                                                });
-                                                await maybeAutofillVideoNameFromDrive(m.id, v.id, url);
+                                            onBlur={e => {
+                                                const trimmed = e.target.value.trim();
+                                                const name = stripDisplayFileExtension(trimmed);
+                                                if (name !== trimmed) {
+                                                    patchVideoLocal(m.id, v.id, { name });
+                                                }
+                                                void flushVideoPersist(v.id, { name });
                                             }}
-                                            placeholder="https://…"
+                                            placeholder="Auto-filled from link"
+                                            title="Filled from Drive or URL; edit to override. File extensions are removed when saved."
                                             className="flex-1 min-w-0 bg-transparent border border-white/[0.08] rounded-lg px-2 py-1.5 text-[10px] text-white placeholder-white/20 focus:outline-none focus:border-violet-500/40"
                                         />
-                                    </label>
+                                    </div>
                                     <label className="flex items-center gap-2 min-w-0 max-w-full">
                                         {videoFieldLabel(sidebar, sidebar ? 'Due' : 'Deadline')}
                                         <input
@@ -958,7 +970,7 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                                             </div>
                                             <p className={`text-white/30 ${sidebar ? 'text-[10px] py-1' : 'text-xs py-2'}`}>
                                                 {vids.length === 0
-                                                    ? 'No videos yet. Add a row — name and status show first; use the arrow to add link and deadline.'
+                                                    ? 'No videos yet. Add a row — paste the video link first; the display name fills from Drive or the URL. Use the arrow for title override and deadline.'
                                                     : "No videos in this queue. Change a row's status to Ready for Deployment, or add a new video."}
                                             </p>
                                         </>
@@ -1363,7 +1375,7 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                                         placeholder="https://drive.google.com/..."
                                     />
                                 </label>
-                                <label className="block space-y-1">
+                                <div className="block space-y-1">
                                     <span className="text-[10px] font-bold uppercase tracking-widest text-white/35">Instructions</span>
                                     <RichTextEditor
                                         value={mainForm.instructions}
@@ -1371,7 +1383,7 @@ export function DeploymentBoardPanel({ variant }: { variant: DeploymentBoardPane
                                         placeholder="Deployment notes, Loom links, client context…"
                                         className="min-h-[140px] text-sm text-white border-white/10"
                                     />
-                                </label>
+                                </div>
                                 <label className="block space-y-1">
                                     <span className="text-[10px] font-bold uppercase tracking-widest text-white/35">Status</span>
                                     <select

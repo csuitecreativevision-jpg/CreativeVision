@@ -8,17 +8,25 @@ export interface SubmissionRow {
     boardId: string;
     boardLabel: string;
     item: any;
+    /** Column used for file upload / preview (often "Submission Preview" mirror → file). */
     submissionColumn: any;
+    /** Dedicated link column for Drive URLs (e.g. "Submission Link"); separate from file preview. */
+    submissionLinkColumn: any | null;
     uploadTarget: { itemId: string; columnId: string };
     hasFile: boolean;
     statusColumn: any | null;
 }
 
-function getSubmissionUpdateTarget(row: SubmissionRow): { boardId: string; itemId: string; columnId: string } | null {
-    const col = row.submissionColumn;
+/** Where to write a URL for the given column (resolves mirror/lookup → source board item + column). Never use a raw `file` column. */
+function resolveColumnWriteTarget(
+    boardId: string,
+    item: any,
+    col: any | null | undefined
+): { boardId: string; itemId: string; columnId: string } | null {
     if (!col) return null;
-    if (col.type === 'file' || col.type === 'link' || col.type === 'text') {
-        return { boardId: row.boardId, itemId: row.item.id, columnId: col.id };
+    if (col.type === 'file') return null;
+    if (col.type === 'link' || col.type === 'text') {
+        return { boardId, itemId: item.id, columnId: col.id };
     }
     if ((col.type === 'mirror' || col.type === 'lookup') && col.settings_str) {
         let sourceBoardId = '';
@@ -46,7 +54,7 @@ function getSubmissionUpdateTarget(row: SubmissionRow): { boardId: string; itemI
             return null;
         }
         if (!relationColId || !sourceColumnId || !sourceBoardId) return null;
-        const relationColValue = row.item.column_values?.find((c: any) => c.id === relationColId);
+        const relationColValue = item.column_values?.find((c: any) => c.id === relationColId);
         if (!relationColValue) return null;
         let sourceItemId = '';
         const rawLinked = (relationColValue as { linked_item_ids?: string[] }).linked_item_ids;
@@ -66,6 +74,30 @@ function getSubmissionUpdateTarget(row: SubmissionRow): { boardId: string; itemI
         return { boardId: sourceBoardId, itemId: sourceItemId, columnId: sourceColumnId };
     }
     return null;
+}
+
+function getSubmissionLinkWriteTarget(row: SubmissionRow): { boardId: string; itemId: string; columnId: string } | null {
+    return resolveColumnWriteTarget(row.boardId, row.item, row.submissionLinkColumn);
+}
+
+/** URL stored in Submission Link (or similar), not the file preview column. */
+function getSubmissionLinkUrl(row: SubmissionRow): string {
+    const colId = row.submissionLinkColumn?.id;
+    if (!colId) return '';
+    const val = row.item?.column_values?.find((v: any) => v.id === colId);
+    if (!val) return '';
+    if (val.value) {
+        try {
+            const parsed = JSON.parse(val.value);
+            if (parsed?.url) return String(parsed.url).trim();
+            if (parsed?.text) return String(parsed.text).trim();
+        } catch {
+            /* ignore */
+        }
+    }
+    const dv = String(val.display_value || '').trim();
+    if (dv && /^https?:\/\//i.test(dv)) return dv;
+    return String(val.text || '').trim();
 }
 
 function getSubmissionDisplayValue(row: SubmissionRow): string {
@@ -89,9 +121,144 @@ function displayWorkspaceName(raw: string): string {
     return raw.replace(/- Workspace/i, '').replace(/\(c-w-[\w-]+\)/gi, '').trim();
 }
 
-function findSubmissionColumn(columns: any[] | undefined): any | null {
-    if (!columns) return null;
-    return columns.find((c: any) => c.title?.toLowerCase().includes('submission')) || null;
+/** Monday column titles: NFKC + Unicode dashes/spaces so API strings match UI "Submission Link". */
+function normalizeMondayColumnTitle(raw: unknown): string {
+    let s = String(raw ?? '');
+    try {
+        s = s.normalize('NFKC');
+    } catch {
+        /* ignore */
+    }
+    return s
+        .replace(/[\u00a0\u2000-\u200d\ufeff]/g, ' ')
+        .replace(/[\u2010-\u2015\u2212\u2043\uff0d]/g, '-')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ');
+}
+
+function columnTypeLower(c: any): string {
+    return String(c?.type ?? '').toLowerCase();
+}
+
+const SUBMISSION_LINK_TITLE_EXACT = 'submission link';
+
+/** Prefer preview / file / mirror so uploads resolve; avoid picking "Submission Link" first (no file target). */
+export function findSubmissionUploadColumn(columns: any[] | undefined): any | null {
+    if (!columns?.length) return null;
+    const subs = columns.filter((c: any) => String(c.title || '').toLowerCase().includes('submission'));
+    if (!subs.length) return null;
+    const t = (c: any) => String(c.title || '').toLowerCase();
+    const preview = subs.find((c) => t(c).includes('preview'));
+    if (preview) return preview;
+    const file = subs.find((c) => columnTypeLower(c) === 'file');
+    if (file) return file;
+    const mirror = subs.find((c) => columnTypeLower(c) === 'mirror' || columnTypeLower(c) === 'lookup');
+    if (mirror) return mirror;
+    const nonLink = subs.find((c) => columnTypeLower(c) !== 'link');
+    if (nonLink) return nonLink;
+    const notBareSubmissionLink = subs.find(
+        (c) =>
+            columnTypeLower(c) !== 'link' ||
+            normalizeMondayColumnTitle(c.title) !== SUBMISSION_LINK_TITLE_EXACT
+    );
+    if (notBareSubmissionLink) return notBareSubmissionLink;
+    return subs[0];
+}
+
+/**
+ * VE Project Board: column titled **Submission Link** (exact name after normalization).
+ * Duplicate columns: prefer native **link** type, then the **last** match (newest column Monday appends at end).
+ */
+export function findSubmissionLinkColumn(columns: any[] | undefined): any | null {
+    if (!columns?.length) return null;
+
+    const norm = (c: any) => normalizeMondayColumnTitle(c.title);
+    const ty = columnTypeLower;
+
+    const pickLastPreferred = (matches: any[]) => {
+        if (!matches.length) return null;
+        const links = matches.filter((c) => ty(c) === 'link');
+        if (links.length) return links[links.length - 1];
+        const mirrors = matches.filter((c) => ty(c) === 'mirror' || ty(c) === 'lookup');
+        if (mirrors.length) return mirrors[mirrors.length - 1];
+        return matches[matches.length - 1];
+    };
+
+    // 1) All columns whose normalized title is exactly "submission link" (handles duplicates + odd Unicode in API)
+    const exactMatches = columns.filter((c: any) => norm(c) === SUBMISSION_LINK_TITLE_EXACT);
+    const exactPick = pickLastPreferred(exactMatches);
+    if (exactPick) return exactPick;
+
+    const subs = columns.filter((c: any) => norm(c).includes('submission'));
+    const candidates = subs.filter((c) => !norm(c).includes('preview'));
+    if (!candidates.length) return null;
+
+    const submissionLinkInTitle = candidates.filter((c) => {
+        const t = norm(c);
+        return t.includes('submission link') || (t.includes('submission') && t.includes('link'));
+    });
+    if (submissionLinkInTitle.length) {
+        const rank = (c: any) => {
+            const t = norm(c);
+            if (t === SUBMISSION_LINK_TITLE_EXACT) return 0;
+            if (ty(c) === 'link') return 1;
+            if (ty(c) === 'mirror' || ty(c) === 'lookup') return 2;
+            return 3;
+        };
+        const minR = Math.min(...submissionLinkInTitle.map((c) => rank(c)));
+        const tier = submissionLinkInTitle
+            .filter((c) => rank(c) === minR)
+            .sort((a, b) => columns.indexOf(a) - columns.indexOf(b));
+        return tier[tier.length - 1];
+    }
+
+    const byTitle = candidates.find(
+        (c) =>
+            norm(c).includes('link') &&
+            (ty(c) === 'link' || ty(c) === 'mirror' || ty(c) === 'lookup' || ty(c) === 'text')
+    );
+    if (byTitle) return byTitle;
+
+    const typeLink = candidates.filter((c) => ty(c) === 'link');
+    if (typeLink.length) return typeLink[typeLink.length - 1];
+
+    const textNamed = candidates.find((c) => ty(c) === 'text' && norm(c).includes('link'));
+    if (textNamed) return textNamed;
+
+    const looseLinks = columns.filter(
+        (c: any) =>
+            ty(c) === 'link' && norm(c).includes('submission') && !norm(c).includes('preview')
+    );
+    if (looseLinks.length) return looseLinks[looseLinks.length - 1];
+
+    return null;
+}
+
+function normalizePastedUrl(raw: string): string {
+    let s = raw.trim();
+    if (!s) return '';
+    if (/^https?:\/\//i.test(s)) return s;
+    if (/^(drive\.google\.com|docs\.google\.com|youtu\.be|youtube\.com)\b/i.test(s)) {
+        return `https://${s.replace(/^\/+/, '')}`;
+    }
+    return s;
+}
+
+function linkColumnValuePayload(col: any | null | undefined, url: string, itemName: string): string {
+    const label = itemName?.trim() || 'Submission Link';
+    if (!col) return JSON.stringify({ url, text: label });
+    if (col.type === 'text') {
+        return JSON.stringify({ text: url });
+    }
+    return JSON.stringify({ url, text: label });
+}
+
+function emptyLinkColumnPayload(col: any | null | undefined): string {
+    if (col?.type === 'text') {
+        return JSON.stringify({ text: '' });
+    }
+    return JSON.stringify({ url: '', text: '' });
 }
 
 function findStatusColumn(columns: any[] | undefined): any | null {
@@ -236,22 +403,24 @@ export function isItemAssignedToEditor(item: any, columns: any[] | undefined, us
 export function buildSubmissionRowsForBoard(boardData: any, boardId: string, boardName: string): SubmissionRow[] {
     const editorFilterName =
         typeof localStorage !== 'undefined' ? localStorage.getItem('portal_user_name') || '' : '';
-    const submissionCol = findSubmissionColumn(boardData?.columns);
+    const submissionUploadCol = findSubmissionUploadColumn(boardData?.columns);
+    const submissionLinkCol = findSubmissionLinkColumn(boardData?.columns);
     const statusCol = findStatusColumn(boardData?.columns);
-    if (!submissionCol) return [];
+    if (!submissionUploadCol) return [];
     const items = flattenBoardItems(boardData);
     const boardLabel = displayWorkspaceName(boardName || '');
     const next: SubmissionRow[] = [];
     for (const item of items) {
         if (!isItemAssignedToEditor(item, boardData.columns, editorFilterName)) continue;
-        const uploadTarget = getMondayFileUploadTarget(item, submissionCol);
+        const uploadTarget = getMondayFileUploadTarget(item, submissionUploadCol);
         if (!uploadTarget) continue;
-        const hasFile = itemHasSubmissionFile(item, submissionCol);
+        const hasFile = itemHasSubmissionFile(item, submissionUploadCol);
         next.push({
             boardId,
             boardLabel,
             item,
-            submissionColumn: submissionCol,
+            submissionColumn: submissionUploadCol,
+            submissionLinkColumn: submissionLinkCol,
             uploadTarget,
             hasFile,
             statusColumn: statusCol,
@@ -427,37 +596,37 @@ export function EditorSubmissionBoardPanel({
 
     const handleSaveLink = async (row: SubmissionRow) => {
         const key = `${row.boardId}-${row.item.id}`;
-        const url = String(linkDrafts[key] || '').trim();
+        const url = normalizePastedUrl(String(linkDrafts[key] || ''));
         if (!url) return;
         const isHttp = /^https?:\/\//i.test(url);
         if (!isHttp) {
             await fireCvSwal({
                 icon: 'warning',
                 title: 'Invalid link',
-                text: 'Please enter a valid URL that starts with http:// or https://',
+                text: 'Paste a full URL (https://…). Google Drive links usually start with https://drive.google.com/…',
             });
             return;
         }
-        if (row.submissionColumn?.type === 'file') {
+        if (!row.submissionLinkColumn) {
             await fireCvSwal({
                 icon: 'info',
-                title: 'This Submission column is file-only',
-                text: 'Use Upload for this project, or ask admin to map Submission to a Link column for Drive links.',
+                title: 'No Submission Link column',
+                text: 'Ask an admin to add a Monday column named "Submission Link" (type: Link) on this board. Preview uploads use a separate file column.',
             });
             return;
         }
-        const target = getSubmissionUpdateTarget(row);
+        const target = getSubmissionLinkWriteTarget(row);
         if (!target) {
             await fireCvSwal({
                 icon: 'error',
                 title: 'Cannot save link',
-                text: 'Submission column is not linked to an editable source column.',
+                text: 'The Submission Link column could not be resolved to an editable source. Check the mirror / connect board in Monday.',
             });
             return;
         }
         setSavingLinkKey(key);
         try {
-            const linkPayload = JSON.stringify({ url, text: row.item.name || 'Submission Link' });
+            const linkPayload = linkColumnValuePayload(row.submissionLinkColumn, url, row.item.name);
             await updateSourceColumn(target.boardId, target.itemId, target.columnId, linkPayload);
             await onRefresh();
             setLinkDrafts((prev) => ({ ...prev, [key]: '' }));
@@ -482,20 +651,20 @@ export function EditorSubmissionBoardPanel({
 
     const handleDeleteLink = async (row: SubmissionRow) => {
         const key = `${row.boardId}-${row.item.id}`;
-        const target = getSubmissionUpdateTarget(row);
+        if (!row.submissionLinkColumn) {
+            await fireCvSwal({
+                icon: 'info',
+                title: 'No Submission Link column',
+                text: 'There is no link column configured for this board.',
+            });
+            return;
+        }
+        const target = getSubmissionLinkWriteTarget(row);
         if (!target) {
             await fireCvSwal({
                 icon: 'error',
                 title: 'Cannot delete link',
-                text: 'Submission column is not linked to an editable source column.',
-            });
-            return;
-        }
-        if (row.submissionColumn?.type === 'file') {
-            await fireCvSwal({
-                icon: 'info',
-                title: 'File submission detected',
-                text: 'This row is using a file submission column. Use Monday file controls to remove uploaded files.',
+                text: 'Submission Link column could not be resolved to an editable source.',
             });
             return;
         }
@@ -515,7 +684,12 @@ export function EditorSubmissionBoardPanel({
 
         setDeletingLinkKey(key);
         try {
-            await updateSourceColumn(target.boardId, target.itemId, target.columnId, JSON.stringify({ url: '', text: '' }));
+            await updateSourceColumn(
+                target.boardId,
+                target.itemId,
+                target.columnId,
+                emptyLinkColumnPayload(row.submissionLinkColumn)
+            );
             await onRefresh();
             setLinkDrafts((prev) => ({ ...prev, [key]: '' }));
             await fireCvSwal({
@@ -591,14 +765,16 @@ export function EditorSubmissionBoardPanel({
 
     if (!boardData) return null;
 
-    if (!findSubmissionColumn(boardData.columns)) {
+    if (!findSubmissionUploadColumn(boardData.columns)) {
         return (
             <div className="flex items-start gap-3 py-8 px-2 text-amber-200/90 rounded-2xl border border-amber-500/20 bg-amber-500/5">
                 <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
                 <div className="text-sm">
                     <p className="font-semibold text-amber-100/95">No Submission column on this board</p>
                     <p className="text-amber-200/70 mt-1 text-xs leading-relaxed">
-                        Add a Monday column with &quot;Submission&quot; in the title (file column, or mirror of one).
+                        Add a Monday column with &quot;Submission&quot; in the title (file column or Submission Preview mirror).
+                        For Drive links without uploading a file, also add a <strong className="text-amber-100/90">Submission Link</strong> link
+                        column.
                     </p>
                 </div>
             </div>
@@ -626,7 +802,8 @@ export function EditorSubmissionBoardPanel({
                 const key = `${row.boardId}-${row.item.id}`;
                 const busy = uploadingKey === key;
                 const submissionValue = getSubmissionDisplayValue(row);
-                const hasHttpLink = /^https?:\/\//i.test(submissionValue);
+                const linkUrl = getSubmissionLinkUrl(row);
+                const hasHttpLink = /^https?:\/\//i.test(linkUrl);
                 const currentStatus = getStatusText(row.item, row.statusColumn);
                 const selectedStatus = statusDrafts[key] ?? '';
                 const statusLocked = isEditorStatusLocked(currentStatus);

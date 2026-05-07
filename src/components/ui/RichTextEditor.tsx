@@ -16,18 +16,26 @@ export function RichTextEditor({ value, onChange, placeholder, className = '' }:
     const theme = usePortalThemeOptional();
     const isDark = theme?.isDark ?? (localStorage.getItem('portal_ui_dark_mode') !== 'false');
 
-    // Sync external value to editor content
+    // Sync external value to editor content (never overwrite the DOM while focused — breaks typing / caret).
     useEffect(() => {
-        if (editorRef.current) {
-            const currentHtml = editorRef.current.innerHTML;
-            // Avoid loop and cursor jumping
-            if (currentHtml === '<br>' && value === '') return;
+        const el = editorRef.current;
+        if (!el) return;
+        const currentHtml = el.innerHTML;
+        if (currentHtml === '<br>' && value === '') return;
 
-            if (value === '' && currentHtml !== '') {
-                editorRef.current.innerHTML = '';
-            } else if (value !== currentHtml) {
-                editorRef.current.innerHTML = value;
+        const isFocusedHere = document.activeElement === el;
+
+        if (isFocusedHere) {
+            if (value === '' && currentHtml !== '' && currentHtml !== '<br>') {
+                el.innerHTML = '';
             }
+            return;
+        }
+
+        if (value === '' && currentHtml !== '') {
+            el.innerHTML = '';
+        } else if (value !== currentHtml) {
+            el.innerHTML = value;
         }
     }, [value]);
 

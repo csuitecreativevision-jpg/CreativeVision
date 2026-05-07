@@ -19,6 +19,19 @@ function isDriveFileHostname(host: string): boolean {
     );
 }
 
+/**
+ * Remove trailing media / archive extensions from a display title (e.g. Drive file name `Clip.mp4`).
+ * Does not strip dotted phrases like `v2.0` (only known extension tokens at the end).
+ */
+export function stripDisplayFileExtension(raw: string): string {
+    const s = raw.trim();
+    if (!s) return s;
+    const re =
+        /\.(?:mp4|m4v|mov|webm|mkv|avi|wmv|flv|mpeg|mpg|m2ts|mts|ts|f4v|3gp|ogv|asf|rmvb|vob|divx|xvid|mxf|r3d|braw|mp3|wav|m4a|aac|flac|ogg|opus|wma|zip|7z|rar|tar|gz|pdf)(\?[^#]*)?$/i;
+    const once = s.replace(re, '').trim();
+    return once.length > 0 ? once : s;
+}
+
 /** Extract a Drive file id from common share URL shapes. Returns null for folders or unrecognized URLs. */
 export function extractGoogleDriveFileId(raw: string): string | null {
     const s = raw.trim();
@@ -91,7 +104,8 @@ export function deriveTitleFromVideoUrl(raw: string): string | null {
         const decoded = decodeURIComponent(candidate).replace(/\+/g, ' ');
         if (!decoded) return null;
         const trimmed = decoded.length > 200 ? `${decoded.slice(0, 197)}…` : decoded;
-        if (trimmed.includes('.') || trimmed.length >= 4) return trimmed;
+        const display = stripDisplayFileExtension(trimmed);
+        if (display) return display;
         return null;
     } catch {
         return null;

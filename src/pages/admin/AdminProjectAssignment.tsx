@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
 import { AdminPageLayout } from '../../components/layout/AdminPageLayout';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fireCvSwal } from '../../lib/swalTheme';
@@ -18,7 +18,6 @@ import {
     ChevronDown,
     ChevronRight,
     Users,
-    Shield,
     FileText,
     Sparkles,
     RefreshCw,
@@ -30,7 +29,7 @@ import { getAllBoards, getAllFolders, getBoardColumns, getBoardGroups, submitPro
 import { useRefresh } from '../../contexts/RefreshContext';
 import { RichTextEditor } from '../../components/ui/RichTextEditor';
 import { announceAssignment } from '../../services/discordService';
-import { getAllCheckers, Checker } from '../../services/boardsService';
+// import { getAllCheckers, Checker } from '../../services/boardsService'; // checker temporarily disabled
 import { createNotification } from '../../services/notificationService';
 import { supabase } from '../../lib/supabaseClient';
 import { SelectionModal } from '../../components/ui/SelectionModal';
@@ -40,6 +39,7 @@ import {
     fetchEditorsAvailableForDate,
 } from '../../services/assignProjectMondayIntegration';
 import { DeploymentBoardPanel } from '../../components/admin/DeploymentBoardPanel';
+import { stripHtmlToPlainText } from '../../lib/instructionLinkify';
 import {
     deriveTitleFromVideoUrl,
     extractGoogleDriveFileId,
@@ -82,24 +82,105 @@ function addDaysLocal(d: Date, n: number): Date {
     return x;
 }
 
+function projectHasParseableDeadline(deadline: string | undefined): boolean {
+    const t = String(deadline ?? '').trim();
+    if (!t) return false;
+    return !Number.isNaN(new Date(t).getTime());
+}
+
+function projectHasInstructionContent(html: string | undefined): boolean {
+    return stripHtmlToPlainText(String(html ?? '')).trim().length > 0;
+}
+
+/** Raw video field must look like a real URL (Drive, etc.). */
+function projectHasValidRawVideoLink(link: string | undefined): boolean {
+    const s = String(link ?? '').trim();
+    if (!s) return false;
+    try {
+        const u = new URL(s);
+        return u.protocol === 'http:' || u.protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
+
+function projectHasValidPrice(price: string | undefined): boolean {
+    const s = String(price ?? '').trim();
+    if (!s) return false;
+    const n = Number(s);
+    return !Number.isNaN(n) && n >= 0;
+}
+
+type AssignmentProjectRow = {
+    projectName: string;
+    projectStatus: string;
+    projectType: string;
+    client: string;
+    price: string;
+    editor: string;
+    checkerName: string;
+    deadline: string;
+    priority: string;
+    instructions: string;
+    rawVideoLink: string;
+};
+
+function getStep1Issues(p: AssignmentProjectRow): string[] {
+    const issues: string[] = [];
+    if (!p.projectName.trim()) issues.push('Project name');
+    if (!projectHasParseableDeadline(p.deadline)) issues.push('Deadline');
+    if (!projectHasValidRawVideoLink(p.rawVideoLink)) issues.push('Raw video link (https…)');
+    if (!projectHasInstructionContent(p.instructions)) issues.push('Instructions');
+    if (!p.projectType.trim()) issues.push('Project type');
+    if (!p.priority.trim()) issues.push('Priority');
+    return issues;
+}
+
+function getStep2Issues(p: AssignmentProjectRow): string[] {
+    const issues: string[] = [];
+    if (!p.client.trim()) issues.push('Client');
+    if (!projectHasValidPrice(p.price)) issues.push('Budget / price');
+    return issues;
+}
+
+function getStep3Issues(p: AssignmentProjectRow): string[] {
+    const issues: string[] = [];
+    if (!p.editor.trim()) issues.push('Editor');
+    // if (!p.checkerName.trim()) issues.push('Checker'); // checker temporarily disabled
+    return issues;
+}
+
 /** 01–12 for 12h deadline pickers. */
 const DEADLINE_PICKER_HOUR_VALUES = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
 /** 00–59. */
 const DEADLINE_PICKER_MINUTE_VALUES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
 
 // ── Field wrapper ────────────────────────────────────────────────────────────
-const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
+const Field = ({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) => (
     <div className="space-y-2">
-        <label className="text-[11px] font-bold uppercase tracking-widest text-white/30">{label}</label>
+        <span className="block text-[11px] font-bold uppercase tracking-widest text-white/30">
+            {label}
+            {required ? (
+                <span className="text-rose-400/90 ml-0.5" title="Required">
+                    *
+                </span>
+            ) : null}
+        </span>
         {children}
     </div>
 );
 
 // ── Select pill button ───────────────────────────────────────────────────────
 const SelectPill = ({
-    label, value, placeholder, color = '#8b5cf6', icon, onClick,
+    label, value, placeholder, color = '#8b5cf6', icon, onClick, required,
 }: {
-    label: string; value: string; placeholder: string; color?: string; icon: React.ReactNode; onClick: () => void;
+    label: string;
+    value: string;
+    placeholder: string;
+    color?: string;
+    icon: React.ReactNode;
+    onClick: () => void;
+    required?: boolean;
 }) => (
     <button
         onClick={onClick}
@@ -115,7 +196,14 @@ const SelectPill = ({
             {icon}
         </div>
         <div className="flex-1 min-w-0">
-            <div className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: `${color}90` }}>{label}</div>
+            <div className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: `${color}90` }}>
+                {label}
+                {required ? (
+                    <span className="text-rose-400/90 ml-0.5 font-bold normal-case" title="Required">
+                        *
+                    </span>
+                ) : null}
+            </div>
             <div className={`text-[14px] font-semibold truncate ${value ? 'text-white' : 'text-white/25'}`}>
                 {value || placeholder}
             </div>
@@ -125,9 +213,11 @@ const SelectPill = ({
 );
 
 // ── Input ────────────────────────────────────────────────────────────────────
-const Input = ({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label?: string }) => (
+const Input = ({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label?: React.ReactNode }) => (
     <div className="space-y-2">
-        {label && <label className="text-[11px] font-bold uppercase tracking-widest text-white/30">{label}</label>}
+        {label != null && label !== false && (
+            <span className="block text-[11px] font-bold uppercase tracking-widest text-white/30">{label}</span>
+        )}
         <input
             {...props}
             className={`w-full bg-white/[0.03] border border-white/[0.07] rounded-xl px-3 py-2 sm:px-4 sm:py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-violet-500/50 transition-colors ${props.className ?? ''}`}
@@ -165,12 +255,12 @@ export default function AdminProjectAssignment() {
     const navigate = useNavigate();
     const { refreshKey } = useRefresh();
     const [step, setStep] = useState(1);
-    const [activeModal, setActiveModal] = useState<'status' | 'type' | 'priority' | 'client' | 'team' | 'checker' | null>(null);
+    const [activeModal, setActiveModal] = useState<'status' | 'type' | 'priority' | 'client' | 'team' | null>(null);
 
     const [availableClients, setAvailableClients] = useState<string[]>([]);
     const [veBoardGroups, setVeBoardGroups] = useState<{ id: string, title: string }[]>([]);
     const [availableTeam, setAvailableTeam] = useState<{ name: string, id: string }[]>([]);
-    const [availableCheckers, setAvailableCheckers] = useState<Checker[]>([]);
+    // const [availableCheckers, setAvailableCheckers] = useState<Checker[]>([]); // checker temporarily disabled
     const [loadingClients, setLoadingClients] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [veProjectBoardId, setVeProjectBoardId] = useState<string | null>(null);
@@ -213,7 +303,7 @@ export default function AdminProjectAssignment() {
     const [isBulkMode, setIsBulkMode] = useState(false);
     const [sharedClient, setSharedClient] = useState(true);
     const [sharedEditor, setSharedEditor] = useState(true);
-    const [sharedChecker, setSharedChecker] = useState(true);
+    // const [sharedChecker, setSharedChecker] = useState(true); // checker temporarily disabled
 
     const [projectStatuses, setProjectStatuses] = useState<string[]>([]);
     const [projectTypes, setProjectTypes] = useState<string[]>([]);
@@ -435,10 +525,10 @@ export default function AdminProjectAssignment() {
                 setLoadingClients(false);
             }
 
-            try {
-                const checkersRes = await getAllCheckers();
-                if (checkersRes.success && checkersRes.data) setAvailableCheckers(checkersRes.data);
-            } catch { }
+            // try {
+            //     const checkersRes = await getAllCheckers();
+            //     if (checkersRes.success && checkersRes.data) setAvailableCheckers(checkersRes.data);
+            // } catch { } // checker temporarily disabled
         };
         fetchData();
     }, [refreshKey]);
@@ -566,12 +656,125 @@ export default function AdminProjectAssignment() {
         return () => document.removeEventListener('mousedown', onClickOutside);
     }, [isDeadlinePickerOpen]);
 
+    const handleContinueStep = async () => {
+        const projectLabel = (p: AssignmentProjectRow, idx: number) =>
+            p.projectName.trim() || `Project ${idx + 1}`;
+
+        if (step === 1) {
+            const failures: { idx: number; label: string; issues: string[] }[] = [];
+            projects.forEach((p, idx) => {
+                const issues = getStep1Issues(p);
+                if (issues.length) failures.push({ idx, label: projectLabel(p, idx), issues });
+            });
+            if (failures.length > 0) {
+                const html =
+                    failures.length === 1
+                        ? `<p class="text-sm text-left">Complete: <b>${failures[0].issues.join(', ')}</b>.</p>`
+                        : `<p class="text-sm text-left mt-1">Each project needs every field on this step.</p><ul class="text-left list-disc pl-5 mt-2 space-y-1 text-sm">${failures
+                              .map(
+                                  f =>
+                                      `<li><b>${f.label.replace(/</g, '&lt;')}</b> — ${f.issues.join(', ')}</li>`
+                              )
+                              .join('')}</ul>`;
+                await fireCvSwal({
+                    icon: 'warning',
+                    title: 'Complete project details',
+                    html,
+                    confirmButtonText: 'OK',
+                });
+                setActiveProjectIndex(failures[0].idx);
+                return;
+            }
+        }
+
+        if (step === 2) {
+            const failures: { idx: number; label: string; issues: string[] }[] = [];
+            projects.forEach((p, idx) => {
+                const issues = getStep2Issues(p);
+                if (issues.length) failures.push({ idx, label: projectLabel(p, idx), issues });
+            });
+            if (failures.length > 0) {
+                const html =
+                    failures.length === 1
+                        ? `<p class="text-sm text-left">Complete: <b>${failures[0].issues.join(', ')}</b>.</p>`
+                        : `<ul class="text-left list-disc pl-5 mt-2 space-y-1 text-sm">${failures
+                              .map(
+                                  f =>
+                                      `<li><b>${f.label.replace(/</g, '&lt;')}</b> — ${f.issues.join(', ')}</li>`
+                              )
+                              .join('')}</ul>`;
+                await fireCvSwal({
+                    icon: 'warning',
+                    title: 'Missing client or pricing',
+                    html,
+                    confirmButtonText: 'OK',
+                });
+                setActiveProjectIndex(failures[0].idx);
+                return;
+            }
+        }
+
+        if (step === 3) {
+            const failures: { idx: number; label: string; issues: string[] }[] = [];
+            projects.forEach((p, idx) => {
+                const issues = getStep3Issues(p);
+                if (issues.length) failures.push({ idx, label: projectLabel(p, idx), issues });
+            });
+            if (failures.length > 0) {
+                const html =
+                    failures.length === 1
+                        ? `<p class="text-sm text-left">Complete: <b>${failures[0].issues.join(', ')}</b>.</p>`
+                        : `<ul class="text-left list-disc pl-5 mt-2 space-y-1 text-sm">${failures
+                              .map(
+                                  f =>
+                                      `<li><b>${f.label.replace(/</g, '&lt;')}</b> — ${f.issues.join(', ')}</li>`
+                              )
+                              .join('')}</ul>`;
+                await fireCvSwal({
+                    icon: 'warning',
+                    title: 'Missing editor',
+                    html,
+                    confirmButtonText: 'OK',
+                });
+                setActiveProjectIndex(failures[0].idx);
+                return;
+            }
+        }
+
+        setStep(s => s + 1);
+    };
+
     const handleSubmit = async () => {
         if (!veProjectBoardId) { alert('Configuration Error: VE Project Board not found.'); return; }
         setIsSubmitting(true);
         try {
             const validProjects = projects.filter(p => p.projectName.trim() !== '');
             if (validProjects.length === 0) { alert('Please enter at least one project name.'); setIsSubmitting(false); return; }
+
+            const firstIncomplete = validProjects
+                .map(p => {
+                    const idx = projects.findIndex(x => x === p);
+                    const s1 = getStep1Issues(p);
+                    if (s1.length) return { idx, step: 1 as const, issues: s1 };
+                    const s2 = getStep2Issues(p);
+                    if (s2.length) return { idx, step: 2 as const, issues: s2 };
+                    const s3 = getStep3Issues(p);
+                    if (s3.length) return { idx, step: 3 as const, issues: s3 };
+                    return null;
+                })
+                .find(Boolean);
+            if (firstIncomplete) {
+                await fireCvSwal({
+                    icon: 'warning',
+                    title: 'Incomplete assignment',
+                    text: `Please complete: ${firstIncomplete.issues.join(', ')}.`,
+                    confirmButtonText: 'OK',
+                });
+                setIsSubmitting(false);
+                setStep(firstIncomplete.step);
+                if (firstIncomplete.idx >= 0) setActiveProjectIndex(firstIncomplete.idx);
+                return;
+            }
 
             const unmappedClients = Array.from(
                 new Set(
@@ -776,19 +979,39 @@ export default function AdminProjectAssignment() {
                                     </div>
                                     <div>
                                         <h3 className="text-[13px] font-bold text-white/80">Project Details</h3>
-                                        <p className="text-[10px] text-white/25">Name, deadline, type and priority</p>
+                                        <p className="text-[10px] text-white/25">
+                                            Complete every field on this step before you continue.
+                                        </p>
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <Input label="Project Name" type="text" value={activeProject.projectName}
+                                    <Input
+                                        label={
+                                            <>
+                                                Project name{' '}
+                                                <span className="text-rose-400/90" title="Required">
+                                                    *
+                                                </span>
+                                            </>
+                                        }
+                                        type="text"
+                                        value={activeProject.projectName}
                                         onChange={e => updateCurrentProject({ projectName: e.target.value })}
-                                        placeholder="e.g. Nike Q1 Commercial" />
+                                        placeholder="e.g. Nike Q1 Commercial"
+                                        aria-required
+                                    />
                                     <div className="space-y-2 relative" ref={deadlinePickerRef}>
-                                        <label className="text-[11px] font-bold uppercase tracking-widest text-white/30">Deadline</label>
+                                        <label className="text-[11px] font-bold uppercase tracking-widest text-white/30">
+                                            Deadline{' '}
+                                            <span className="text-rose-400/90" title="Required">
+                                                *
+                                            </span>
+                                        </label>
                                         <button
                                             type="button"
                                             onClick={openDeadlinePicker}
+                                            aria-required
                                             className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl px-3 py-2 sm:px-4 sm:py-3 text-sm text-left text-white hover:border-violet-500/50 transition-colors flex items-center justify-between"
                                         >
                                             <span className={activeProject.deadline ? 'text-white' : 'text-white/25'}>
@@ -798,6 +1021,9 @@ export default function AdminProjectAssignment() {
                                             </span>
                                             <Calendar className="w-4 h-4 text-white/55" />
                                         </button>
+                                        <p className="text-[10px] text-white/25 leading-snug">
+                                            Choose date and time, then <span className="text-white/45 font-semibold">Apply</span> — closing the picker without Apply does not save.
+                                        </p>
 
                                         {isDeadlinePickerOpen && (
                                             <div className="absolute z-[90] mt-2 w-[20rem] max-w-[calc(100vw-2rem)] rounded-xl border border-white/[0.12] bg-[#121425] p-2.5 space-y-2 shadow-2xl">
@@ -998,11 +1224,12 @@ export default function AdminProjectAssignment() {
                                     </div>
                                 </div>
 
-                                <Field label="Raw Video Link">
+                                <Field label="Raw video link" required>
                                     <div className="relative">
                                         <Link className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 pointer-events-none" />
                                         <input
                                             type="url"
+                                            aria-required
                                             value={activeProject.rawVideoLink}
                                             onChange={e => {
                                                 const v = e.target.value;
@@ -1022,18 +1249,36 @@ export default function AdminProjectAssignment() {
                                     </div>
                                 </Field>
 
-                                <Field label="Instructions / Notes">
+                                <Field label="Instructions / notes" required>
                                     <div className="bg-white/[0.03] border border-white/[0.07] rounded-xl overflow-hidden">
-                                        <RichTextEditor value={activeProject.instructions || ''} onChange={val => updateCurrentProject({ instructions: val })}
-                                            placeholder="Enter project instructions..." className="min-h-[120px] text-white" />
+                                        <RichTextEditor
+                                            value={activeProject.instructions || ''}
+                                            onChange={val => updateCurrentProject({ instructions: val })}
+                                            placeholder="Enter project instructions…"
+                                            className="min-h-[120px] text-white"
+                                        />
                                     </div>
                                 </Field>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <SelectPill label="Project Type" value={activeProject.projectType} placeholder="Select type…"
-                                        color="#3b82f6" icon={<BookOpen className="w-4 h-4" />} onClick={() => setActiveModal('type')} />
-                                    <SelectPill label="Priority" value={activeProject.priority} placeholder="Select priority…"
-                                        color="#ef4444" icon={<Layers className="w-4 h-4" />} onClick={() => setActiveModal('priority')} />
+                                    <SelectPill
+                                        label="Project type"
+                                        value={activeProject.projectType}
+                                        placeholder="Select type…"
+                                        color="#3b82f6"
+                                        icon={<BookOpen className="w-4 h-4" />}
+                                        onClick={() => setActiveModal('type')}
+                                        required
+                                    />
+                                    <SelectPill
+                                        label="Priority"
+                                        value={activeProject.priority}
+                                        placeholder="Select priority…"
+                                        color="#ef4444"
+                                        icon={<Layers className="w-4 h-4" />}
+                                        onClick={() => setActiveModal('priority')}
+                                        required
+                                    />
                                 </div>
                             </motion.div>
                         )}
@@ -1049,19 +1294,31 @@ export default function AdminProjectAssignment() {
                                         </div>
                                         <div>
                                             <h3 className="text-[13px] font-bold text-white/80">Client & Pricing</h3>
-                                            <p className="text-[10px] text-white/25">Who is this project for?</p>
+                                            <p className="text-[10px] text-white/25">Choose client and budget for each project.</p>
                                         </div>
                                     </div>
                                     {isBulkMode && <BulkToggle label="Apply to all" checked={sharedClient} onChange={v => { setSharedClient(v); if (v) setProjects(prev => prev.map(p => ({ ...p, client: activeProject.client }))); }} />}
                                 </div>
 
-                                <SelectPill label="Client" value={activeProject.client} placeholder="Select client…"
-                                    color="#10b981" icon={<User className="w-4 h-4" />} onClick={() => setActiveModal('client')} />
+                                <SelectPill
+                                    label="Client"
+                                    value={activeProject.client}
+                                    placeholder="Select client…"
+                                    color="#10b981"
+                                    icon={<User className="w-4 h-4" />}
+                                    onClick={() => setActiveModal('client')}
+                                    required
+                                />
 
-                                <Field label="Project Budget / Price (PHP)">
+                                <Field label="Project budget / price (PHP)" required>
                                     <div className="relative">
                                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-white/30">₱</span>
-                                        <input type="number" value={activeProject.price}
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            aria-required
+                                            value={activeProject.price}
                                             onChange={e => updateCurrentProject({ price: e.target.value })}
                                             placeholder="0.00"
                                             className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl pl-9 pr-4 py-2 sm:py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-emerald-500/50 transition-colors font-mono" />
@@ -1081,14 +1338,21 @@ export default function AdminProjectAssignment() {
                                         </div>
                                         <div>
                                             <h3 className="text-[13px] font-bold text-white/80">Assign to Team</h3>
-                                            <p className="text-[10px] text-white/25">Editor and quality checker</p>
+                                            <p className="text-[10px] text-white/25">Pick an editor for each project.</p>
                                         </div>
                                     </div>
                                     {isBulkMode && <BulkToggle label="Apply editor to all" checked={sharedEditor} onChange={v => { setSharedEditor(v); if (v && activeProject.editor) setProjects(prev => prev.map(p => ({ ...p, editor: activeProject.editor }))); }} />}
                                 </div>
 
-                                <SelectPill label="Team Member (Editor)" value={activeProject.editor} placeholder="Select editor…"
-                                    color="#3b82f6" icon={<User className="w-4 h-4" />} onClick={() => setActiveModal('team')} />
+                                <SelectPill
+                                    label="Team member (editor)"
+                                    value={activeProject.editor}
+                                    placeholder="Select editor…"
+                                    color="#3b82f6"
+                                    icon={<User className="w-4 h-4" />}
+                                    onClick={() => setActiveModal('team')}
+                                    required
+                                />
 
                                 {availabilityEditors.length > 0 && (
                                     <div className="rounded-2xl border border-white/[0.07] bg-cyan-500/[0.04] p-3 sm:p-4 space-y-2">
@@ -1127,15 +1391,24 @@ export default function AdminProjectAssignment() {
                                     </div>
                                 )}
 
+                                {/* Checker temporarily disabled
                                 <div className="flex items-center justify-between">
-                                    <SelectPill label="Checker of the Day" value={activeProject.checkerName} placeholder="Select checker…"
-                                        color="#f59e0b" icon={<Shield className="w-4 h-4" />} onClick={() => setActiveModal('checker')} />
+                                    <SelectPill
+                                        label="Checker of the day"
+                                        value={activeProject.checkerName}
+                                        placeholder="Select checker…"
+                                        color="#f59e0b"
+                                        icon={<Shield className="w-4 h-4" />}
+                                        onClick={() => setActiveModal('checker')}
+                                        required
+                                    />
                                 </div>
                                 {isBulkMode && (
                                     <div className="flex justify-end">
                                         <BulkToggle label="Apply checker to all" checked={sharedChecker} onChange={v => { setSharedChecker(v); if (v && activeProject.checkerName) setProjects(prev => prev.map(p => ({ ...p, checkerName: activeProject.checkerName }))); }} />
                                     </div>
                                 )}
+                                */}
                             </motion.div>
                         )}
 
@@ -1163,16 +1436,23 @@ export default function AdminProjectAssignment() {
                                                     {p.client && <span className="text-[10px] text-emerald-400 font-semibold">{p.client}</span>}
                                                     {p.projectType && <span className="text-[10px] text-blue-400 font-semibold">{p.projectType}</span>}
                                                     {p.price && <span className="text-[10px] text-white/30 font-semibold">₱{p.price}</span>}
+                                                    {projectHasParseableDeadline(p.deadline) && (
+                                                        <span className="text-[10px] text-violet-400/90 font-semibold">
+                                                            {formatDeadlineInManila(p.deadline!, true)}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                             {/* Right */}
                                             <div className="flex items-center gap-4 text-right flex-shrink-0">
+                                                {/* Checker temporarily disabled
                                                 {p.checkerName && (
                                                     <div>
                                                         <p className="text-[9px] font-bold uppercase tracking-widest text-amber-500/60">Checker</p>
                                                         <p className="text-[12px] font-semibold text-white/70">{p.checkerName}</p>
                                                     </div>
                                                 )}
+                                                */}
                                                 <div>
                                                     <p className="text-[9px] font-bold uppercase tracking-widest text-blue-400/60">Editor</p>
                                                     <p className="text-[12px] font-semibold text-white/70">{p.editor || 'Unassigned'}</p>
@@ -1196,7 +1476,7 @@ export default function AdminProjectAssignment() {
                         </button>
 
                         <button
-                            onClick={step === 4 ? handleSubmit : () => setStep(s => s + 1)}
+                            onClick={step === 4 ? handleSubmit : () => void handleContinueStep()}
                             disabled={isSubmitting || loadingClients}
                             className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-150 ${
                                 step === 4
@@ -1424,10 +1704,12 @@ export default function AdminProjectAssignment() {
                 options={availableTeam.map(u => u.name)} selected={activeProject.editor}
                 onSelect={val => isBulkMode && sharedEditor ? setProjects(prev => prev.map(p => ({ ...p, editor: val }))) : updateCurrentProject({ editor: val })}
                 icon={User} />
+            {/* Checker temporarily disabled
             <SelectionModal isOpen={activeModal === 'checker'} onClose={() => setActiveModal(null)} title="Select Checker of the Day"
                 options={availableCheckers.filter(c => c.is_active).map(c => c.name)} selected={activeProject.checkerName}
                 onSelect={val => isBulkMode && sharedChecker ? setProjects(prev => prev.map(p => ({ ...p, checkerName: val }))) : updateCurrentProject({ checkerName: val })}
                 icon={Check} />
+            */}
         </AdminPageLayout>
     );
 }

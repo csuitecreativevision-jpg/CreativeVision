@@ -292,10 +292,10 @@ export function AdminChatbotProvider({ children }: { children: ReactNode }) {
                                                     void submitMessage();
                                                 }
                                             }}
-                                            rows={1}
+                                            rows={3}
                                             placeholder="Type your commands here"
                                             disabled={isLoading}
-                                            className={`flex-1 rounded-2xl px-4 py-3 text-sm focus:outline-none transition-all disabled:opacity-50 resize-none min-h-[46px] max-h-[140px] overflow-y-auto whitespace-pre-wrap [overflow-wrap:anywhere] ${
+                                            className={`flex-1 rounded-2xl px-4 py-3 text-sm focus:outline-none transition-[border-color,box-shadow] disabled:opacity-50 resize-y min-h-[4.25rem] max-h-[min(55dvh,22rem)] overflow-y-auto whitespace-pre-wrap [overflow-wrap:anywhere] ${
                                                 isDark
                                                     ? 'bg-white/5 border border-white/10 text-white focus:border-[#8b5cf6]/50 focus:ring-1 focus:ring-[#8b5cf6]/50 placeholder:text-gray-500 [scrollbar-width:thin] [scrollbar-color:#6d28d9_transparent]'
                                                     : 'bg-white border border-zinc-200 text-zinc-900 focus:border-zinc-500 focus:ring-1 focus:ring-zinc-400/40 placeholder:text-zinc-500'

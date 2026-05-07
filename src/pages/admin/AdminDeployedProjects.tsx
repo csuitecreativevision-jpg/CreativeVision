@@ -16,6 +16,7 @@ import { isMondayStatusForApproval } from '../../lib/mondayItemStatus';
 import { extractGoogleDriveFileId } from '../../services/googleDriveLinkService';
 import { isCvApprovedMondayStatus, maybeClearSubmissionVideoFeedback } from '../../services/submissionVideoFeedbackService';
 import { ThreeLogoLoader } from '../../components/ui/ThreeLogoLoader';
+import { findSubmissionLinkColumn } from '../../components/views/EditorSubmissionHub';
 
 type QuickRange = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'custom';
 
@@ -214,7 +215,10 @@ export default function AdminDeployedProjects() {
             const editorId = getColId((t, type) => type === 'people' && (t.includes('editor') || t.includes('owner')));
             const priceId = getColId((t) => t.includes('price') || t.includes('budget'));
             const linkId = getColId((t) => t.includes('raw video') || t.includes('video link') || t === 'link');
-            const submissionId = getColId((t) => t.includes('submission'));
+            /** Prefer VE board "Submission Link" column; fall back to any submission* column (e.g. preview). */
+            const submissionLinkCol = findSubmissionLinkColumn(cols);
+            const submissionId =
+                submissionLinkCol?.id || getColId((t) => t.includes('submission'));
             const instructionsId = getColId((t) => t.includes('instruction') || t.includes('notes'));
             const deadlineId = getColId((t) => t.includes('deadline') || t === 'date' || t.includes('due'));
             const deployedDateId = getColId(
