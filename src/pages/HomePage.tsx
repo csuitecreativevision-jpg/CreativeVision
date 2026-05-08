@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { motion, useScroll, useTransform, AnimatePresence, useMotionValue, animate, useInView } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, animate, useInView, useTransform } from 'framer-motion';
 import { Play, TrendingDown, Clock, Eye, ArrowRight, Zap, ChevronLeft, ChevronRight, Plus, Minus } from 'lucide-react';
 
 const faqs = [
@@ -41,39 +41,84 @@ function CountingNumber({ value, suffix = "" }: { value: number, suffix?: string
 
 export default function HomePage() {
   const location = useLocation();
-  const targetRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: targetRef,
-  });
+  const [sceneIndex, setSceneIndex] = useState(0);
+  const [isSceneLocked, setIsSceneLocked] = useState(false);
+  const touchStartY = useRef<number | null>(null);
 
   useEffect(() => {
     if (location.hash === '#showcase') {
-      // Small delay to ensure layout is complete before scrolling
-      setTimeout(() => {
-        window.scrollTo({ top: window.innerHeight * 2.9, behavior: 'instant' as ScrollBehavior });
-      }, 100);
+      setSceneIndex(3);
     } else if (location.state && location.state.target === 'services') {
-      // Scene5 is the last scene, roughly at 80% scroll
-      // Scene5 (Ready to Scale) is exactly at 4x viewport height
-      setTimeout(() => {
-        window.scrollTo({
-          top: window.innerHeight * 4,
-          behavior: 'auto'
-        });
-      }, 50);
+      setSceneIndex(4);
       window.history.replaceState({}, document.title);
     } else {
-      window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+      setSceneIndex(0);
     }
   }, [location]);
 
-  // 6 sections = 600vw. We want to move left by 500vw (which is 83.33% of 600vw)
-  const x = useTransform(scrollYProgress, [0, 1], ['0%', '-83.333%']);
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, []);
 
-  // Global Parallax Background Orbs
-  const bgY1 = useTransform(scrollYProgress, [0, 1], ['0%', '50%']);
-  const bgY2 = useTransform(scrollYProgress, [0, 1], ['0%', '-50%']);
-  const bgX1 = useTransform(scrollYProgress, [0, 1], ['0%', '30%']);
+  useEffect(() => {
+    const changeScene = (direction: 1 | -1) => {
+      if (isSceneLocked) return;
+      setSceneIndex((prev) => {
+        const next = Math.min(5, Math.max(0, prev + direction));
+        return next;
+      });
+      setIsSceneLocked(true);
+      window.setTimeout(() => setIsSceneLocked(false), 450);
+    };
+
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      if (Math.abs(event.deltaY) < 8) return;
+      changeScene(event.deltaY > 0 ? 1 : -1);
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (["ArrowDown", "PageDown", " "].includes(event.key)) {
+        event.preventDefault();
+        changeScene(1);
+      } else if (["ArrowUp", "PageUp"].includes(event.key)) {
+        event.preventDefault();
+        changeScene(-1);
+      }
+    };
+
+    window.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('wheel', onWheel);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isSceneLocked]);
+
+  const renderScene = () => {
+    switch (sceneIndex) {
+      case 0:
+        return <Scene1 />;
+      case 1:
+        return <Scene2 />;
+      case 2:
+        return <Scene3 />;
+      case 3:
+        return <Scene4 />;
+      case 4:
+        return <Scene5 />;
+      case 5:
+      default:
+        return <Scene6 />;
+    }
+  };
+
+  const bgX = `${sceneIndex * 6}%`;
+  const progress = sceneIndex / 5;
 
   return (
     <div className="bg-[#050508] text-white selection:bg-violet-500/30 font-sans overflow-x-hidden max-w-full">
@@ -81,40 +126,47 @@ export default function HomePage() {
 
       {/* Global Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <motion.div style={{ y: bgY1, x: bgX1 }} className="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vw] bg-violet-600/10 rounded-full blur-[120px]" />
-        <motion.div style={{ y: bgY2 }} className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-fuchsia-600/10 rounded-full blur-[150px]" />
-        <motion.div style={{ y: bgY1 }} className="absolute top-[40%] left-[40%] w-[30vw] h-[30vw] bg-indigo-500/10 rounded-full blur-[100px]" />
+        <motion.div animate={{ x: bgX }} transition={{ duration: 0.35, ease: "easeOut" }} className="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vw] bg-violet-600/10 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-fuchsia-600/10 rounded-full blur-[150px]" />
+        <div className="absolute top-[40%] left-[40%] w-[30vw] h-[30vw] bg-indigo-500/10 rounded-full blur-[100px]" />
       </div>
 
-      {/* Scroll Rig */}
-      <div ref={targetRef} className="relative h-[600vh]">
-        {/* Vertical Snap Points */}
-        <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
-          <div className="h-[100vh] snap-start" />
-          <div className="h-[100vh] snap-start" />
-          <div className="h-[100vh] snap-start" />
-          <div className="h-[100vh] snap-start" />
-          <div className="h-[100vh] snap-start" />
-          <div className="h-[100vh] snap-start" />
-        </div>
-
-        <div className="sticky top-0 h-screen overflow-hidden flex items-center z-10">
-          <motion.div style={{ x }} className="flex h-full w-[600vw]">
-            <Scene1 />
-            <Scene2 />
-            <Scene3 />
-            <Scene4 />
-            <Scene5 />
-            <Scene6 />
+      <div
+        className="h-screen overflow-hidden flex items-center z-10 touch-pan-y"
+        onTouchStart={(event) => {
+          touchStartY.current = event.touches[0]?.clientY ?? null;
+        }}
+        onTouchEnd={(event) => {
+          const startY = touchStartY.current;
+          const endY = event.changedTouches[0]?.clientY;
+          touchStartY.current = null;
+          if (startY === null || typeof endY !== 'number' || isSceneLocked) return;
+          const delta = startY - endY;
+          if (Math.abs(delta) < 30) return;
+          setSceneIndex((prev) => Math.min(5, Math.max(0, prev + (delta > 0 ? 1 : -1))));
+          setIsSceneLocked(true);
+          window.setTimeout(() => setIsSceneLocked(false), 450);
+        }}
+      >
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={sceneIndex}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.35, ease: "easeInOut" }}
+            className="w-screen h-full"
+          >
+            {renderScene()}
           </motion.div>
-        </div>
+        </AnimatePresence>
       </div>
 
       {/* Progress Bar */}
-      <div className="fixed left-1/2 -translate-x-1/2 w-32 h-[2px] bg-white/10 rounded-full overflow-hidden z-50 bottom-[max(1.5rem,env(safe-area-inset-bottom,0px))] sm:bottom-8">
+      <div className="fixed left-1/2 -translate-x-1/2 w-32 h-[2px] bg-white/10 rounded-full overflow-hidden z-40 bottom-[max(0.75rem,env(safe-area-inset-bottom,0px))] sm:bottom-4">
         <motion.div
           className="h-full bg-violet-500/80"
-          style={{ scaleX: scrollYProgress, transformOrigin: '0% 50%' }}
+          style={{ scaleX: progress, transformOrigin: '0% 50%' }}
         />
       </div>
     </div>
@@ -137,8 +189,8 @@ function Scene1() {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(139,92,246,0.05)_0%,transparent_50%)] pointer-events-none" />
       <div className="z-10 text-center max-w-5xl mx-auto min-w-0 w-full">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           transition={{ duration: 0.8 }}
           className="inline-flex items-center gap-2 glass-panel px-4 py-2 rounded-full mb-10"
         >
@@ -147,8 +199,8 @@ function Scene1() {
         </motion.div>
 
         <motion.h1
-          initial={{ opacity: 0, y: 40, filter: 'blur(10px)' }}
-          whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+          initial={{ opacity: 0, filter: 'blur(10px)' }}
+          animate={{ opacity: 1, filter: 'blur(0px)' }}
           viewport={{ amount: 0.3 }}
           transition={{ duration: 1.2, delay: 0.2, ease: "easeOut" }}
           className="font-display text-4xl sm:text-5xl md:text-7xl lg:text-9xl font-medium leading-[0.9] tracking-tight mb-6 md:mb-8 text-glow-premium"
@@ -156,13 +208,13 @@ function Scene1() {
           <div className="flex flex-col items-center justify-center gap-2 md:gap-4">
             <div>Turn</div>
             <div className="inline-grid place-items-center">
-              <AnimatePresence>
+              <AnimatePresence initial={false} mode="sync">
                 <motion.span
                   key={index}
-                  initial={{ opacity: 0, y: 40, filter: 'blur(8px)', scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, filter: 'blur(0px)', scale: 1 }}
-                  exit={{ opacity: 0, y: -40, filter: 'blur(8px)', scale: 1.05 }}
-                  transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.35, ease: 'linear' }}
                   className="italic text-violet-400 text-glow-violet col-start-1 row-start-1"
                 >
                   {words[index]}
@@ -175,7 +227,7 @@ function Scene1() {
 
         <motion.p
           initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
+          animate={{ opacity: 1 }}
           transition={{ duration: 1, delay: 0.5 }}
           className="select-text text-base md:text-lg lg:text-xl text-white/50 max-w-2xl mx-auto leading-relaxed font-light px-4 md:px-0"
         >
@@ -205,7 +257,7 @@ function Scene2() {
         <div>
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
+            animate={{ opacity: 1, scale: 1 }}
             viewport={{ amount: 0.3 }}
             transition={{ duration: 0.5 }}
             className="inline-flex items-center gap-2 glass-panel px-4 py-2 rounded-full mb-8 text-white/70"
@@ -214,8 +266,8 @@ function Scene2() {
             <span className="text-[10px] font-medium tracking-[0.2em] uppercase">Reality Check</span>
           </motion.div>
           <motion.h2
-            initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
-            whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+            initial={{ opacity: 0, filter: 'blur(10px)' }}
+            animate={{ opacity: 1, filter: 'blur(0px)' }}
             viewport={{ amount: 0.3 }}
             transition={{ duration: 1, delay: 0.1, ease: "easeOut" }}
             className="font-display text-4xl md:text-6xl lg:text-8xl font-medium tracking-tight mb-6 md:mb-8 leading-[0.9] text-glow-premium"
@@ -226,7 +278,7 @@ function Scene2() {
           </motion.h2>
           <motion.p
             initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
+            animate={{ opacity: 1 }}
             viewport={{ amount: 0.3 }}
             transition={{ duration: 0.8, delay: 0.2 }}
             className="select-text text-base md:text-lg text-white/50 max-w-md leading-relaxed font-light"
@@ -243,8 +295,8 @@ function Scene2() {
             ].map((item, i) => (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, x: -20 }}
-                whileInView={{ opacity: 1, x: 0 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 viewport={{ amount: 0.3 }}
                 transition={{ duration: 0.6, delay: 0.2 + (i * 0.1) }}
                 className="glass-panel p-5 rounded-2xl flex items-center justify-between"
@@ -265,12 +317,11 @@ function Scene2() {
           ].map((item, i) => (
             <motion.div
               key={i}
-              initial={{ opacity: 0, y: item.yOffset + 50 }}
-              whileInView={{ opacity: 1, y: item.yOffset }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
               viewport={{ amount: 0.3 }}
               transition={{
                 opacity: { duration: 0.8, delay: item.delay },
-                y: { duration: 0.8, delay: item.delay, ease: "easeOut" }
               }}
               className="absolute glass-panel p-8 rounded-2xl w-[320px] shadow-[0_20px_40px_rgba(0,0,0,0.3)]"
               style={{ left: `calc(50% - 160px + ${item.xOffset}px)`, transform: `rotateZ(${item.rotate}deg)` }}
@@ -295,8 +346,8 @@ function Scene3() {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(139,92,246,0.04)_0%,transparent_60%)] pointer-events-none" />
       <div className="z-10 w-full max-w-6xl mx-auto text-center">
         <motion.h2
-          initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
-          whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+          initial={{ opacity: 0, filter: 'blur(10px)' }}
+          animate={{ opacity: 1, filter: 'blur(0px)' }}
           viewport={{ amount: 0.3 }}
           transition={{ duration: 1, ease: "easeOut" }}
           className="font-display text-4xl md:text-5xl lg:text-7xl font-medium tracking-tight mb-4 md:mb-6 text-glow-premium"
@@ -307,7 +358,7 @@ function Scene3() {
         </motion.h2>
         <motion.p
           initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
+          animate={{ opacity: 1 }}
           viewport={{ amount: 0.3 }}
           transition={{ duration: 0.8, delay: 0.2 }}
           className="select-text text-[10px] font-medium tracking-[0.3em] uppercase text-white/40 mb-16 md:mb-24"
@@ -324,11 +375,11 @@ function Scene3() {
           ].map((stat, i) => (
             <motion.div
               key={i}
-              initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
-              whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              initial={{ opacity: 0, filter: 'blur(10px)' }}
+              animate={{ opacity: 1, filter: 'blur(0px)' }}
               viewport={{ amount: 0.3 }}
               transition={{ duration: 0.8, delay: 0.1 + (i * 0.1), ease: "easeOut" }}
-              whileHover={{ y: -5, scale: 1.02, backgroundColor: "rgba(255,255,255,0.08)" }}
+              whileHover={{ scale: 1.02, backgroundColor: "rgba(255,255,255,0.08)" }}
               style={{ willChange: "transform, filter, opacity" }}
               className="glass-panel p-6 md:p-10 rounded-2xl flex flex-col items-center justify-center"
             >
@@ -342,8 +393,8 @@ function Scene3() {
 
         {/* Client Names */}
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           viewport={{ amount: 0.3 }}
           transition={{ duration: 0.8, delay: 0.6 }}
           className="w-full px-4 md:px-0"
@@ -403,33 +454,33 @@ function Scene4() {
   }, [activeIndex, showcaseWorks.length]);
 
   return (
-    <section className="w-screen h-full flex flex-col justify-center relative px-8 md:px-24 py-16 overflow-hidden">
-      <div className="mb-6 md:mb-10 flex flex-col md:flex-row justify-between items-start md:items-end z-20 shrink-0 gap-6">
+    <section className="w-screen h-full flex flex-col justify-start relative px-6 md:px-20 pt-8 md:pt-10 pb-6 md:pb-8 overflow-hidden">
+      <div className="mb-3 md:mb-4 flex flex-col md:flex-row justify-between items-start md:items-end z-20 shrink-0 gap-3">
         <div>
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             viewport={{ amount: 0.3 }}
             transition={{ duration: 0.8 }}
-            className="inline-flex items-center gap-2 glass-panel px-4 py-2 rounded-full mb-4 md:mb-6"
+            className="inline-flex items-center gap-2 glass-panel px-4 py-2 rounded-full mb-3 md:mb-4"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-violet-400/80" />
             <span className="text-[10px] font-medium tracking-[0.2em] uppercase text-white/70">Selected Work</span>
           </motion.div>
           <motion.h2
             initial={{ opacity: 0, filter: 'blur(10px)' }}
-            whileInView={{ opacity: 1, filter: 'blur(0px)' }}
+            animate={{ opacity: 1, filter: 'blur(0px)' }}
             viewport={{ amount: 0.3 }}
             transition={{ duration: 1, ease: "easeOut" }}
-            className="font-display text-4xl md:text-5xl lg:text-7xl font-medium tracking-tight text-glow-premium mb-4"
+            className="font-display text-4xl md:text-5xl lg:text-7xl font-medium tracking-tight text-glow-premium mb-3"
           >
             <div>
               Cinematic <span className="italic text-violet-400 text-glow-violet">Excellence.</span>
             </div>
           </motion.h2>
           <motion.p
-            initial={{ opacity: 0, y: 10 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             viewport={{ amount: 0.3 }}
             transition={{ duration: 1, delay: 0.2, ease: "easeOut" }}
             className="select-text text-sm md:text-base text-white/50 font-light max-w-xl tracking-wide leading-relaxed"
@@ -441,8 +492,8 @@ function Scene4() {
         <div className="flex flex-col items-end gap-4">
           <motion.button
             onClick={() => navigate('/portfolio')}
-            initial={{ opacity: 0, x: 20 }}
-            whileInView={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             viewport={{ amount: 0.3 }}
             transition={{ duration: 0.8, delay: 0.2 }}
             className="hidden md:flex items-center gap-2 text-xs tracking-widest uppercase font-medium hover:text-white/70 transition-colors"
@@ -452,10 +503,10 @@ function Scene4() {
         </div>
       </div>
 
-      <div className="flex flex-col items-center justify-center gap-8 w-full flex-1 min-h-0 z-10 pb-4 md:pb-8">
+      <div className="flex flex-col items-center justify-start gap-2 md:gap-3 w-full z-10 pt-0 pb-10 md:pb-12">
 
         {/* Active Video Showcase Carousel */}
-        <div className="relative w-full flex justify-center items-center h-full max-h-[60vh]">
+        <div className="relative w-full flex justify-center items-start h-[36vh] md:h-[40vh]">
           {showcaseWorks.map((work, index) => {
             let offset = index - activeIndex;
             // Normalize offset for 4 items to be -1, 0, 1, 2
@@ -467,17 +518,16 @@ function Scene4() {
             return (
               <motion.div
                 key={index}
-                initial={{ x: "-50%", y: "-50%", scale: 0.8, opacity: 0 }}
+                initial={{ x: "-50%", scale: 0.8, opacity: 0 }}
                 animate={{
                   x: `calc(-50% + ${offset * 22}vw)`,
-                  y: "-50%",
                   scale: 1 - Math.abs(offset) * 0.15,
                   opacity: Math.abs(offset) > 1 ? 0 : 1,
                   filter: offset === 0 ? "blur(0px)" : "blur(40px)",
                   zIndex: 30 - Math.abs(offset) * 10,
                 }}
                 transition={{ type: "spring", stiffness: 150, damping: 25 }}
-                className={`absolute top-1/2 left-1/2 rounded-2xl md:rounded-3xl overflow-hidden shadow-[0_0_40px_rgba(139,92,246,0.2)] border border-white/10 bg-black/50 backdrop-blur-sm cursor-pointer flex items-center justify-center ${work.type === 'short' ? 'h-full aspect-[9/16]' : 'w-[85vw] md:w-[60vw] max-w-5xl aspect-video'
+                className={`absolute top-[2%] left-1/2 rounded-2xl md:rounded-3xl overflow-hidden shadow-[0_0_40px_rgba(139,92,246,0.2)] border border-white/10 bg-black/50 backdrop-blur-sm cursor-pointer flex items-center justify-center ${work.type === 'short' ? 'h-full aspect-[9/16]' : 'w-[82vw] md:w-[56vw] max-w-5xl aspect-video'
                   }`}
                 onClick={() => setActiveIndex(index)}
               >
@@ -526,7 +576,7 @@ function Scene4() {
         </div>
 
         {/* Navigation Controls */}
-        <div className="flex items-center justify-center gap-6 mt-4 w-full">
+        <div className="flex items-center justify-center gap-6 mt-0 w-full">
           <button
             onClick={() => setActiveIndex((prev) => (prev - 1 + showcaseWorks.length) % showcaseWorks.length)}
             className="w-12 h-12 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 hover:border-white/30 transition-all text-white/50 hover:text-white backdrop-blur-sm"
@@ -560,29 +610,29 @@ function Scene5() {
   const navigate = useNavigate();
 
   return (
-    <section className="w-screen h-full flex flex-col justify-center relative px-8 md:px-24 py-16">
+    <section className="w-screen h-full flex flex-col justify-center relative px-6 md:px-20 py-8 md:py-10">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(139,92,246,0.08)_0%,transparent_60%)] pointer-events-none" />
 
       <div className="z-10 w-full max-w-6xl mx-auto">
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 md:gap-8 mb-12 md:mb-16">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 md:gap-6 mb-6 md:mb-8">
           <div>
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
               viewport={{ amount: 0.3 }}
               transition={{ duration: 0.8 }}
-              className="inline-flex items-center gap-2 glass-panel px-4 py-2 rounded-full mb-4 md:mb-6"
+              className="inline-flex items-center gap-2 glass-panel px-4 py-2 rounded-full mb-3 md:mb-4"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-violet-400/80" />
               <span className="text-[10px] font-medium tracking-[0.2em] uppercase text-white/70">Choose Your Path</span>
             </motion.div>
             <motion.h2
               initial={{ opacity: 0, filter: 'blur(10px)' }}
-              whileInView={{ opacity: 1, filter: 'blur(0px)' }}
+              animate={{ opacity: 1, filter: 'blur(0px)' }}
               viewport={{ amount: 0.3 }}
               transition={{ duration: 1, ease: "easeOut" }}
-              className="font-display text-5xl md:text-7xl lg:text-8xl font-medium tracking-tight text-glow-premium leading-[0.9]"
+              className="font-display text-4xl md:text-6xl lg:text-7xl font-medium tracking-tight text-glow-premium leading-[0.9]"
             >
               <div>Ready to</div>
               <div className="text-violet-400 text-glow-violet italic mt-2">Scale?</div>
@@ -590,7 +640,7 @@ function Scene5() {
           </div>
           <motion.p
             initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
+            animate={{ opacity: 1 }}
             viewport={{ amount: 0.3 }}
             transition={{ duration: 0.8, delay: 0.2 }}
             className="select-text text-white/50 max-w-sm text-sm md:text-base font-light pb-2"
@@ -601,11 +651,11 @@ function Scene5() {
 
         {/* Main Card: Hire CreativeVision */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           viewport={{ amount: 0.3 }}
           transition={{ duration: 0.8, delay: 0.3 }}
-          className="glass-panel p-8 md:p-12 rounded-3xl relative overflow-hidden border border-white/10 shadow-[0_0_40px_rgba(139,92,246,0.1)] group hover:border-violet-500/30 transition-colors duration-500"
+          className="glass-panel p-6 md:p-10 rounded-3xl relative overflow-hidden border border-white/10 shadow-[0_0_40px_rgba(139,92,246,0.1)] group hover:border-violet-500/30 transition-colors duration-500"
         >
           {/* Background glow/accents */}
           <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3 group-hover:bg-violet-500/20 transition-colors duration-700 pointer-events-none" />
@@ -615,13 +665,13 @@ function Scene5() {
             <Zap className="w-96 h-96" />
           </div>
 
-          <div className="relative z-10 flex flex-col md:flex-row gap-12 items-center justify-between">
+          <div className="relative z-10 flex flex-col md:flex-row gap-8 items-center justify-between">
             <div className="flex-1 w-full">
               <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center mb-6 md:mb-8 text-violet-400 shadow-[0_0_20px_rgba(139,92,246,0.2)]">
                 <Zap className="w-6 h-6 md:w-7 md:h-7" />
               </div>
               <h3 className="font-sans text-4xl md:text-5xl font-black mb-4 tracking-tight">Hire CreativeVision</h3>
-              <p className="select-text text-white/60 mb-8 md:mb-10 max-w-lg text-base md:text-lg font-light">
+              <p className="select-text text-white/60 mb-6 md:mb-8 max-w-lg text-base md:text-lg font-light">
                 Transform your raw footage into high-converting assets with professional turnaround.
               </p>
 
@@ -649,10 +699,10 @@ function Scene5() {
         {/* Join the Roster (Simple Text) */}
         <motion.div
           initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
+          animate={{ opacity: 1 }}
           viewport={{ amount: 0.3 }}
           transition={{ duration: 0.8, delay: 0.5 }}
-          className="mt-8 md:mt-12 text-center md:text-left px-4"
+          className="mt-4 md:mt-6 text-center md:text-left px-4"
         >
           <p className="select-text text-sm md:text-base text-white/40 font-light">
             Are you a world-class editor?{' '}
@@ -679,8 +729,8 @@ function Scene6() {
       
       <div className="z-10 w-full max-w-4xl mx-auto">
         <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           viewport={{ amount: 0.3 }}
           transition={{ duration: 0.8 }}
           className="inline-flex items-center gap-2 glass-panel px-4 py-2 rounded-full mb-8"
@@ -691,7 +741,7 @@ function Scene6() {
         
         <motion.h2 
           initial={{ opacity: 0, filter: 'blur(10px)' }}
-          whileInView={{ opacity: 1, filter: 'blur(0px)' }}
+          animate={{ opacity: 1, filter: 'blur(0px)' }}
           viewport={{ amount: 0.3 }}
           transition={{ duration: 1, ease: "easeOut" }}
           className="font-display text-4xl md:text-5xl lg:text-7xl font-bold tracking-tight mb-12 text-glow-premium"
@@ -705,8 +755,8 @@ function Scene6() {
             return (
               <motion.div
                 key={index}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 viewport={{ amount: 0.3 }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
                 className={`glass-panel border overflow-hidden rounded-2xl transition-all duration-300 ${isOpen ? 'border-violet-500/40 bg-white/10' : 'border-white/10 hover:border-white/20'}`}
