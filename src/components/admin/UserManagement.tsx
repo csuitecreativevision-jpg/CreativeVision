@@ -203,6 +203,7 @@ export function UserManagement() {
                 workspace_id: selectedUserWorkspace,
                 allowed_board_ids: selectedBoardIds,
                 name: newUserName.trim(),
+                ...(newUserPassword.trim() ? { password: newUserPassword } : {}),
                 is_full_timer: newUserRole === 'editor' ? newUserFullTimer : false
             });
             setIsCreatingUser(false);

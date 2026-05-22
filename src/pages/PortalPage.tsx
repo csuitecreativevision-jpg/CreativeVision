@@ -26,7 +26,7 @@ export default function PortalPage() {
         setError(null);
         setIsLoading(true);
 
-        const result = await loginUser(email.toLowerCase(), password);
+        const result = await loginUser(email, password);
 
         if (!result.success || !result.user) {
             setError(result.error || 'Invalid credentials');

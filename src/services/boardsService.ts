@@ -201,8 +201,38 @@ const DOMAIN_ROLE_MAP: Record<string, UserRole> = {
  */
 export async function loginUser(email: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
     try {
-        const password_hash = await hashPassword(password);
-        const normalizedEmail = email.toLowerCase();
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+        if (!supabaseUrl?.trim() || !supabaseKey?.trim()) {
+            return {
+                success: false,
+                error: 'Database is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env, then restart the dev server.',
+            };
+        }
+
+        if (!globalThis.crypto?.subtle) {
+            return {
+                success: false,
+                error: 'Login requires HTTPS or localhost. Open the site at https://… or http://localhost, not a plain LAN IP.',
+            };
+        }
+
+        const normalizedEmail = email.trim().toLowerCase();
+        const normalizedPassword = password.trim();
+
+        if (!normalizedEmail || !normalizedPassword) {
+            return { success: false, error: 'Email and password are required.' };
+        }
+
+        const domain = normalizedEmail.split('@')[1] ?? '';
+        if (!DOMAIN_ROLE_MAP[domain]) {
+            return {
+                success: false,
+                error: 'Use your portal email (@admin.cv, @editors.cv, or @clients.cv).',
+            };
+        }
+
+        const password_hash = await hashPassword(normalizedPassword);
 
         const { data, error } = await supabase
             .from('users')
@@ -211,20 +241,31 @@ export async function loginUser(email: string, password: string): Promise<{ succ
             .eq('password_hash', password_hash)
             .maybeSingle();
 
-        if (error || !data) {
-            console.error('Login failed:', error);
-            return { success: false, error: 'Invalid email or password' };
+        // PostgREST returns PGRST116 when no row matches — treat as invalid credentials.
+        if (error && error.code !== 'PGRST116') {
+            console.error('Login query failed:', error);
+            return {
+                success: false,
+                error: 'Could not reach the database. Check your connection and Supabase settings.',
+            };
+        }
+
+        if (!data) {
+            return { success: false, error: 'Invalid email or password.' };
         }
 
         // Enforce domain ↔ role match
-        const domain = normalizedEmail.split('@')[1] ?? '';
         const expectedRole = DOMAIN_ROLE_MAP[domain];
         if (expectedRole && data.role !== expectedRole) {
-            return { success: false, error: 'Access denied. This account is not authorized for this portal.' };
+            return {
+                success: false,
+                error: `This account is registered as ${data.role}, but ${normalizedEmail} must be a ${expectedRole} account.`,
+            };
         }
 
         return { success: true, user: data };
     } catch (error) {
+        console.error('Login failed:', error);
         return { success: false, error: error instanceof Error ? error.message : 'Login failed' };
     }
 }
@@ -287,6 +328,7 @@ export async function updateUser(
         role?: UserRole;
         workspace_id?: string;
         name?: string;
+        password?: string;
         allowed_board_ids?: string[];
         is_full_timer?: boolean;
     }
@@ -295,6 +337,13 @@ export async function updateUser(
         const updateData: Record<string, unknown> = {
             updated_at: new Date().toISOString()
         };
+        if (updates.password !== undefined) {
+            const trimmed = updates.password.trim();
+            if (trimmed.length < 4) {
+                return { success: false, error: 'Password must be at least 4 characters.' };
+            }
+            updateData.password_hash = await hashPassword(trimmed);
+        }
         if (updates.name !== undefined) updateData.name = updates.name;
         if (updates.role !== undefined) updateData.role = updates.role;
         if (updates.workspace_id !== undefined) {
