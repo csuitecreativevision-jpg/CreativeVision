@@ -33,3 +33,7 @@ supabase/.temp/linked-project.json
 
 # Server build used to pre-build pages (scripts/prerender.mjs)
 dist-ssr
+
+.vercel
+.env*
+!.env.example
