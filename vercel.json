@@ -1,4 +1,16 @@
 {
+  "redirects": [
+    {
+      "source": "/:old(portal|admin-dashboard|admin-portal|editor-portal|client-portal)",
+      "destination": "https://dashboard.creativevision.dev/login",
+      "permanent": false
+    },
+    {
+      "source": "/:old(portal|admin-dashboard|admin-portal|editor-portal|client-portal)/:path*",
+      "destination": "https://dashboard.creativevision.dev/login",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/dashboards",

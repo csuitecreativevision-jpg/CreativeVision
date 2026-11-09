@@ -1,7 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Play, Scissors, Sparkles, Zap, Video, Check, XCircle, ChevronDown, ArrowRight } from 'lucide-react';
-import { submitApplicationToMonday } from '../services/mondayService';
+import { BOOKING_API } from './site/links';
 
 interface CareersSectionProps {
     id?: string;
@@ -140,11 +140,32 @@ export default function CareersSection({ id, className, onBack }: CareersSection
         setSubmitStatus('idle');
 
         try {
-            await submitApplicationToMonday({
-                ...formData,
-                specialization: specializations.find(s => s.id === formData.specialization)?.title || formData.specialization,
-                resumeFile: undefined,
+            // Applications go to the CreativeVision dashboard (Editor applications), not Monday.com.
+            const answers = [
+                ['Have you worked as a video editor for a brand, business, or client before?', formData.hasWorkedBefore],
+                ['Your video editing experience', formData.experienceDescription],
+                ['Software and tools you use', formData.toolsUsed],
+                ['Motion graphics, animation or VFX experience', formData.motionGraphicsExp],
+                ['Your editing workflow from raw footage to final delivery', formData.workflowDescription],
+                ['How you decide if an edit is successful', formData.successMetric],
+                ['Why you want to work with CreativeVision', formData.whyJoin],
+                ['Current employment status', formData.employmentStatus],
+                ['Currently a student?', formData.isStudent],
+                ['Expected rate per video (PHP)', formData.expectedRate],
+            ].map(([question, answer]) => ({ question, answer: String(answer ?? '') }));
+            const res = await fetch(`${BOOKING_API}/api/public/applications`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: formData.fullName,
+                    email: formData.email,
+                    specialization: specializations.find(s => s.id === formData.specialization)?.title || formData.specialization,
+                    portfolioLink: formData.portfolioLink,
+                    answers,
+                }),
             });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'We couldn’t send your application. Please try again.');
 
             setSubmitStatus('success');
         } catch (error) {
