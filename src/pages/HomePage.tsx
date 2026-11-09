@@ -91,7 +91,8 @@ export default function HomePage() {
     const state = location.state as { target?: string } | null;
     if (!id && state?.target === 'services') id = 'services';
     const timer = window.setTimeout(() => {
-      if (!id) return window.scrollTo(0, 0);
+      // The logo or "Home" while already here: back to the top.
+      if (!id) return window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
       document.getElementById(id)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
     }, 60);
     return () => window.clearTimeout(timer);

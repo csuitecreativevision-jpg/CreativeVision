@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { MotionConfig } from 'framer-motion';
 import { ArrowRight, Bell, CalendarDays, Clapperboard, MessagesSquare, ShieldCheck, Smartphone, Users, Wallet } from 'lucide-react';
@@ -56,9 +55,6 @@ function BookCall({ label = 'Book a free call', className = primaryButton }: { l
 
 export default function DashboardsPage() {
   useSitePage();
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
 
   return (
     <MotionConfig reducedMotion="user">

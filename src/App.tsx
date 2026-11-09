@@ -8,15 +8,26 @@ import { ThreeLogoLoader } from './components/ui/ThreeLogoLoader';
 import { MainChatbot } from './components/MainChatbot';
 import { canonicalUrl, routeMeta } from './seo/routes';
 
+// The website's pages. They're loaded quietly in the background once the first page is up
+// (see the effect in App), so moving between them is instant.
+const sitePages = {
+  home: () => import('./pages/HomePage'),
+  dashboards: () => import('./pages/DashboardsPage'),
+  start: () => import('./pages/StartProjectPage'),
+  portfolio: () => import('./pages/PortfolioPage'),
+  pricing: () => import('./pages/PricingPage'),
+  join: () => import('./pages/JoinPage'),
+};
+
 // Lazy Load Pages
-const HomePage = lazy(() => import('./pages/HomePage'));
-const DashboardsPage = lazy(() => import('./pages/DashboardsPage'));
+const HomePage = lazy(sitePages.home);
+const DashboardsPage = lazy(sitePages.dashboards);
 const HireUsPage = lazy(() => import('./pages/HireUsPage'));
-const JoinPage = lazy(() => import('./pages/JoinPage'));
-const StartProjectPage = lazy(() => import('./pages/StartProjectPage'));
+const JoinPage = lazy(sitePages.join);
+const StartProjectPage = lazy(sitePages.start);
 const ThankYouPage = lazy(() => import('./pages/ThankYouPage'));
-const PortfolioPage = lazy(() => import('./pages/PortfolioPage'));
-const PricingPage = lazy(() => import('./pages/PricingPage'));
+const PortfolioPage = lazy(sitePages.portfolio);
+const PricingPage = lazy(sitePages.pricing);
 const PortalPage = lazy(() => import('./pages/PortalPage'));
 const PortalRouter = lazy(() => import('./pages/PortalRouter'));
 const AdminPortal = lazy(() => import('./pages/AdminPortal'));
@@ -40,6 +51,10 @@ const AdminLeaveApprovals = lazy(() => import('./pages/admin/AdminLeaveApprovals
 const AdminCalendar = lazy(() => import('./pages/admin/AdminCalendar'));
 
 const isNativeAppShell = Capacitor.isNativePlatform();
+
+/** The old portal (and its 3D logo loading screen); every other address is the website. */
+const PORTAL_PREFIXES = ['/portal', '/admin-dashboard', '/admin-portal', '/editor-portal', '/client-portal'];
+const isPortalRoute = (path: string) => PORTAL_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
 
 export default function App() {
   const navigate = useNavigate();
@@ -102,6 +117,13 @@ export default function App() {
     }
     if (prevPathRef.current === location.pathname) return;
     prevPathRef.current = location.pathname;
+    // Website pages change instantly and open at the top (pages with a #section scroll there
+    // themselves); the loading screen is only for the portal.
+    if (!isPortalRoute(location.pathname)) {
+      setRouteLoading(false);
+      if (!location.hash) window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+      return;
+    }
     setRouteLoading(true);
     if (routeLoaderTimerRef.current) {
       window.clearTimeout(routeLoaderTimerRef.current);
@@ -109,7 +131,17 @@ export default function App() {
     routeLoaderTimerRef.current = window.setTimeout(() => {
       setRouteLoading(false);
     }, 900);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (isNativeAppShell || isPortalRoute(location.pathname)) return;
+    const warm = () => Object.values(sitePages).forEach((load) => void load().catch(() => undefined));
+    const idle = (window as Window & { requestIdleCallback?: (callback: () => void) => number }).requestIdleCallback;
+    if (idle) idle(warm);
+    else window.setTimeout(warm, 1500);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -178,7 +210,7 @@ export default function App() {
         animate={{ opacity: !suppressNativeLoader && routeLoading && !isPortalPath ? 0 : 1 }}
         transition={{ duration: 0.35, ease: 'easeInOut' }}
       >
-        <Suspense fallback={suppressNativeLoader ? null : <ThreeLogoLoader />}>
+        <Suspense fallback={suppressNativeLoader || !isPortalRoute(location.pathname) ? null : <ThreeLogoLoader />}>
           <Routes>
             <Route
               path="/"
