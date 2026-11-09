@@ -13,6 +13,7 @@ import { canonicalUrl, routeMeta } from './seo/routes';
 const sitePages = {
   home: () => import('./pages/HomePage'),
   dashboards: () => import('./pages/DashboardsPage'),
+  book: () => import('./pages/BookPage'),
   start: () => import('./pages/StartProjectPage'),
   portfolio: () => import('./pages/PortfolioPage'),
   pricing: () => import('./pages/PricingPage'),
@@ -22,6 +23,7 @@ const sitePages = {
 // Lazy Load Pages
 const HomePage = lazy(sitePages.home);
 const DashboardsPage = lazy(sitePages.dashboards);
+const BookPage = lazy(sitePages.book);
 const HireUsPage = lazy(() => import('./pages/HireUsPage'));
 const JoinPage = lazy(sitePages.join);
 const StartProjectPage = lazy(sitePages.start);
@@ -223,6 +225,7 @@ export default function App() {
               }
             />
             <Route path="/dashboards" element={<DashboardsPage />} />
+            <Route path="/book" element={<BookPage />} />
             <Route path="/hire" element={<HireUsPage onBack={handleBack} />} />
             <Route path="/join" element={<JoinPage onBack={() => {
               navigate('/', { state: { target: 'services' } });

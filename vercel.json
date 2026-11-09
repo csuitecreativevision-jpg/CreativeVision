@@ -5,6 +5,10 @@
       "destination": "/dashboards/index.html"
     },
     {
+      "source": "/book",
+      "destination": "/book/index.html"
+    },
+    {
       "source": "/start",
       "destination": "/start/index.html"
     },

@@ -8,7 +8,6 @@ import { DashboardMock } from '../components/site/DashboardMock';
 import { VideoStrip } from '../components/site/VideoStrip';
 import { Eyebrow, Reveal } from '../components/site/Reveal';
 import { useSitePage } from '../components/site/useSitePage';
-import { CALL_URL } from '../components/site/links';
 
 const isServer = typeof window === 'undefined';
 
@@ -317,14 +316,20 @@ function DashboardSpotlight() {
             <Link to="/dashboards" className={primaryButton}>
               Learn more <ArrowRight className="h-5 w-5" aria-hidden="true" />
             </Link>
-            <a href={CALL_URL} target="_blank" rel="noopener noreferrer" className={secondaryButton}>
-              Book a free call<span className="sr-only"> (opens in a new tab)</span>
-            </a>
+            <Link to="/book?topic=dashboard" className={secondaryButton}>
+              Book a free call
+            </Link>
           </div>
         </Reveal>
         <Reveal delay={0.1}>
           <DashboardMock />
           <p className="mt-3 text-center text-sm text-white/50">An example dashboard. Yours is built around your business.</p>
+          <p className="mt-6 text-center text-base text-white/70">
+            We’ve built dashboards for the Philippine Nurses Association, My Dad’s Place and our own studio.{' '}
+            <Link to="/dashboards#examples" className="font-medium text-white underline decoration-white/30 underline-offset-4 hover:decoration-white">
+              See them
+            </Link>
+          </p>
         </Reveal>
       </div>
     </section>
@@ -530,9 +535,9 @@ function FinalCta() {
           <Link to="/start" className={primaryButton}>
             Start a project <ArrowRight className="h-5 w-5" aria-hidden="true" />
           </Link>
-          <a href={CALL_URL} target="_blank" rel="noopener noreferrer" className={secondaryButton}>
-            Book a free call<span className="sr-only"> (opens in a new tab)</span>
-          </a>
+          <Link to="/book" className={secondaryButton}>
+            Book a free call
+          </Link>
         </div>
         <p className="relative mt-8 text-base text-white/65">
           Are you a video editor?{' '}

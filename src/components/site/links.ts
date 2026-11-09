@@ -1,5 +1,5 @@
 // Where the website's buttons go.
 /** The CreativeVision dashboard (clients, editors and the team sign in here). */
 export const DASHBOARD_URL = 'https://dashboard.creativevision.dev';
-/** Book a free call (Google Calendar booking page). */
-export const CALL_URL = 'https://calendar.app.google/QWFbKx47UMHYHb9y8';
+/** The CreativeVision dashboard's booking API ("Book a free call" goes to the Super Admin to approve). */
+export const BOOKING_API = (import.meta.env.VITE_BOOKING_API as string | undefined)?.replace(/\/$/, '') || DASHBOARD_URL;

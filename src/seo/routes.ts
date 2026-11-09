@@ -28,6 +28,11 @@ export const ROUTES: RouteMeta[] = [
     prerender: 'dashboards',
   },
   {
+    path: '/book',
+    title: 'Book a Free Call | CreativeVision',
+    description: 'Request a free 30-minute call with CreativeVision about video editing or a custom dashboard. Pick a time that suits you and we’ll confirm by email.',
+  },
+  {
     path: '/start',
     title: 'Start a Project | CreativeVision',
     description: 'Tell CreativeVision what you need: short videos, long videos, both, or a custom dashboard. See what’s included and book a free call.',

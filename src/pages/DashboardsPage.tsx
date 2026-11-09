@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { MotionConfig } from 'framer-motion';
 import { ArrowRight, Bell, CalendarDays, Clapperboard, MessagesSquare, ShieldCheck, Smartphone, Users, Wallet } from 'lucide-react';
 import { SiteNav } from '../components/site/SiteNav';
@@ -6,7 +7,7 @@ import { SiteFooter } from '../components/site/SiteFooter';
 import { DashboardMock } from '../components/site/DashboardMock';
 import { Eyebrow, Reveal } from '../components/site/Reveal';
 import { useSitePage } from '../components/site/useSitePage';
-import { CALL_URL } from '../components/site/links';
+import { WorkExamples } from '../components/site/WorkExamples';
 
 const FEATURES = [
   { icon: Users, title: 'A portal for your clients', text: 'Clients send files, follow every project and approve the finished work, without long email threads.' },
@@ -46,15 +47,22 @@ function Highlight({ children }: { children: React.ReactNode }) {
 
 function BookCall({ label = 'Book a free call', className = primaryButton }: { label?: string; className?: string }) {
   return (
-    <a href={CALL_URL} target="_blank" rel="noopener noreferrer" className={className}>
+    <Link to="/book?topic=dashboard" className={className}>
       {label} <ArrowRight className="h-5 w-5" aria-hidden="true" />
-      <span className="sr-only"> (opens in a new tab)</span>
-    </a>
+    </Link>
   );
 }
 
 export default function DashboardsPage() {
   useSitePage();
+  const location = useLocation();
+  // Links like /dashboards#examples scroll to that part of the page.
+  useEffect(() => {
+    const id = location.hash.replace('#', '');
+    if (!id) return;
+    const timer = window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ block: 'start' }), 60);
+    return () => window.clearTimeout(timer);
+  }, [location.key, location.hash]);
 
   return (
     <MotionConfig reducedMotion="user">
@@ -93,16 +101,21 @@ export default function DashboardsPage() {
             </div>
           </section>
 
-          <section aria-labelledby="story-title" className="px-4 py-20 sm:px-6 lg:px-8">
-            <Reveal className="glass-panel mx-auto max-w-5xl rounded-3xl p-8 md:p-14">
-              <h2 id="story-title" className="font-display text-3xl font-medium tracking-tight text-glow-premium md:text-5xl">
-                Built on what we use <Highlight>every day.</Highlight>
-              </h2>
-              <p className="mt-6 text-lg leading-relaxed text-white/75">
-                We run CreativeVision on our own dashboard. Clients send footage and approve videos there, editors get their work and their
-                pay there, and we see the whole studio at a glance. We’ll build one that fits the way your business works.
-              </p>
-            </Reveal>
+          <section id="examples" aria-labelledby="examples-title" className="scroll-mt-20 px-4 py-20 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-7xl">
+              <Reveal className="max-w-3xl">
+                <Eyebrow>Our work</Eyebrow>
+                <h2 id="examples-title" className="font-display text-4xl font-medium tracking-tight text-glow-premium md:text-6xl">
+                  Dashboards we’ve <Highlight>built.</Highlight>
+                </h2>
+                <p className="mt-5 text-lg leading-relaxed text-white/70">
+                  From our own studio to a national convention. Each one is built around how that organization already works.
+                </p>
+              </Reveal>
+              <div className="mt-14">
+                <WorkExamples />
+              </div>
+            </div>
           </section>
 
           <section id="included" aria-labelledby="included-title" className="scroll-mt-20 px-4 py-20 sm:px-6 lg:px-8">

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Brand } from './SiteNav';
-import { CALL_URL, DASHBOARD_URL } from './links';
+import { DASHBOARD_URL } from './links';
 
 const linkClass = 'text-white/65 transition-colors hover:text-white';
 
@@ -27,11 +27,7 @@ export function SiteFooter() {
           <h2 className="text-sm font-semibold text-white">Get in touch</h2>
           <ul className="mt-4 space-y-3 text-sm">
             <li><Link to="/start" className={linkClass}>Start a project</Link></li>
-            <li>
-              <a href={CALL_URL} target="_blank" rel="noopener noreferrer" className={linkClass}>
-                Book a free call<span className="sr-only"> (opens in a new tab)</span>
-              </a>
-            </li>
+            <li><Link to="/book" className={linkClass}>Book a free call</Link></li>
             <li><Link to="/join" className={linkClass}>Join our team</Link></li>
             <li><a href={DASHBOARD_URL} className={linkClass}>Client sign in</a></li>
           </ul>
