@@ -1,796 +1,545 @@
-import { useRef, useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence, useMotionValue, animate, useInView, useTransform } from 'framer-motion';
-import { Play, TrendingDown, Clock, Eye, ArrowRight, Zap, ChevronLeft, ChevronRight, Plus, Minus } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { AnimatePresence, MotionConfig, animate, motion, useInView, useReducedMotion } from 'framer-motion';
+import { ArrowRight, Check, Clapperboard, LayoutDashboard, Minus, Plus } from 'lucide-react';
+import { SiteNav } from '../components/site/SiteNav';
+import { SiteFooter } from '../components/site/SiteFooter';
+import { DashboardMock } from '../components/site/DashboardMock';
+import { VideoStrip } from '../components/site/VideoStrip';
+import { Eyebrow, Reveal } from '../components/site/Reveal';
+import { useSitePage } from '../components/site/useSitePage';
+import { CALL_URL } from '../components/site/links';
 
-const faqs = [
+const isServer = typeof window === 'undefined';
+
+export const faqs = [
   {
-    question: "What is your typical turnaround time?",
-    answer: "Our standard turnaround time is 24-48 hours for short-form content. For long-form editorial or complex VFX work, we provide a custom timeline during the onboarding phase, typically ranging from 3-5 business days."
+    question: 'What is CreativeVision?',
+    answer:
+      'CreativeVision is a video editing team that also builds custom dashboards. We edit short and long videos for creators and brands, and we build private online dashboards that keep a business’s clients, team, projects and payments in one place.',
   },
   {
-    question: "How do you handle high-volume content needs?",
-    answer: "We specialize in scaling output. By assigning dedicated editors to your workspace, we maintain consistent quality and style while handling up to 30+ assets per month per creator."
+    question: 'How fast will I get my videos?',
+    answer:
+      'Most short videos are ready in 24 to 48 hours. Longer or more detailed videos usually take 3 to 5 business days. We confirm the timeline with you before we start.',
   },
   {
-    question: "Can I request revisions on my projects?",
-    answer: "Absolutely. Every project includes up to two rounds of focused revisions. We use a frame-accurate review system so you can leave precise feedback directly on the video."
+    question: 'Can you handle a lot of videos every month?',
+    answer:
+      'Yes. You get dedicated editors who learn your style, so the quality stays the same even at 30 or more videos a month per creator.',
   },
   {
-    question: "What types of content do you specialize in?",
-    answer: "We are industry leaders in high-retention short-form (Reels/TikTok/Shorts) and cinematic long-form YouTube editorial. We also handle commercial spots, course content, and branding trailers."
-  }
+    question: 'Can I ask for changes?',
+    answer:
+      'Yes. Every video includes two rounds of changes. You leave your notes right on the video, at the exact moment you mean.',
+  },
+  {
+    question: 'What kinds of videos do you edit?',
+    answer: 'Short videos for Reels, TikTok and YouTube Shorts, long YouTube videos and podcasts, ads, online courses and trailers.',
+  },
+  {
+    question: 'What is a custom dashboard?',
+    answer:
+      'A private website just for your business. Your clients, team, projects, files and payments live in one place, and everyone signs in from a computer or phone. We build it around the way you already work.',
+  },
+  {
+    question: 'How much does a dashboard cost, and how long does it take?',
+    answer:
+      'It depends on what you need. After a free call, we send you a clear plan with the price and the timeline. Nothing starts until you say yes.',
+  },
 ];
 
-function CountingNumber({ value, suffix = "" }: { value: number, suffix?: string }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const isInView = useInView(ref, { once: false, amount: 0.5 });
-  const count = useMotionValue(0);
-  const rounded = useTransform(count, (latest) => Math.round(latest) + suffix);
+const ROTATING = ['Content', 'Watch Time', 'Stories', 'Footage', 'Views'];
 
-  useEffect(() => {
-    if (isInView) {
-      count.set(0);
-      const controls = animate(count, value, { duration: 2, ease: "easeOut" });
-      return controls.stop;
-    }
-  }, [isInView, value, count]);
+const STATS = [
+  { value: 250, suffix: 'M+', label: 'Views generated' },
+  { value: 24, suffix: 'h', label: 'Turnaround time' },
+  { value: 98, suffix: '%', label: 'Retention rate' },
+  { value: 2, suffix: 'x', label: 'Average ROI' },
+];
 
-  return <motion.span ref={ref}>{rounded}</motion.span>;
+const CLIENTS = [
+  { name: 'RFX', style: 'tracking-[0.3em] text-2xl md:text-3xl font-black uppercase' },
+  { name: 'Kala Capital Partners', style: 'tracking-[0.08em] text-sm md:text-lg font-bold uppercase' },
+  { name: 'Kerns Marketing', style: 'tracking-[0.12em] text-base md:text-xl font-bold uppercase' },
+];
+
+const STEPS = [
+  { title: 'Tell us what you need', text: 'Pick a service and book a free call with us.' },
+  { title: 'Get a clear plan', text: 'We agree on what you’ll get, the price and the timeline before any work starts.' },
+  { title: 'We get to work', text: 'You check every video, or every part of your dashboard, and ask for changes along the way.' },
+];
+
+const primaryButton =
+  'inline-flex items-center justify-center gap-2 rounded-full bg-white px-7 py-3.5 text-base font-semibold text-black shadow-[0_0_40px_rgba(255,255,255,0.18)] transition hover:bg-violet-100';
+const secondaryButton =
+  'inline-flex items-center justify-center gap-2 rounded-full border border-white/20 px-7 py-3.5 text-base font-medium text-white transition hover:border-white/40 hover:bg-white/[0.05]';
+
+function Highlight({ children }: { children: React.ReactNode }) {
+  return <span className="italic text-violet-300 text-glow-violet">{children}</span>;
 }
 
 export default function HomePage() {
+  useSitePage();
   const location = useLocation();
-  const [sceneIndex, setSceneIndex] = useState(0);
-  const [isSceneLocked, setIsSceneLocked] = useState(false);
-  const touchStartY = useRef<number | null>(null);
+  const reduce = useReducedMotion();
 
+  // Links like /#work or /#faq (from the menu or other pages) scroll to that part of the page.
   useEffect(() => {
-    if (location.hash === '#showcase') {
-      setSceneIndex(3);
-    } else if (location.state && location.state.target === 'services') {
-      setSceneIndex(4);
-      window.history.replaceState({}, document.title);
-    } else {
-      setSceneIndex(0);
-    }
-  }, [location]);
-
-  useEffect(() => {
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prevOverflow;
-    };
-  }, []);
-
-  useEffect(() => {
-    const changeScene = (direction: 1 | -1) => {
-      if (isSceneLocked) return;
-      setSceneIndex((prev) => {
-        const next = Math.min(5, Math.max(0, prev + direction));
-        return next;
-      });
-      setIsSceneLocked(true);
-      window.setTimeout(() => setIsSceneLocked(false), 450);
-    };
-
-    const onWheel = (event: WheelEvent) => {
-      event.preventDefault();
-      if (Math.abs(event.deltaY) < 8) return;
-      changeScene(event.deltaY > 0 ? 1 : -1);
-    };
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (["ArrowDown", "PageDown", " "].includes(event.key)) {
-        event.preventDefault();
-        changeScene(1);
-      } else if (["ArrowUp", "PageUp"].includes(event.key)) {
-        event.preventDefault();
-        changeScene(-1);
-      }
-    };
-
-    window.addEventListener('wheel', onWheel, { passive: false });
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('wheel', onWheel);
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [isSceneLocked]);
-
-  const renderScene = () => {
-    switch (sceneIndex) {
-      case 0:
-        return <Scene1 />;
-      case 1:
-        return <Scene2 />;
-      case 2:
-        return <Scene3 />;
-      case 3:
-        return <Scene4 />;
-      case 4:
-        return <Scene5 />;
-      case 5:
-      default:
-        return <Scene6 />;
-    }
-  };
-
-  const bgX = `${sceneIndex * 6}%`;
-  const progress = sceneIndex / 5;
+    let id = location.hash.replace('#', '');
+    if (id === 'showcase') id = 'work';
+    const state = location.state as { target?: string } | null;
+    if (!id && state?.target === 'services') id = 'services';
+    const timer = window.setTimeout(() => {
+      if (!id) return window.scrollTo(0, 0);
+      document.getElementById(id)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    }, 60);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key]);
 
   return (
-    <div className="bg-[#050508] text-white selection:bg-violet-500/30 font-sans overflow-x-hidden max-w-full">
-      <div className="bg-noise" />
+    <MotionConfig reducedMotion="user">
+      <div className="relative bg-[#050508] font-sans text-white selection:bg-violet-500/30">
+        <div className="bg-noise" aria-hidden="true" />
+        <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden="true">
+          <div className="absolute left-[-10%] top-[-10%] h-[40vw] w-[40vw] rounded-full bg-violet-600/10 blur-[120px]" />
+          <div className="absolute bottom-[-10%] right-[-10%] h-[50vw] w-[50vw] rounded-full bg-fuchsia-600/10 blur-[150px]" />
+        </div>
 
-      {/* Global Background Effects */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <motion.div animate={{ x: bgX }} transition={{ duration: 0.35, ease: "easeOut" }} className="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vw] bg-violet-600/10 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-fuchsia-600/10 rounded-full blur-[150px]" />
-        <div className="absolute top-[40%] left-[40%] w-[30vw] h-[30vw] bg-indigo-500/10 rounded-full blur-[100px]" />
-      </div>
+        <SiteNav />
 
-      <div
-        className="h-screen overflow-hidden flex items-center z-10 touch-pan-y"
-        onTouchStart={(event) => {
-          touchStartY.current = event.touches[0]?.clientY ?? null;
-        }}
-        onTouchEnd={(event) => {
-          const startY = touchStartY.current;
-          const endY = event.changedTouches[0]?.clientY;
-          touchStartY.current = null;
-          if (startY === null || typeof endY !== 'number' || isSceneLocked) return;
-          const delta = startY - endY;
-          if (Math.abs(delta) < 30) return;
-          setSceneIndex((prev) => Math.min(5, Math.max(0, prev + (delta > 0 ? 1 : -1))));
-          setIsSceneLocked(true);
-          window.setTimeout(() => setIsSceneLocked(false), 450);
-        }}
-      >
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={sceneIndex}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.35, ease: "easeInOut" }}
-            className="w-screen h-full"
-          >
-            {renderScene()}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+        <main id="main" tabIndex={-1} className="relative z-10 outline-none">
+          <Hero />
+          <Services />
+          <DashboardSpotlight />
+          <Work />
+          <Results />
+          <About />
+          <HowItWorks />
+          <Faq />
+          <FinalCta />
+        </main>
 
-      {/* Progress Bar */}
-      <div className="fixed left-1/2 -translate-x-1/2 w-32 h-[2px] bg-white/10 rounded-full overflow-hidden z-40 bottom-[max(0.75rem,env(safe-area-inset-bottom,0px))] sm:bottom-4">
-        <motion.div
-          className="h-full bg-violet-500/80"
-          style={{ scaleX: progress, transformOrigin: '0% 50%' }}
-        />
+        <SiteFooter />
       </div>
-    </div>
+    </MotionConfig>
   );
 }
 
-function Scene1() {
-  const words = ["Watch Time", "Content", "Stories", "Footage", "Views"];
+function Hero() {
+  const reduce = useReducedMotion();
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setIndex((prev) => (prev + 1) % words.length);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
+    if (reduce) return;
+    const timer = window.setInterval(() => setIndex((value) => (value + 1) % ROTATING.length), 3000);
+    return () => window.clearInterval(timer);
+  }, [reduce]);
 
   return (
-    <section className="w-screen h-full flex flex-col justify-center items-center relative px-4 sm:px-8">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(139,92,246,0.05)_0%,transparent_50%)] pointer-events-none" />
-      <div className="z-10 text-center max-w-5xl mx-auto min-w-0 w-full">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.8 }}
-          className="inline-flex items-center gap-2 glass-panel px-4 py-2 rounded-full mb-10"
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-violet-400/80 animate-pulse" />
-          <span className="text-[10px] font-medium tracking-[0.2em] uppercase text-white/70">Accepting New Clients</span>
-        </motion.div>
+    <section className="relative flex min-h-[100svh] flex-col items-center justify-center px-4 pb-16 pt-28 text-center sm:px-6">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(139,92,246,0.07)_0%,transparent_55%)]" aria-hidden="true" />
+      <div className="relative mx-auto w-full max-w-5xl">
+        <p className="glass-panel mb-8 inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-medium uppercase tracking-[0.18em] text-white/75">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet-400" aria-hidden="true" />
+          Accepting new clients
+        </p>
 
-        <motion.h1
-          initial={{ opacity: 0, filter: 'blur(10px)' }}
-          animate={{ opacity: 1, filter: 'blur(0px)' }}
-          viewport={{ amount: 0.3 }}
-          transition={{ duration: 1.2, delay: 0.2, ease: "easeOut" }}
-          className="font-display text-4xl sm:text-5xl md:text-7xl lg:text-9xl font-medium leading-[0.9] tracking-tight mb-6 md:mb-8 text-glow-premium"
-        >
-          <div className="flex flex-col items-center justify-center gap-2 md:gap-4">
-            <div>Turn</div>
-            <div className="inline-grid place-items-center">
-              <AnimatePresence initial={false} mode="sync">
-                <motion.span
-                  key={index}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.35, ease: 'linear' }}
-                  className="italic text-violet-400 text-glow-violet col-start-1 row-start-1"
-                >
-                  {words[index]}
-                </motion.span>
-              </AnimatePresence>
-            </div>
-            <div>Into Revenue.</div>
-          </div>
-        </motion.h1>
+        <h1 className="font-display text-5xl font-medium leading-[0.95] tracking-tight text-glow-premium sm:text-7xl lg:text-8xl">
+          <span className="sr-only">Turn content into revenue.</span>
+          <span aria-hidden="true" className="flex flex-col items-center gap-1 sm:gap-3">
+            <span>Turn</span>
+            <span className="inline-grid place-items-center">
+              {isServer ? (
+                <span className="italic text-violet-300 text-glow-violet">{ROTATING[0]}</span>
+              ) : (
+                <AnimatePresence initial={false} mode="sync">
+                  <motion.span
+                    key={index}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.35, ease: 'linear' }}
+                    className="col-start-1 row-start-1 italic text-violet-300 text-glow-violet"
+                  >
+                    {ROTATING[index]}
+                  </motion.span>
+                </AnimatePresence>
+              )}
+            </span>
+            <span>Into Revenue.</span>
+          </span>
+        </h1>
 
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 0.5 }}
-          className="select-text text-base md:text-lg lg:text-xl text-white/50 max-w-2xl mx-auto leading-relaxed font-light px-4 md:px-0"
-        >
-          Stop posting content that gets ignored. We engineer cinematic videos that hook audiences and drive conversions.
-        </motion.p>
+        <p className="mx-auto mt-8 max-w-2xl text-lg leading-relaxed text-white/75 md:text-xl">
+          <strong className="font-semibold text-white">CreativeVision</strong> edits videos people actually watch, and builds custom
+          dashboards that keep your clients, team and projects in one place.
+        </p>
+
+        <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <Link to="/start" className={primaryButton}>
+            Start a project <ArrowRight className="h-5 w-5" aria-hidden="true" />
+          </Link>
+          <Link to="/#work" className={secondaryButton}>
+            See our work
+          </Link>
+        </div>
+
+        <p className="mt-8 text-sm text-white/65">
+          <span className="mr-2 rounded-full bg-violet-500/20 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-violet-200">New</span>
+          We now build custom dashboards for businesses.{' '}
+          <Link to="/dashboards" className="font-medium text-white underline decoration-white/30 underline-offset-4 hover:decoration-white">
+            See how they work
+          </Link>
+        </p>
       </div>
-
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1, delay: 1.5 }}
-        className="absolute bottom-12 left-1/2 -translate-x-1/2 text-white/30 text-[10px] tracking-[0.3em] uppercase flex flex-col items-center gap-6"
-      >
-        <span>Scroll to explore</span>
-        <div className="w-[1px] h-16 bg-gradient-to-b from-white/20 to-transparent" />
-      </motion.div>
     </section>
   );
 }
 
-function Scene2() {
+function ServiceCard({
+  icon: Icon,
+  title,
+  badge,
+  text,
+  points,
+  link,
+}: {
+  icon: typeof Clapperboard;
+  title: string;
+  badge?: string;
+  text: string;
+  points: string[];
+  link: { to: string; label: string };
+}) {
   return (
-    <section className="w-screen h-full flex flex-col justify-center items-center relative px-8 overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(139,92,246,0.03)_0%,transparent_70%)] pointer-events-none" />
-      <div className="z-10 w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-        {/* Left: Editorial Typography */}
-        <div>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            viewport={{ amount: 0.3 }}
-            transition={{ duration: 0.5 }}
-            className="inline-flex items-center gap-2 glass-panel px-4 py-2 rounded-full mb-8 text-white/70"
-          >
-            <TrendingDown className="w-3 h-3" />
-            <span className="text-[10px] font-medium tracking-[0.2em] uppercase">Reality Check</span>
-          </motion.div>
-          <motion.h2
-            initial={{ opacity: 0, filter: 'blur(10px)' }}
-            animate={{ opacity: 1, filter: 'blur(0px)' }}
-            viewport={{ amount: 0.3 }}
-            transition={{ duration: 1, delay: 0.1, ease: "easeOut" }}
-            className="font-display text-4xl md:text-6xl lg:text-8xl font-medium tracking-tight mb-6 md:mb-8 leading-[0.9] text-glow-premium"
-          >
-            <div>
-              Your content is <span className="italic text-violet-400 text-glow-violet">bleeding</span> money.
-            </div>
-          </motion.h2>
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            viewport={{ amount: 0.3 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-            className="select-text text-base md:text-lg text-white/50 max-w-md leading-relaxed font-light"
-          >
-            You're paying for production, ads, and distribution—but your videos aren't converting. The market is saturated with amateur edits and weak hooks.
-          </motion.p>
+    <article className="glass-panel flex h-full flex-col rounded-3xl p-7 md:p-9">
+      <div className="mb-6 flex items-center gap-3">
+        <span className="grid h-12 w-12 place-items-center rounded-xl border border-violet-400/30 bg-violet-500/15 text-violet-300">
+          <Icon className="h-6 w-6" aria-hidden="true" />
+        </span>
+        {badge && <span className="rounded-full bg-violet-500/20 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-violet-200">{badge}</span>}
+      </div>
+      <h3 className="text-2xl font-bold tracking-tight md:text-3xl">{title}</h3>
+      <p className="mt-3 text-base leading-relaxed text-white/70">{text}</p>
+      <ul className="mt-6 space-y-3">
+        {points.map((point) => (
+          <li key={point} className="flex gap-3 text-[15px] leading-snug text-white/85">
+            <Check className="mt-0.5 h-4 w-4 shrink-0 text-violet-300" aria-hidden="true" />
+            {point}
+          </li>
+        ))}
+      </ul>
+      <Link to={link.to} className="mt-8 inline-flex items-center gap-2 self-start font-semibold text-white underline decoration-white/30 underline-offset-4 hover:decoration-white">
+        {link.label} <ArrowRight className="h-4 w-4" aria-hidden="true" />
+      </Link>
+    </article>
+  );
+}
 
-          {/* Mobile Stats (Visible only on small screens) */}
-          <div className="grid grid-cols-1 gap-3 mt-8 md:hidden w-full">
-            {[
-              { stat: "87%", title: "Fail to Convert" },
-              { stat: "3 sec", title: "To Capture Attention" },
-              { stat: "10x", title: "Cost of Bad Content" }
-            ].map((item, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                viewport={{ amount: 0.3 }}
-                transition={{ duration: 0.6, delay: 0.2 + (i * 0.1) }}
-                className="glass-panel p-5 rounded-2xl flex items-center justify-between"
-              >
-                <h3 className="font-display text-3xl font-medium text-violet-400 text-glow-violet">{item.stat}</h3>
-                <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-white/70 text-right max-w-[100px]">{item.title}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-
-        {/* Right: Floating Fragmented Elements */}
-        <div className="relative h-[500px] w-full hidden md:block" style={{ perspective: '1000px' }}>
-          {[
-            { icon: TrendingDown, stat: "87%", title: "Fail to Convert", desc: "Poor hooks, weak pacing.", yOffset: 0, xOffset: -80, rotate: -5, delay: 0 },
-            { icon: Clock, stat: "3 sec", title: "To Capture Attention", desc: "Viewers lost instantly.", yOffset: 140, xOffset: 80, rotate: 5, delay: 0.2 },
-            { icon: Eye, stat: "10x", title: "Cost of Bad Content", desc: "Wasted ad spend.", yOffset: 280, xOffset: -40, rotate: -2, delay: 0.4 }
-          ].map((item, i) => (
-            <motion.div
-              key={i}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-              viewport={{ amount: 0.3 }}
-              transition={{
-                opacity: { duration: 0.8, delay: item.delay },
-              }}
-              className="absolute glass-panel p-8 rounded-2xl w-[320px] shadow-[0_20px_40px_rgba(0,0,0,0.3)]"
-              style={{ left: `calc(50% - 160px + ${item.xOffset}px)`, transform: `rotateZ(${item.rotate}deg)` }}
-            >
-              <div className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center text-white/70 mb-6">
-                <item.icon className="w-4 h-4" />
-              </div>
-              <h3 className="font-display text-4xl font-medium mb-2 text-violet-400 text-glow-violet">{item.stat}</h3>
-              <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-white/70 mb-2">{item.title}</p>
-              <p className="text-xs text-white/40 font-light">{item.desc}</p>
-            </motion.div>
-          ))}
+function Services() {
+  return (
+    <section id="services" aria-labelledby="services-title" className="scroll-mt-20 px-4 py-24 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
+        <Reveal className="max-w-3xl">
+          <Eyebrow>What we do</Eyebrow>
+          <h2 id="services-title" className="font-display text-4xl font-medium tracking-tight text-glow-premium md:text-6xl">
+            Two ways we help you <Highlight>grow.</Highlight>
+          </h2>
+          <p className="mt-5 text-lg leading-relaxed text-white/70">
+            Great videos bring people in. A good dashboard keeps the work running smoothly behind the scenes. Choose one, or both.
+          </p>
+        </Reveal>
+        <div className="mt-12 grid gap-5 lg:grid-cols-2">
+          <Reveal>
+            <ServiceCard
+              icon={Clapperboard}
+              title="Video editing"
+              text="Send us your raw footage. Get back videos that are ready to post, and made to keep people watching."
+              points={[
+                'Short videos for Reels, TikTok and YouTube Shorts',
+                'Long YouTube videos, podcasts, courses and ads',
+                'Color, sound, captions and motion graphics',
+                'Most short videos ready in 24 to 48 hours',
+                'Two rounds of changes included',
+              ]}
+              link={{ to: '/start', label: 'See video plans' }}
+            />
+          </Reveal>
+          <Reveal delay={0.1}>
+            <ServiceCard
+              icon={LayoutDashboard}
+              title="Custom dashboards"
+              badge="New"
+              text="Your own private website for running your business, built around the way you already work."
+              points={[
+                'A client portal to send files, follow progress and approve work',
+                'Projects, deadlines and your team in one view',
+                'Payments, invoices and payroll kept track of for you',
+                'Chat, video meetings and announcements built in',
+                'Works on computer and phone, and installs like an app',
+              ]}
+              link={{ to: '/dashboards', label: 'See how dashboards work' }}
+            />
+          </Reveal>
         </div>
       </div>
     </section>
   );
 }
 
-function Scene3() {
+function DashboardSpotlight() {
   return (
-    <section className="w-screen h-full flex flex-col justify-center items-center relative px-8">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(139,92,246,0.04)_0%,transparent_60%)] pointer-events-none" />
-      <div className="z-10 w-full max-w-6xl mx-auto text-center">
-        <motion.h2
-          initial={{ opacity: 0, filter: 'blur(10px)' }}
-          animate={{ opacity: 1, filter: 'blur(0px)' }}
-          viewport={{ amount: 0.3 }}
-          transition={{ duration: 1, ease: "easeOut" }}
-          className="font-display text-4xl md:text-5xl lg:text-7xl font-medium tracking-tight mb-4 md:mb-6 text-glow-premium"
-        >
-          <div>
-            Trusted by the <span className="italic text-violet-400 text-glow-violet">world's best.</span>
+    <section aria-labelledby="spotlight-title" className="px-4 py-24 sm:px-6 lg:px-8">
+      <div className="mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[0.9fr_1.1fr]">
+        <Reveal>
+          <Eyebrow>Custom dashboards</Eyebrow>
+          <h2 id="spotlight-title" className="font-display text-4xl font-medium tracking-tight text-glow-premium md:text-6xl">
+            One place for <Highlight>everything.</Highlight>
+          </h2>
+          <p className="mt-5 text-lg leading-relaxed text-white/70">
+            No more chasing files in email threads or updates across five different apps. Your clients, team, projects and payments
+            live together in one dashboard, the same kind we run CreativeVision on every day.
+          </p>
+          <ul className="mt-7 space-y-3">
+            {['Clients see exactly where their project is', 'Your team always knows what’s next', 'You see the whole business at a glance'].map(
+              (point) => (
+                <li key={point} className="flex gap-3 text-base text-white/85">
+                  <Check className="mt-1 h-4 w-4 shrink-0 text-violet-300" aria-hidden="true" />
+                  {point}
+                </li>
+              ),
+            )}
+          </ul>
+          <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+            <Link to="/dashboards" className={primaryButton}>
+              Learn more <ArrowRight className="h-5 w-5" aria-hidden="true" />
+            </Link>
+            <a href={CALL_URL} target="_blank" rel="noopener noreferrer" className={secondaryButton}>
+              Book a free call<span className="sr-only"> (opens in a new tab)</span>
+            </a>
           </div>
-        </motion.h2>
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          viewport={{ amount: 0.3 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="select-text text-[10px] font-medium tracking-[0.3em] uppercase text-white/40 mb-16 md:mb-24"
-        >
-          Delivering impact at scale
-        </motion.p>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-16 md:mb-24 px-4 md:px-0">
-          {[
-            { val: 250, suffix: "M+", label: "Views Generated" },
-            { val: 24, suffix: "h", label: "Turnaround Time" },
-            { val: 98, suffix: "%", label: "Retention Rate" },
-            { val: 2, suffix: "x", label: "Average ROI" }
-          ].map((stat, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, filter: 'blur(10px)' }}
-              animate={{ opacity: 1, filter: 'blur(0px)' }}
-              viewport={{ amount: 0.3 }}
-              transition={{ duration: 0.8, delay: 0.1 + (i * 0.1), ease: "easeOut" }}
-              whileHover={{ scale: 1.02, backgroundColor: "rgba(255,255,255,0.08)" }}
-              style={{ willChange: "transform, filter, opacity" }}
-              className="glass-panel p-6 md:p-10 rounded-2xl flex flex-col items-center justify-center"
-            >
-              <h3 className="font-sans text-3xl md:text-4xl lg:text-5xl font-black mb-2 md:mb-3 text-violet-400 text-glow-violet">
-                <CountingNumber value={stat.val} suffix={stat.suffix} />
-              </h3>
-              <p className="text-[8px] md:text-[10px] font-medium tracking-[0.1em] md:tracking-[0.15em] uppercase text-white/40 text-center">{stat.label}</p>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* Client Names */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          viewport={{ amount: 0.3 }}
-          transition={{ duration: 0.8, delay: 0.6 }}
-          className="w-full px-4 md:px-0"
-        >
-          <p className="text-[10px] text-white/25 font-medium uppercase tracking-[0.25em] text-center mb-3">Clients & Partners</p>
-          <div className="grid grid-cols-3 gap-4">
-            {[
-              { name: 'RFX', style: 'tracking-[0.3em] text-2xl md:text-3xl lg:text-4xl font-black uppercase' },
-              { name: 'Kala Capital Partners', style: 'tracking-[0.08em] text-base md:text-lg lg:text-xl font-bold uppercase' },
-              { name: 'Kerns Marketing', style: 'tracking-[0.12em] text-lg md:text-xl lg:text-2xl font-bold uppercase' },
-            ].map((client, i) => (
-              <div key={i} className="glass-panel rounded-2xl flex items-center justify-center py-8 md:py-10 px-4 md:px-8 group cursor-default">
-                <span className={`${client.style} text-white/40 group-hover:text-white transition-colors duration-500`}>
-                  {client.name}
-                </span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
+        </Reveal>
+        <Reveal delay={0.1}>
+          <DashboardMock />
+          <p className="mt-3 text-center text-sm text-white/50">An example dashboard. Yours is built around your business.</p>
+        </Reveal>
       </div>
     </section>
   );
 }
 
-function Scene4() {
-  const navigate = useNavigate();
-  const [activeIndex, setActiveIndex] = useState(0);
+function Work() {
+  return (
+    <section id="work" aria-labelledby="work-title" className="scroll-mt-20 px-4 py-24 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
+        <Reveal className="mb-10 flex flex-col justify-between gap-6 md:flex-row md:items-end">
+          <div className="max-w-2xl">
+            <Eyebrow>Our work</Eyebrow>
+            <h2 id="work-title" className="font-display text-4xl font-medium tracking-tight text-glow-premium md:text-6xl">
+              Videos made to be <Highlight>watched.</Highlight>
+            </h2>
+            <p className="mt-5 text-lg leading-relaxed text-white/70">A few recent edits. Press play on any video to watch it here.</p>
+          </div>
+          <Link to="/portfolio" className="inline-flex items-center gap-2 font-semibold text-white underline decoration-white/30 underline-offset-4 hover:decoration-white">
+            View all projects <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
+        </Reveal>
+        <VideoStrip />
+      </div>
+    </section>
+  );
+}
 
-  const showcaseWorks = [
-    {
-      vid: "https://www.youtube.com/embed/DFsizBNcfIA?autoplay=1&mute=1&loop=1&playlist=DFsizBNcfIA&controls=0&rel=0&modestbranding=1&playsinline=1&disablekb=1",
-      type: "long",
-      isYoutube: true
-    },
-    {
-      vid: "https://www.youtube.com/embed/4iQHoaFQr8E?autoplay=1&mute=1&loop=1&playlist=4iQHoaFQr8E&controls=0&rel=0&modestbranding=1&playsinline=1&disablekb=1",
-      type: "long",
-      isYoutube: true
-    },
-    {
-      vid: "https://www.youtube.com/embed/n4ha0vyW7Vc?autoplay=1&mute=1&loop=1&playlist=n4ha0vyW7Vc&controls=0&rel=0&modestbranding=1&playsinline=1&disablekb=1",
-      type: "short",
-      isYoutube: true
-    },
-    {
-      vid: "https://www.youtube.com/embed/g7EigqBCJco?autoplay=1&mute=1&loop=1&playlist=g7EigqBCJco&controls=0&rel=0&modestbranding=1&playsinline=1&disablekb=1",
-      type: "short",
-      isYoutube: true
-    }
-  ];
+function StatNumber({ value, suffix }: { value: number; suffix: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true, amount: 0.6 });
+  const reduce = useReducedMotion();
+  const [shown, setShown] = useState(isServer ? value : 0);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveIndex((prev) => (prev + 1) % showcaseWorks.length);
-    }, 6000); // 6 seconds per slide
-    return () => clearInterval(timer);
-  }, [activeIndex, showcaseWorks.length]);
+    if (!inView) return;
+    if (reduce) return setShown(value);
+    const controls = animate(0, value, { duration: 1.6, ease: 'easeOut', onUpdate: (latest) => setShown(Math.round(latest)) });
+    return () => controls.stop();
+  }, [inView, reduce, value]);
 
   return (
-    <section className="w-screen h-full flex flex-col justify-start relative px-6 md:px-20 pt-8 md:pt-10 pb-6 md:pb-8 overflow-hidden">
-      <div className="mb-3 md:mb-4 flex flex-col md:flex-row justify-between items-start md:items-end z-20 shrink-0 gap-3">
-        <div>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            viewport={{ amount: 0.3 }}
-            transition={{ duration: 0.8 }}
-            className="inline-flex items-center gap-2 glass-panel px-4 py-2 rounded-full mb-3 md:mb-4"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-violet-400/80" />
-            <span className="text-[10px] font-medium tracking-[0.2em] uppercase text-white/70">Selected Work</span>
-          </motion.div>
-          <motion.h2
-            initial={{ opacity: 0, filter: 'blur(10px)' }}
-            animate={{ opacity: 1, filter: 'blur(0px)' }}
-            viewport={{ amount: 0.3 }}
-            transition={{ duration: 1, ease: "easeOut" }}
-            className="font-display text-4xl md:text-5xl lg:text-7xl font-medium tracking-tight text-glow-premium mb-3"
-          >
-            <div>
-              Cinematic <span className="italic text-violet-400 text-glow-violet">Excellence.</span>
-            </div>
-          </motion.h2>
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            viewport={{ amount: 0.3 }}
-            transition={{ duration: 1, delay: 0.2, ease: "easeOut" }}
-            className="select-text text-sm md:text-base text-white/50 font-light max-w-xl tracking-wide leading-relaxed"
-          >
-            A curated selection of our most impactful campaigns. We blend high-end production with data-driven strategy to create videos that don't just look beautiful—they perform.
-          </motion.p>
-        </div>
+    <>
+      <span ref={ref} aria-hidden="true">
+        {shown}
+        {suffix}
+      </span>
+      <span className="sr-only">
+        {value}
+        {suffix}
+      </span>
+    </>
+  );
+}
 
-        <div className="flex flex-col items-end gap-4">
-          <motion.button
-            onClick={() => navigate('/portfolio')}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            viewport={{ amount: 0.3 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-            className="hidden md:flex items-center gap-2 text-xs tracking-widest uppercase font-medium hover:text-white/70 transition-colors"
-          >
-            View All Projects <ArrowRight className="w-4 h-4" />
-          </motion.button>
-        </div>
-      </div>
-
-      <div className="flex flex-col items-center justify-start gap-2 md:gap-3 w-full z-10 pt-0 pb-10 md:pb-12">
-
-        {/* Active Video Showcase Carousel */}
-        <div className="relative w-full flex justify-center items-start h-[36vh] md:h-[40vh]">
-          {showcaseWorks.map((work, index) => {
-            let offset = index - activeIndex;
-            // Normalize offset for 4 items to be -1, 0, 1, 2
-            if (offset < -1) offset += showcaseWorks.length;
-            if (offset > 2) offset -= showcaseWorks.length;
-
-            const isCenter = offset === 0;
-
-            return (
-              <motion.div
-                key={index}
-                initial={{ x: "-50%", scale: 0.8, opacity: 0 }}
-                animate={{
-                  x: `calc(-50% + ${offset * 22}vw)`,
-                  scale: 1 - Math.abs(offset) * 0.15,
-                  opacity: Math.abs(offset) > 1 ? 0 : 1,
-                  filter: offset === 0 ? "blur(0px)" : "blur(40px)",
-                  zIndex: 30 - Math.abs(offset) * 10,
-                }}
-                transition={{ type: "spring", stiffness: 150, damping: 25 }}
-                className={`absolute top-[2%] left-1/2 rounded-2xl md:rounded-3xl overflow-hidden shadow-[0_0_40px_rgba(139,92,246,0.2)] border border-white/10 bg-black/50 backdrop-blur-sm cursor-pointer flex items-center justify-center ${work.type === 'short' ? 'h-full aspect-[9/16]' : 'w-[82vw] md:w-[56vw] max-w-5xl aspect-video'
-                  }`}
-                onClick={() => setActiveIndex(index)}
-              >
-                {/* Video Content */}
-                {work.isYoutube ? (
-                  <iframe
-                    src={work.vid}
-                    title="Video Showcase"
-                    frameBorder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    referrerPolicy="strict-origin-when-cross-origin"
-                    allowFullScreen
-                    className="w-full h-full object-cover pointer-events-none"
-                  />
-                ) : (
-                  <video
-                    src={work.vid}
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    className="w-full h-full object-cover"
-                  />
-                )}
-
-                {/* Premium Glass Overlay */}
-                <div className="absolute inset-0 border border-white/10 rounded-2xl md:rounded-3xl pointer-events-none" />
-                {!isCenter && <div className="absolute inset-0 bg-black/60 pointer-events-none transition-colors duration-500" />}
-
-                {isCenter && (
-                  <>
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
-                    <div className="absolute bottom-6 left-6 right-6 flex items-center justify-between pointer-events-none">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20">
-                          <Play className="w-3 h-3 text-white fill-white" />
-                        </div>
-                        <span className="text-xs font-medium tracking-widest uppercase text-white/90">Playing Showcase</span>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </motion.div>
-            );
-          })}
-        </div>
-
-        {/* Navigation Controls */}
-        <div className="flex items-center justify-center gap-6 mt-0 w-full">
-          <button
-            onClick={() => setActiveIndex((prev) => (prev - 1 + showcaseWorks.length) % showcaseWorks.length)}
-            className="w-12 h-12 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 hover:border-white/30 transition-all text-white/50 hover:text-white backdrop-blur-sm"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <div className="flex gap-2">
-            {showcaseWorks.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setActiveIndex(i)}
-                className={`w-2 h-2 rounded-full transition-all duration-300 ${activeIndex === i ? 'bg-violet-400 w-8' : 'bg-white/20 hover:bg-white/40'}`}
-                aria-label={`Go to slide ${i + 1}`}
-              />
+function Results() {
+  return (
+    <section aria-labelledby="results-title" className="px-4 py-24 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl text-center">
+        <Reveal>
+          <h2 id="results-title" className="font-display text-4xl font-medium tracking-tight text-glow-premium md:text-6xl">
+            Trusted by brands that <Highlight>grow.</Highlight>
+          </h2>
+        </Reveal>
+        <dl className="mt-14 grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6">
+          {STATS.map((stat, i) => (
+            <Reveal key={stat.label} delay={i * 0.06} className="glass-panel flex flex-col-reverse items-center justify-center rounded-2xl p-6 md:p-9">
+              <dt className="mt-2 text-sm font-medium text-white/65">{stat.label}</dt>
+              <dd className="text-4xl font-black text-violet-300 text-glow-violet md:text-5xl">
+                <StatNumber value={stat.value} suffix={stat.suffix} />
+              </dd>
+            </Reveal>
+          ))}
+        </dl>
+        <Reveal className="mt-14">
+          <h3 className="text-sm font-medium uppercase tracking-[0.2em] text-white/60">Clients and partners</h3>
+          <ul className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {CLIENTS.map((client) => (
+              <li key={client.name} className="glass-panel flex items-center justify-center rounded-2xl px-6 py-8">
+                <span className={`${client.style} text-white/70`}>{client.name}</span>
+              </li>
             ))}
-          </div>
-          <button
-            onClick={() => setActiveIndex((prev) => (prev + 1) % showcaseWorks.length)}
-            className="w-12 h-12 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 hover:border-white/30 transition-all text-white/50 hover:text-white backdrop-blur-sm"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        </div>
-
+          </ul>
+        </Reveal>
       </div>
     </section>
   );
 }
 
-function Scene5() {
-  const navigate = useNavigate();
-
+function About() {
   return (
-    <section className="w-screen h-full flex flex-col justify-center relative px-6 md:px-20 py-8 md:py-10">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(139,92,246,0.08)_0%,transparent_60%)] pointer-events-none" />
-
-      <div className="z-10 w-full max-w-6xl mx-auto">
-        {/* Header Section */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 md:gap-6 mb-6 md:mb-8">
-          <div>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              viewport={{ amount: 0.3 }}
-              transition={{ duration: 0.8 }}
-              className="inline-flex items-center gap-2 glass-panel px-4 py-2 rounded-full mb-3 md:mb-4"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-violet-400/80" />
-              <span className="text-[10px] font-medium tracking-[0.2em] uppercase text-white/70">Choose Your Path</span>
-            </motion.div>
-            <motion.h2
-              initial={{ opacity: 0, filter: 'blur(10px)' }}
-              animate={{ opacity: 1, filter: 'blur(0px)' }}
-              viewport={{ amount: 0.3 }}
-              transition={{ duration: 1, ease: "easeOut" }}
-              className="font-display text-4xl md:text-6xl lg:text-7xl font-medium tracking-tight text-glow-premium leading-[0.9]"
-            >
-              <div>Ready to</div>
-              <div className="text-violet-400 text-glow-violet italic mt-2">Scale?</div>
-            </motion.h2>
-          </div>
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            viewport={{ amount: 0.3 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-            className="select-text text-white/50 max-w-sm text-sm md:text-base font-light pb-2"
-          >
-            We don't just edit videos. We engineer attention. Choose your path to excellence below.
-          </motion.p>
-        </div>
-
-        {/* Main Card: Hire CreativeVision */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          viewport={{ amount: 0.3 }}
-          transition={{ duration: 0.8, delay: 0.3 }}
-          className="glass-panel p-6 md:p-10 rounded-3xl relative overflow-hidden border border-white/10 shadow-[0_0_40px_rgba(139,92,246,0.1)] group hover:border-violet-500/30 transition-colors duration-500"
-        >
-          {/* Background glow/accents */}
-          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3 group-hover:bg-violet-500/20 transition-colors duration-700 pointer-events-none" />
-
-          {/* Watermark Icon */}
-          <div className="absolute right-10 top-1/2 -translate-y-1/2 opacity-[0.03] pointer-events-none">
-            <Zap className="w-96 h-96" />
-          </div>
-
-          <div className="relative z-10 flex flex-col md:flex-row gap-8 items-center justify-between">
-            <div className="flex-1 w-full">
-              <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center mb-6 md:mb-8 text-violet-400 shadow-[0_0_20px_rgba(139,92,246,0.2)]">
-                <Zap className="w-6 h-6 md:w-7 md:h-7" />
-              </div>
-              <h3 className="font-sans text-4xl md:text-5xl font-black mb-4 tracking-tight">Hire CreativeVision</h3>
-              <p className="select-text text-white/60 mb-6 md:mb-8 max-w-lg text-base md:text-lg font-light">
-                Transform your raw footage into high-converting assets with professional turnaround.
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
-                {['4K Post-Production', 'Sound Design', 'Color Grading', 'VFX & Motion'].map(item => (
-                  <div key={item} className="flex items-center gap-3 text-sm md:text-base text-white/80 font-medium">
-                    <span className="w-2 h-2 rounded-full bg-violet-500 shadow-[0_0_10px_rgba(139,92,246,0.8)]" />
-                    {item}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="w-full md:w-auto shrink-0 mt-8 md:mt-0">
-              <button
-                onClick={() => navigate('/start')}
-                className="w-full md:w-auto bg-white text-black px-10 py-5 rounded-full font-semibold text-sm md:text-base tracking-wide hover:scale-105 transition-all flex items-center justify-center gap-3 shadow-[0_0_40px_rgba(255,255,255,0.3)] hover:shadow-[0_0_60px_rgba(255,255,255,0.5)]"
-              >
-                Start Project <ArrowRight className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Join the Roster (Simple Text) */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          viewport={{ amount: 0.3 }}
-          transition={{ duration: 0.8, delay: 0.5 }}
-          className="mt-4 md:mt-6 text-center md:text-left px-4"
-        >
-          <p className="select-text text-sm md:text-base text-white/40 font-light">
-            Are you a world-class editor?{' '}
-            <button
-              onClick={() => navigate('/join')}
-              className="text-white/80 hover:text-white font-medium underline underline-offset-4 decoration-white/30 hover:decoration-white transition-all"
-            >
-              Join the roster
-            </button>
+    <section id="about" aria-labelledby="about-title" className="scroll-mt-20 px-4 py-24 sm:px-6 lg:px-8">
+      <Reveal className="glass-panel mx-auto max-w-5xl rounded-3xl p-8 md:p-14">
+        <Eyebrow>About us</Eyebrow>
+        <h2 id="about-title" className="font-display text-4xl font-medium tracking-tight text-glow-premium md:text-5xl">
+          About <Highlight>CreativeVision</Highlight>
+        </h2>
+        <div className="mt-6 space-y-4 text-lg leading-relaxed text-white/75">
+          <p>
+            CreativeVision started as a team of video editors. As we grew, keeping every client, editor and video organized got harder,
+            so we built our own dashboard to run the whole studio in one place.
           </p>
-        </motion.div>
+          <p>
+            Today we do both: we edit videos for creators and brands, and we build custom dashboards for businesses that want the same
+            kind of order behind the scenes.
+          </p>
+        </div>
+      </Reveal>
+    </section>
+  );
+}
 
+function HowItWorks() {
+  return (
+    <section aria-labelledby="how-title" className="px-4 py-24 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
+        <Reveal className="max-w-3xl">
+          <Eyebrow>How it works</Eyebrow>
+          <h2 id="how-title" className="font-display text-4xl font-medium tracking-tight text-glow-premium md:text-6xl">
+            Simple from <Highlight>start</Highlight> to finish.
+          </h2>
+        </Reveal>
+        <ol className="mt-12 grid gap-5 md:grid-cols-3">
+          {STEPS.map((step, i) => (
+            <li key={step.title} className="list-none">
+              <Reveal delay={i * 0.08} className="glass-panel h-full rounded-3xl p-7 md:p-8">
+                <span className="grid h-10 w-10 place-items-center rounded-full bg-violet-500/20 font-semibold text-violet-200" aria-hidden="true">
+                  {i + 1}
+                </span>
+                <h3 className="mt-5 text-xl font-bold">
+                  <span className="sr-only">Step {i + 1}: </span>
+                  {step.title}
+                </h3>
+                <p className="mt-2 text-base leading-relaxed text-white/70">{step.text}</p>
+              </Reveal>
+            </li>
+          ))}
+        </ol>
       </div>
     </section>
   );
 }
 
-function Scene6() {
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
-
+function Faq() {
+  const [open, setOpen] = useState<number | null>(0);
   return (
-    <section className="w-screen h-full flex flex-col justify-center relative px-8 md:px-24 py-16">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(139,92,246,0.06)_0%,transparent_60%)] pointer-events-none" />
-      
-      <div className="z-10 w-full max-w-4xl mx-auto">
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          viewport={{ amount: 0.3 }}
-          transition={{ duration: 0.8 }}
-          className="inline-flex items-center gap-2 glass-panel px-4 py-2 rounded-full mb-8"
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-violet-400/80" />
-          <span className="text-[10px] font-medium tracking-[0.2em] uppercase text-white/70">Support</span>
-        </motion.div>
-        
-        <motion.h2 
-          initial={{ opacity: 0, filter: 'blur(10px)' }}
-          animate={{ opacity: 1, filter: 'blur(0px)' }}
-          viewport={{ amount: 0.3 }}
-          transition={{ duration: 1, ease: "easeOut" }}
-          className="font-display text-4xl md:text-5xl lg:text-7xl font-bold tracking-tight mb-12 text-glow-premium"
-        >
-          Frequently Asked <span className="text-violet-400 italic font-medium text-glow-violet">Questions</span>
-        </motion.h2>
-
-        <div className="flex flex-col gap-4">
-          {faqs.map((faq, index) => {
-            const isOpen = openIndex === index;
+    <section id="faq" aria-labelledby="faq-title" className="scroll-mt-20 px-4 py-24 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-4xl">
+        <Reveal>
+          <Eyebrow>Questions</Eyebrow>
+          <h2 id="faq-title" className="font-display text-4xl font-medium tracking-tight text-glow-premium md:text-6xl">
+            Frequently asked <Highlight>questions</Highlight>
+          </h2>
+        </Reveal>
+        <div className="mt-10 flex flex-col gap-3">
+          {faqs.map((faq, i) => {
+            const isOpen = open === i;
             return (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                viewport={{ amount: 0.3 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                className={`glass-panel border overflow-hidden rounded-2xl transition-all duration-300 ${isOpen ? 'border-violet-500/40 bg-white/10' : 'border-white/10 hover:border-white/20'}`}
+              <div
+                key={faq.question}
+                className={`glass-panel overflow-hidden rounded-2xl border transition-colors ${isOpen ? 'border-violet-400/40 bg-white/[0.06]' : 'border-white/10'}`}
               >
-                <button
-                  onClick={() => setOpenIndex(isOpen ? null : index)}
-                  className="w-full px-6 py-5 md:px-8 md:py-6 flex items-center justify-between text-left focus:outline-none"
-                >
-                  <span className={`text-base md:text-lg font-medium transition-colors ${isOpen ? 'text-white' : 'text-white/80'}`}>
-                    {faq.question}
-                  </span>
-                  <div className={`shrink-0 ml-4 w-8 h-8 rounded-full border flex items-center justify-center transition-all duration-300 ${isOpen ? 'bg-violet-500/20 border-violet-500/50 text-violet-400 rotate-180' : 'border-white/10 text-white/50'}`}>
-                    {isOpen ? <Minus className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                  </div>
-                </button>
-                <AnimatePresence>
-                  {isOpen && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.3, ease: "easeInOut" }}
+                <h3>
+                  <button
+                    type="button"
+                    id={`faq-q-${i}`}
+                    aria-expanded={isOpen}
+                    aria-controls={`faq-a-${i}`}
+                    onClick={() => setOpen(isOpen ? null : i)}
+                    className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left md:px-8"
+                  >
+                    <span className="text-base font-medium text-white md:text-lg">{faq.question}</span>
+                    <span
+                      className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border ${isOpen ? 'border-violet-400/50 bg-violet-500/20 text-violet-200' : 'border-white/15 text-white/70'}`}
+                      aria-hidden="true"
                     >
-                      <p className="select-text px-6 pb-6 md:px-8 md:pb-8 text-sm md:text-base text-white/60 leading-relaxed max-w-3xl">
-                        {faq.answer}
-                      </p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
+                      {isOpen ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                    </span>
+                  </button>
+                </h3>
+                <div id={`faq-a-${i}`} role="region" aria-labelledby={`faq-q-${i}`} hidden={!isOpen && !isServer}>
+                  <p className="max-w-3xl px-6 pb-6 text-base leading-relaxed text-white/75 md:px-8">{faq.answer}</p>
+                </div>
+              </div>
             );
           })}
         </div>
       </div>
+    </section>
+  );
+}
+
+function FinalCta() {
+  return (
+    <section aria-labelledby="cta-title" className="px-4 pb-28 pt-12 sm:px-6 lg:px-8">
+      <Reveal className="glass-panel relative mx-auto max-w-5xl overflow-hidden rounded-3xl border border-white/10 p-8 text-center md:p-16">
+        <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-violet-500/20 blur-[100px]" aria-hidden="true" />
+        <h2 id="cta-title" className="relative font-display text-4xl font-medium tracking-tight text-glow-premium md:text-6xl">
+          Ready when <Highlight>you are.</Highlight>
+        </h2>
+        <p className="relative mx-auto mt-5 max-w-xl text-lg text-white/75">Tell us what you need, and we’ll take it from there.</p>
+        <div className="relative mt-9 flex flex-col justify-center gap-3 sm:flex-row">
+          <Link to="/start" className={primaryButton}>
+            Start a project <ArrowRight className="h-5 w-5" aria-hidden="true" />
+          </Link>
+          <a href={CALL_URL} target="_blank" rel="noopener noreferrer" className={secondaryButton}>
+            Book a free call<span className="sr-only"> (opens in a new tab)</span>
+          </a>
+        </div>
+        <p className="relative mt-8 text-base text-white/65">
+          Are you a video editor?{' '}
+          <Link to="/join" className="font-medium text-white underline decoration-white/30 underline-offset-4 hover:decoration-white">
+            Join our team
+          </Link>
+        </p>
+      </Reveal>
     </section>
   );
 }

@@ -918,3 +918,41 @@ select:autofill {
     box-shadow: 0 0 20px rgba(116, 36, 245, 0.4), 0 0 40px rgba(116, 36, 245, 0.2);
   }
 }
+
+/* Website pages (home, dashboards): a normal scrolling page with a visible scrollbar, selectable
+   text and clear keyboard focus rings. Set by components/site/useSitePage.ts. */
+html.cv-scroll {
+  scroll-snap-type: none;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+html.cv-scroll::-webkit-scrollbar {
+  display: block;
+  width: 10px;
+}
+html.cv-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border: 3px solid #050508;
+  border-radius: 999px;
+}
+html.cv-scroll::-webkit-scrollbar-track {
+  background: #050508;
+}
+html.cv-scroll body {
+  user-select: text;
+  -webkit-user-select: text;
+}
+html.cv-scroll :focus-visible {
+  outline: 2px solid #a78bfa;
+  outline-offset: 3px;
+}
+.cv-strip {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.cv-scroll {
+    scroll-behavior: auto;
+  }
+}

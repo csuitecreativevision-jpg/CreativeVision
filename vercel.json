@@ -1,8 +1,36 @@
 {
-    "rewrites": [
-        {
-            "source": "/(.*)",
-            "destination": "/index.html"
-        }
-    ]
+  "rewrites": [
+    {
+      "source": "/dashboards",
+      "destination": "/dashboards/index.html"
+    },
+    {
+      "source": "/start",
+      "destination": "/start/index.html"
+    },
+    {
+      "source": "/portfolio",
+      "destination": "/portfolio/index.html"
+    },
+    {
+      "source": "/pricing/short-form",
+      "destination": "/pricing/short-form/index.html"
+    },
+    {
+      "source": "/pricing/long-form",
+      "destination": "/pricing/long-form/index.html"
+    },
+    {
+      "source": "/pricing/mixed",
+      "destination": "/pricing/mixed/index.html"
+    },
+    {
+      "source": "/join",
+      "destination": "/join/index.html"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/app.html"
+    }
+  ]
 }

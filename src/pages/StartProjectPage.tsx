@@ -1,32 +1,36 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Video, Film, Layers, ArrowRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Video, Film, Layers, ArrowRight, LayoutDashboard } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function StartProjectPage() {
   const navigate = useNavigate();
 
   const options = [
     {
-      id: 'short-form',
-      title: 'Short Form',
-      subtitle: 'Viral Architecture',
-      description: 'High-impact vertical content engineered for virality, retention, and immediate audience engagement.',
+      to: '/pricing/short-form',
+      title: 'Short videos',
+      description: 'Reels, TikTok and YouTube Shorts that grab attention in the first few seconds.',
       icon: Video
     },
     {
-      id: 'long-form',
-      title: 'Long Form',
-      subtitle: 'Cinematic Narratives',
-      description: 'Deep-dive storytelling and widescreen cinematic production that builds unwavering brand authority.',
+      to: '/pricing/long-form',
+      title: 'Long videos',
+      description: 'YouTube videos, podcasts, courses and ads, edited to keep people watching.',
       icon: Film
     },
     {
-      id: 'mixed',
-      title: 'Ecosystem',
-      subtitle: 'Omnichannel Dominance',
-      description: 'A strategic, relentless blend of both formats to completely saturate your market.',
+      to: '/pricing/mixed',
+      title: 'Short and long videos',
+      description: 'A mix of both, so you show up everywhere your audience is.',
       icon: Layers
+    },
+    {
+      to: '/dashboards',
+      title: 'Custom dashboard',
+      badge: 'New',
+      description: 'Your own online workspace for clients, team, projects and payments.',
+      icon: LayoutDashboard
     }
   ];
 
@@ -36,7 +40,7 @@ export default function StartProjectPage() {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      className="h-screen h-[100dvh] bg-[#0a0a0c] text-white selection:bg-violet-500/30 flex flex-col overflow-hidden font-sans relative"
+      className="min-h-screen min-h-[100dvh] bg-[#0a0a0c] text-white selection:bg-violet-500/30 flex flex-col font-sans relative"
     >
       <div className="bg-noise opacity-30 pointer-events-none z-50 fixed inset-0" />
 
@@ -61,10 +65,10 @@ export default function StartProjectPage() {
       >
         <button
           onClick={() => navigate('/', { state: { target: 'services' } })}
-          className="group flex items-center gap-2 text-[10px] md:text-xs font-bold tracking-[0.2em] uppercase text-white/50 hover:text-white transition-colors bg-[#1a1a1a]/50 border border-white/10 px-4 md:px-6 py-2.5 md:py-3 rounded-full backdrop-blur-md"
+          className="group flex items-center gap-2 text-sm font-medium text-white/75 hover:text-white transition-colors bg-[#1a1a1a]/50 border border-white/10 px-4 md:px-6 py-2.5 md:py-3 rounded-full backdrop-blur-md"
         >
-          <ArrowLeft className="w-3.5 h-3.5 md:w-4 md:h-4 transition-transform group-hover:-translate-x-1" />
-          Return
+          <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" aria-hidden="true" />
+          Back to home
         </button>
       </motion.nav>
 
@@ -79,22 +83,21 @@ export default function StartProjectPage() {
             transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
           >
             <h1 className="font-display text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.1] mb-4 md:mb-6">
-              <span className="text-white/90">Choose your</span><br />
-              <span className="italic text-violet-400 text-glow-violet">Ecosystem.</span>
+              <span className="text-white/90">What do you</span><br />
+              <span className="italic text-violet-400 text-glow-violet">need?</span>
             </h1>
-            <p className="text-sm md:text-base text-white/50 font-light max-w-2xl mx-auto tracking-wide leading-relaxed">
-              Every detail acts as a leverage point. Every frame is calculated.<br className="hidden md:block" />
-              Select the architecture that aligns with your vision.
+            <p className="text-base md:text-lg text-white/70 max-w-2xl mx-auto leading-relaxed">
+              Pick one to see what's included. Not sure? Choose any of them and book a free call; we'll help you decide.
             </p>
           </motion.div>
         </div>
 
         {/* Premium List Containers */}
         <div className="w-full max-w-3xl mx-auto flex flex-col gap-4 md:gap-5 relative z-10">
-          {options.map((option, i) => (
-            <div
-              key={option.id}
-              onClick={() => navigate(`/pricing/${option.id}`)}
+          {options.map((option) => (
+            <Link
+              key={option.to}
+              to={option.to}
               className="group relative flex items-center gap-5 md:gap-6 p-5 md:p-6 rounded-[1.5rem] md:rounded-[2rem] border border-white/5 bg-white/[0.02] backdrop-blur-xl hover:bg-white/[0.04] hover:border-violet-500/30 transition-all duration-500 cursor-pointer w-full text-left overflow-hidden shadow-lg hover:shadow-[0_0_40px_rgba(139,92,246,0.15)] hover:-translate-y-1"
             >
               {/* Subtle background gradient on hover */}
@@ -102,24 +105,27 @@ export default function StartProjectPage() {
 
               {/* Icon Container */}
               <div className="relative w-14 h-14 md:w-16 md:h-16 rounded-full border border-violet-500/20 flex items-center justify-center shrink-0 bg-violet-500/10 group-hover:bg-violet-500/20 group-hover:border-violet-500/40 transition-all duration-500 shadow-[0_0_15px_rgba(139,92,246,0.2)] group-hover:shadow-[0_0_25px_rgba(139,92,246,0.4)]">
-                <option.icon className="w-6 h-6 md:w-7 md:h-7 text-violet-400 group-hover:text-violet-300 transition-all duration-500 group-hover:scale-110 group-hover:-rotate-6" strokeWidth={1.5} />
+                <option.icon aria-hidden="true" className="w-6 h-6 md:w-7 md:h-7 text-violet-400 group-hover:text-violet-300 transition-all duration-500 group-hover:scale-110 group-hover:-rotate-6" strokeWidth={1.5} />
               </div>
 
               {/* Text Content */}
               <div className="flex-1 relative z-10">
-                <h3 className="text-2xl md:text-3xl font-sans font-extrabold text-white mb-1 md:mb-1.5 group-hover:text-glow-premium transition-all duration-500">
+                <h2 className="text-2xl md:text-3xl font-sans font-extrabold text-white mb-1 md:mb-1.5 group-hover:text-glow-premium transition-all duration-500">
                   {option.title}
-                </h3>
-                <p className="text-white/50 text-sm md:text-base font-light group-hover:text-white/70 transition-colors duration-500">
+                  {option.badge && (
+                    <span className="ml-3 align-middle rounded-full bg-violet-500/20 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-violet-200">{option.badge}</span>
+                  )}
+                </h2>
+                <p className="text-white/70 text-sm md:text-base group-hover:text-white/80 transition-colors duration-500">
                   {option.description}
                 </p>
               </div>
 
               {/* Arrow */}
               <div className="hidden md:flex items-center justify-center w-12 h-12 rounded-full bg-white/[0.03] border border-white/10 group-hover:bg-violet-500/20 group-hover:border-violet-500/40 transition-all duration-500 shrink-0 relative z-10">
-                <ArrowRight className="w-5 h-5 text-white/40 group-hover:text-violet-300 group-hover:translate-x-1 transition-all duration-500" />
+                <ArrowRight aria-hidden="true" className="w-5 h-5 text-white/40 group-hover:text-violet-300 group-hover:translate-x-1 transition-all duration-500" />
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </main>

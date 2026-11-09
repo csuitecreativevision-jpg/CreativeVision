@@ -30,3 +30,6 @@ dist-ssr
 test_discord.js
 test_edge.js
 supabase/.temp/linked-project.json
+
+# Server build used to pre-build pages (scripts/prerender.mjs)
+dist-ssr

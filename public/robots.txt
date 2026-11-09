@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /portal
+Disallow: /admin-dashboard
+Disallow: /admin-portal
+Disallow: /editor-portal
+Disallow: /client-portal
+Disallow: /thank-you
+
+Sitemap: https://www.creativevision.dev/sitemap.xml

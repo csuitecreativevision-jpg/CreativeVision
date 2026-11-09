@@ -6,9 +6,11 @@ import { BackgroundLayout } from './components/layout/BackgroundLayout';
 import { CinematicOverlay } from './components/ui/CinematicOverlay';
 import { ThreeLogoLoader } from './components/ui/ThreeLogoLoader';
 import { MainChatbot } from './components/MainChatbot';
+import { canonicalUrl, routeMeta } from './seo/routes';
 
 // Lazy Load Pages
 const HomePage = lazy(() => import('./pages/HomePage'));
+const DashboardsPage = lazy(() => import('./pages/DashboardsPage'));
 const HireUsPage = lazy(() => import('./pages/HireUsPage'));
 const JoinPage = lazy(() => import('./pages/JoinPage'));
 const StartProjectPage = lazy(() => import('./pages/StartProjectPage'));
@@ -69,6 +71,23 @@ export default function App() {
   useEffect(() => {
     // Lenis removed for native scroll feel
   }, []);
+
+  // The tab title, description and canonical address of each public page (src/seo/routes.ts),
+  // so search engines index www.creativevision.dev and each page's own address.
+  useEffect(() => {
+    const meta = routeMeta(location.pathname);
+    if (!meta) return;
+    document.title = meta.title;
+    const set = (selector: string, attribute: 'content' | 'href', value: string) => {
+      document.querySelector(selector)?.setAttribute(attribute, value);
+    };
+    const url = canonicalUrl(meta.path);
+    set('meta[name="description"]', 'content', meta.description);
+    set('link[rel="canonical"]', 'href', url);
+    set('meta[property="og:url"]', 'content', url);
+    set('meta[property="og:title"]', 'content', meta.title);
+    set('meta[property="og:description"]', 'content', meta.description);
+  }, [location.pathname]);
 
   useLayoutEffect(() => {
     const isStartupNativePath =
@@ -171,6 +190,7 @@ export default function App() {
                 )
               }
             />
+            <Route path="/dashboards" element={<DashboardsPage />} />
             <Route path="/hire" element={<HireUsPage onBack={handleBack} />} />
             <Route path="/join" element={<JoinPage onBack={() => {
               navigate('/', { state: { target: 'services' } });
